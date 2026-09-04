@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-const SB_URL = import.meta.env.VITE_SB_URL;
-const SB_KEY = import.meta.env.VITE_SB_KEY;
-const APP_PW = import.meta.env.VITE_ADMIN_PW;
+const SB_URL = "https://pdfadcnrxlojuxjqtzil.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZmFkY25yeGxvanV4anF0emlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMTQ0MzksImV4cCI6MjEwMjg5MDQzOX0.1gRq0MWGc6EFOtm5-rma4Fo1shVSWIW8kFDX-Np6CIM";
+const APP_PW = "GwituMucii@22";
 
 const C = { navy:"#050A1F",mid:"#0A1128",light:"#0F1A3A",yellow:"#F5C000",white:"#FFFFFF",bg:"#F5F5F5",muted:"#8899AA",dark:"#556677",green:"#4CAF50",red:"#E85B5B",orange:"#E8A45B" };
 const STAFF = ["Burton Kariuki","Martin Ruguru"];
@@ -37,15 +37,42 @@ const sb = {
 
 function parseMpesa(sms) {
   const s = sms.trim();
+
+  // Nawiri SACCO paybill deposit message
+  // "KES 4,000.00 has been credited to your account No: ... Detail: M-Pesa Paybill Deposit > [254... > 505368 > 12091 | James]"
+  if (/has been credited to your account/i.test(s)) {
+    const amtM = s.match(/KES\s*([\d,]+\.?\d*)\s+has been credited/i);
+    const nameM = s.match(/\|\s*([A-Za-z][A-Za-z ]+?)\s*\]/);
+    const phoneM = s.match(/\[\s*(254\d+)/);
+    const refM = s.match(/>\s*(\d+)\s*\|\s*[A-Za-z]/);
+    let phone = "";
+    if (phoneM) {
+      // Convert 254XXXXXXXXX to 07XXXXXXXXX
+      const intl = phoneM[1].replace(/X/gi, "0");
+      phone = "0" + intl.slice(3);
+    }
+    return {
+      code: refM ? refM[1] : "",
+      amount: amtM ? Number(amtM[1].replace(/,/g,"")) : 0,
+      name: nameM ? nameM[1].trim() : "",
+      phone,
+      type: "sacco"
+    };
+  }
+
+  // Standard M-Pesa message
+  // "QJK7X8Y9Z0 Confirmed. You have received Ksh1,000 from JOHN DOE 0712345678..."
   const codeM = s.match(/^([A-Z0-9]{8,12})\s/);
   const amtM = s.match(/(?:received|paid|send|sent)\s+Ksh\s*([\d,]+)/i) || s.match(/Ksh\s*([\d,]+)/i);
   const nameM = s.match(/from\s+([A-Z][A-Z ]+?)\s+(?:0[679]\d{8}|\d{4,})/i);
   const phoneM = s.match(/(0[679]\d{8})/);
-  const codeVal = codeM ? codeM[1] : "";
-  const amt = amtM ? Number(amtM[1].replace(/,/g,"")) : 0;
-  const name = nameM ? nameM[1].trim() : "";
-  const phone = phoneM ? phoneM[1] : "";
-  return { code:codeVal, amount:amt, name, phone };
+  return {
+    code: codeM ? codeM[1] : "",
+    amount: amtM ? Number(amtM[1].replace(/,/g,"")) : 0,
+    name: nameM ? nameM[1].trim() : "",
+    phone: phoneM ? phoneM[1] : "",
+    type: "mpesa"
+  };
 }
 
 const GS = () => (
@@ -87,7 +114,6 @@ export default function App() {
   const [tab, setTab] = useState("sale");
 
   const tryLogin = () => {
-    if(!APP_PW) { setPwErr("Setup error: VITE_ADMIN_PW not set in Netlify environment variables. Redeploy after setting it."); return; }
     if(pw.trim() === APP_PW.trim()) { setAuthed(true); setPwErr(""); }
     else { setPwErr("Wrong password. Try again."); }
   };
@@ -100,15 +126,12 @@ export default function App() {
         <div style={{textAlign:"center",marginBottom:28}}>
           <div style={{fontSize:24,fontWeight:600,color:"#F5C000",letterSpacing:"0.1em"}}>KARU</div>
           <div style={{fontSize:13,color:"#8899AA",marginTop:4}}>Accounts System</div>
-          <div style={{fontSize:11,marginTop:8,padding:"4px 10px",borderRadius:100,display:"inline-block",background:APP_PW?"rgba(76,175,80,0.1)":"rgba(232,91,91,0.1)",color:APP_PW?"#4CAF50":"#E85B5B"}}>
-            {APP_PW ? "Password configured" : "Password not configured"}
-          </div>
         </div>
         <div className="field">
           <label>Password</label>
           <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setPwErr("");}} onKeyDown={e=>e.key==="Enter"&&tryLogin()} placeholder="Enter password"/>
         </div>
-        {pwErr && <div style={{color:"#E85B5B",fontSize:12,marginBottom:12,lineHeight:1.5}}>{pwErr}</div>}
+        {pwErr && <div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{pwErr}</div>}
         <button className="btn-y" onClick={tryLogin} style={{width:"100%"}}>Sign In</button>
       </div>
     </div>
@@ -161,11 +184,19 @@ function SaleTab() {
     setSms(v);
     if(v.trim().length > 20) {
       const p = parseMpesa(v);
-      if(p.code) {
+      if(p.amount > 0 || p.name || p.code) {
         setParsed(p);
         if(p.name) setCName(p.name);
         if(p.phone) setCPhone(p.phone);
         if(p.code) setMpesaCode(p.code);
+        if(p.amount > 0) {
+          // Auto-add a single item row with the amount if items are empty
+          setItems(prev => {
+            const hasContent = prev.some(i => i.name || i.price);
+            if(!hasContent) return [{id:Date.now(),name:"",qty:1,price:String(p.amount)}];
+            return prev;
+          });
+        }
         setPay("mpesa");
       }
     }
@@ -246,7 +277,9 @@ function SaleTab() {
       <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:16}}>
         <div style={{fontSize:12,color:"#8899AA",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>Paste M-Pesa SMS to auto-fill</div>
         <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste the M-Pesa confirmation SMS here..." style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,resize:"none",minHeight:60,fontFamily:"'DM Sans',sans-serif"}}/>
-        {parsed?.code&&<div style={{fontSize:12,color:"#4CAF50",marginTop:4}}>Parsed: {parsed.code} | KSh {parsed.amount.toLocaleString()} | {parsed.name||"Name not found"}</div>}
+        {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:12,color:"#4CAF50",marginTop:4}}>
+          {parsed.type==="sacco"?"Nawiri SACCO":"M-Pesa"} — Ref: {parsed.code||"n/a"} | KSh {parsed.amount.toLocaleString()} | {parsed.name||"Name not detected"}{parsed.phone?" | "+parsed.phone:""}
+        </div>}
       </div>
       <div className="field">
         <label>Served by</label>
