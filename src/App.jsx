@@ -118,8 +118,20 @@ function SaleTab(){
   const [pay,setPay]=useState("mpesa"); const [mpesaCode,setMpesaCode]=useState("");
   const [notes,setNotes]=useState(""); const [err,setErr]=useState("");
   const [saving,setSaving]=useState(false); const [receipt,setReceipt]=useState(null); const [saved,setSaved]=useState(null);
+  const [payType,setPayType]=useState("full"); const [initPay,setInitPay]=useState("");
+  const [pendingSales,setPendingSales]=useState([]); const [addPaySale,setAddPaySale]=useState(null);
+  const [addPayAmt,setAddPayAmt]=useState(""); const [addPayMethod,setAddPayMethod]=useState("mpesa");
+  const [addPayCode,setAddPayCode]=useState(""); const [addPayNotes,setAddPayNotes]=useState("");
+  const [addPayStaff,setAddPayStaff]=useState("Burton Kariuki"); const [addPaySaving,setAddPaySaving]=useState(false);
+  const [showPending,setShowPending]=useState(false);
 
-  useEffect(()=>{ sb.get("karu_stock","select=*&order=date_in.asc").then(s=>setStockItems(s)).catch(console.error); },[]);
+  const loadPendingSales=async()=>{
+    try{ const ps=await sb.get("karu_sales","select=*&balance_due=gt.0&order=created_at.desc"); setPendingSales(ps); }catch(e){console.error(e);}
+  };
+  useEffect(()=>{
+    sb.get("karu_stock","select=*&order=date_in.asc").then(s=>setStockItems(s)).catch(console.error);
+    loadPendingSales();
+  },[]);
 
   const handleSms=v=>{
     setSms(v);
@@ -170,14 +182,38 @@ function SaleTab(){
       const lastNo=sales.length?parseInt(sales[0].receipt_no.split("-").pop()||"0"):0;
       const receipt_no=`KARU-${now.getFullYear().toString().slice(2)}${String(now.getMonth()+1).padStart(2,"0")}-${String(lastNo+1).padStart(3,"0")}`;
       const total=vi.reduce((s,i)=>s+(Number(i.qty)*Number(i.price)),0);
-      const data={receipt_no,date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:vi,payment_method:pay==="mpesa"?"M-Pesa":"Cash",mpesa_code:mpesaCode.toUpperCase(),total,notes};
-      await sb.post("karu_sales",data);
+      if(payType==="instalment"&&(!initPay||Number(initPay)<=0)){setErr("Enter the initial payment amount.");setSaving(false);return;}
+      if(payType==="instalment"&&Number(initPay)>total){setErr("Initial payment cannot exceed total.");setSaving(false);return;}
+      const amtPaid=payType==="instalment"?Number(initPay):total;
+      const balDue=payType==="instalment"?total-amtPaid:0;
+      const data={receipt_no,date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:vi,payment_method:pay==="mpesa"?"M-Pesa":"Cash",mpesa_code:mpesaCode.toUpperCase(),total,amount_paid:amtPaid,balance_due:balDue,payment_type:payType,notes};
+      const [newSale]=await sb.post("karu_sales",data);
+      if(payType==="instalment"&&newSale?.id){
+        await sb.post("karu_payments",{sale_id:newSale.id,receipt_no,customer_name:cName,amount:amtPaid,payment_method:pay==="mpesa"?"M-Pesa":"Cash",mpesa_code:mpesaCode.toUpperCase(),date,recorded_by:staff,notes:"Initial instalment payment"});
+      }
       await reduceStock(vi);
       const fresh=await sb.get("karu_stock","select=*&order=date_in.asc");
       setStockItems(fresh);
       if(withReceipt){ setReceipt(data); } else { setSaved(data); }
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
+  };
+
+  const addPaymentToSale=async()=>{
+    if(!addPayAmt||Number(addPayAmt)<=0){alert("Enter a valid amount.");return;}
+    if(addPayMethod==="mpesa"&&!addPayCode.trim()){alert("M-Pesa code required.");return;}
+    setAddPaySaving(true);
+    try{
+      const now=new Date(); const date=now.toISOString().split("T")[0];
+      const newPaid=Number(addPaySale.amount_paid||0)+Number(addPayAmt);
+      const newBal=Math.max(0,Number(addPaySale.total)-newPaid);
+      await sb.post("karu_payments",{sale_id:addPaySale.id,receipt_no:addPaySale.receipt_no,customer_name:addPaySale.customer_name,amount:Number(addPayAmt),payment_method:addPayMethod==="mpesa"?"M-Pesa":"Cash",mpesa_code:addPayCode.toUpperCase(),date,recorded_by:addPayStaff,notes:addPayNotes||"Instalment payment"});
+      await sb.patch("karu_sales",addPaySale.id,{amount_paid:newPaid,balance_due:newBal,payment_type:newBal<=0?"full":"instalment"});
+      setAddPaySale(null); setAddPayAmt(""); setAddPayCode(""); setAddPayNotes("");
+      await loadPendingSales();
+      alert(newBal<=0?"Fully paid! Account cleared.":"Payment recorded. Balance: KSh "+newBal.toLocaleString());
+    }catch(e){alert("Failed: "+e.message);}
+    setAddPaySaving(false);
   };
 
   const shareWA=()=>{
@@ -248,6 +284,7 @@ function SaleTab(){
       <div style={{fontSize:18,fontWeight:600,marginBottom:8}}>Sale Recorded</div>
       <div style={{color:"#8899AA",fontSize:14,marginBottom:4}}>{saved.customer_name}</div>
       <div style={{color:"#F5C000",fontSize:24,fontWeight:600,marginBottom:4}}>KSh {Number(saved.total).toLocaleString()}</div>
+      {saved.payment_type==="instalment"&&<div style={{color:"#E8A45B",fontSize:14,marginBottom:4}}>Paid: KSh {Number(saved.amount_paid).toLocaleString()} · Balance: KSh {Number(saved.balance_due).toLocaleString()}</div>}
       <div style={{color:"#8899AA",fontSize:13,marginBottom:24}}>{saved.payment_method} · {saved.receipt_no}</div>
       <div style={{color:"#4CAF50",fontSize:13,marginBottom:32}}>Stock updated automatically</div>
       <button className="btn-y" onClick={()=>{setSaved(null);setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);}} style={{width:"100%",padding:14}}>New Sale</button>
@@ -294,6 +331,40 @@ function SaleTab(){
 
   return (
     <div>
+      {pendingSales.length>0&&(
+        <div style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.4)",borderRadius:8,padding:12,marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setShowPending(x=>!x)}>
+            <div><span style={{color:"#E8A45B",fontWeight:600,fontSize:13}}>Pending Balances</span><span style={{background:"rgba(232,164,91,0.2)",color:"#E8A45B",fontSize:11,padding:"2px 8px",borderRadius:100,marginLeft:8}}>{pendingSales.length}</span></div>
+            <span style={{color:"#E8A45B"}}>{showPending?"▲":"▼"}</span>
+          </div>
+          {showPending&&(
+            <div style={{marginTop:10}}>
+              {addPaySale?(
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:10}}>{addPaySale.customer_name} — Balance: KSh {Number(addPaySale.balance_due).toLocaleString()}</div>
+                  <div className="field"><label>Amount received (KSh)</label><input type="number" value={addPayAmt} onChange={e=>setAddPayAmt(e.target.value)} placeholder="0"/></div>
+                  <div className="field"><label>Method</label><div className="tog"><button className={`tog-btn${addPayMethod==="mpesa"?" on":""}`} onClick={()=>setAddPayMethod("mpesa")}>M-Pesa</button><button className={`tog-btn${addPayMethod==="cash"?" on":""}`} onClick={()=>setAddPayMethod("cash")}>Cash</button></div></div>
+                  {addPayMethod==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={addPayCode} onChange={e=>setAddPayCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>}
+                  <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${addPayStaff===s?" on":""}`} onClick={()=>setAddPayStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
+                  <div className="field"><label>Notes (optional)</label><input value={addPayNotes} onChange={e=>setAddPayNotes(e.target.value)} placeholder="e.g. Second instalment"/></div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button className="btn-y" onClick={addPaymentToSale} disabled={addPaySaving} style={{flex:1,fontSize:13}}>{addPaySaving?"Saving...":"Record Payment"}</button>
+                    <button className="btn-g" onClick={()=>setAddPaySale(null)} style={{fontSize:13}}>Cancel</button>
+                  </div>
+                </div>
+              ):pendingSales.map(s=>(
+                <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1A2A4A"}}>
+                  <div><div style={{fontSize:13,fontWeight:500}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · Total KSh {Number(s.total).toLocaleString()} · Paid KSh {Number(s.amount_paid||0).toLocaleString()}</div></div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>KSh {Number(s.balance_due).toLocaleString()}</div>
+                    <button className="btn-g" onClick={()=>setAddPaySale(s)} style={{fontSize:11,padding:"4px 10px",marginTop:4}}>Add payment</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:14}}>
         <div style={{fontSize:11,color:"#8899AA",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>Paste M-Pesa or Nawiri SACCO SMS to auto-fill</div>
         <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste confirmation SMS here..." style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,resize:"none",minHeight:56,fontFamily:"'DM Sans',sans-serif"}}/>
@@ -320,7 +391,18 @@ function SaleTab(){
         <button className="btn-g" onClick={addItem} style={{width:"100%",fontSize:13}}>+ Add another item</button>
         {items.some(i=>i.price&&i.qty)&&<div style={{textAlign:"right",marginTop:8,fontSize:14,fontWeight:600,color:"#F5C000"}}>Total: KSh {items.reduce((s,i)=>s+(Number(i.qty||0)*Number(i.price||0)),0).toLocaleString()}</div>}
       </div>
-      <div className="field"><label>Payment</label><div className="tog"><button className={`tog-btn${pay==="mpesa"?" on":""}`} onClick={()=>setPay("mpesa")}>M-Pesa</button><button className={`tog-btn${pay==="cash"?" on":""}`} onClick={()=>setPay("cash")}>Cash</button></div></div>
+      <div className="field"><label>Payment type</label><div className="tog">
+        <button className={`tog-btn${payType==="full"?" on":""}`} onClick={()=>setPayType("full")}>Full Payment</button>
+        <button className={`tog-btn${payType==="instalment"?" on":""}`} onClick={()=>setPayType("instalment")}>Instalment</button>
+      </div></div>
+      {payType==="instalment"&&(
+        <div className="field" style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12,marginBottom:12}}>
+          <label style={{color:"#E8A45B"}}>Initial payment today (KSh)</label>
+          <input type="number" value={initPay} onChange={e=>setInitPay(e.target.value)} placeholder="Amount customer is paying now"/>
+          {initPay&&items.some(i=>i.price&&i.qty)&&<div style={{fontSize:12,color:"#E8A45B",marginTop:6}}>Balance will be: KSh {Math.max(0,items.reduce((s,i)=>s+(Number(i.qty||0)*Number(i.price||0)),0)-Number(initPay)).toLocaleString()}</div>}
+        </div>
+      )}
+      <div className="field"><label>Payment method</label><div className="tog"><button className={`tog-btn${pay==="mpesa"?" on":""}`} onClick={()=>setPay("mpesa")}>M-Pesa</button><button className={`tog-btn${pay==="cash"?" on":""}`} onClick={()=>setPay("cash")}>Cash</button></div></div>
       {pay==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace",letterSpacing:"0.05em"}}/></div>}
       <div className="field"><label>Notes (optional)</label><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Balance pending"/></div>
       {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
@@ -339,6 +421,8 @@ function StockTab(){
   const [editVals,setEditVals]=useState({}); const [editReason,setEditReason]=useState("");
   const [editStaff,setEditStaff]=useState("Burton Kariuki"); const [lockStaff,setLockStaff]=useState("Burton Kariuki");
   const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
+  const [addingToTrip,setAddingToTrip]=useState(null);
+  const [addExtraItems,setAddExtraItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
   const [trip,setTrip]=useState({date:new Date().toISOString().split("T")[0],notes:"",created_by:"Burton Kariuki"});
   const [tripItems,setTripItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
 
@@ -390,6 +474,22 @@ function StockTab(){
       setEditItem(null);
       await loadAll();
     }catch(e){setErr("Save failed: "+e.message);}
+    setSaving(false);
+  };
+
+  const saveAddItems=async(t)=>{
+    const vi=addExtraItems.filter(i=>i.name&&Number(i.unit_cost)>0);
+    if(!vi.length){alert("Add at least one item with name and cost.");return;}
+    setSaving(true);
+    try{
+      await sb.post("karu_stock",vi.map(i=>({trip_id:t.id,trip_no:t.trip_no,name:i.name,category:i.category,qty_in:Number(i.qty_in),qty_sold:0,unit_cost:Number(i.unit_cost),selling_price:Number(i.selling_price||0),date_in:t.date})));
+      const addedCost=vi.reduce((s,i)=>s+(Number(i.qty_in)*Number(i.unit_cost)),0);
+      await sb.patch("karu_trips",t.id,{total_cost:Number(t.total_cost)+addedCost});
+      await logAudit({trip_no:t.trip_no,record_id:t.id,action:"add_items",reason:`Added ${vi.length} item(s) to trip`,changed_by:lockStaff});
+      setAddingToTrip(null);
+      setAddExtraItems([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
+      await loadAll();
+    }catch(e){alert("Failed: "+e.message);}
     setSaving(false);
   };
 
@@ -523,6 +623,35 @@ function StockTab(){
                     </div>
                   );
                 })}
+                {!locked&&(
+                  <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #0F1A3A"}}>
+                    {addingToTrip?.id===t.id?(
+                      <div>
+                        <div style={{fontSize:13,fontWeight:600,marginBottom:10,color:"#F5C000"}}>Add items to {t.trip_no}</div>
+                        {addExtraItems.map(i=>(
+                          <div key={i.id} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:8,marginBottom:7}}>
+                            <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:5,marginBottom:5}}>
+                              <input value={i.name} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,name:e.target.value}:a))} placeholder="Item name" style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 9px",color:"#E8E2D4",fontSize:12}}/>
+                              <button onClick={()=>setAddExtraItems(x=>x.filter(a=>a.id!==i.id))} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:14}}>x</button>
+                            </div>
+                            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5}}>
+                              <select value={i.category} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,category:e.target.value}:a))} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+                              <input type="number" value={i.qty_in} min={1} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,qty_in:e.target.value}:a))} placeholder="Qty" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:11,textAlign:"center",width:"100%"}}/>
+                              <input type="number" value={i.unit_cost} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,unit_cost:e.target.value}:a))} placeholder="Cost (KSh)" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:11,width:"100%"}}/>
+                            </div>
+                          </div>
+                        ))}
+                        <button className="btn-g" onClick={()=>setAddExtraItems(x=>[...x,{id:Date.now(),name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}])} style={{width:"100%",fontSize:12,marginBottom:8}}>+ Add another</button>
+                        <div style={{display:"flex",gap:8}}>
+                          <button className="btn-y" onClick={()=>saveAddItems(t)} disabled={saving} style={{flex:1,fontSize:12}}>{saving?"Saving...":"Save Items"}</button>
+                          <button className="btn-g" onClick={()=>{setAddingToTrip(null);setAddExtraItems([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);}} style={{fontSize:12}}>Cancel</button>
+                        </div>
+                      </div>
+                    ):(
+                      <button className="btn-g" onClick={()=>setAddingToTrip(t)} style={{width:"100%",fontSize:12,marginBottom:10}}>+ Add forgotten items to this trip</button>
+                    )}
+                  </div>
+                )}
                 {!locked&&(
                   <div style={{marginTop:12}}>
                     <div style={{fontSize:11,color:"#8899AA",marginBottom:6}}>Lock confirmed by</div>
@@ -740,6 +869,47 @@ function ReportsTab(){
           ))}
         </div>
       )}
+      {/* Month-on-month table */}
+      {(()=>{
+        const mmap={};
+        data.sales.forEach(s=>{const m=s.date.slice(0,7);if(!mmap[m])mmap[m]={sales:0,expenses:0};mmap[m].sales+=Number(s.total);});
+        data.expenses.forEach(e=>{const m=e.date.slice(0,7);if(!mmap[m])mmap[m]={sales:0,expenses:0};mmap[m].expenses+=Number(e.amount);});
+        const rows=Object.entries(mmap).sort(([a],[b])=>b.localeCompare(a)).map(([month,d])=>({month,sales:d.sales,expenses:d.expenses,profit:d.sales-d.expenses}));
+        if(!rows.length) return null;
+        const tots=rows.reduce((s,r)=>({sales:s.sales+r.sales,expenses:s.expenses+r.expenses,profit:s.profit+r.profit}),{sales:0,expenses:0,profit:0});
+        const fmtM=m=>{const[y,mo]=m.split("-");return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(mo)-1]+" "+y;};
+        const fmt=n=>"KSh "+n.toLocaleString();
+        return (
+          <div className="card" style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Month-on-month performance</div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:320}}>
+                <thead>
+                  <tr>{["Month","Sales","Expenses","Profit"].map(h=><th key={h} style={{textAlign:h==="Month"?"left":"right",padding:"4px 4px 8px",color:"#8899AA",fontWeight:500,borderBottom:"1px solid #1A2A4A",whiteSpace:"nowrap"}}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {rows.map(r=>(
+                    <tr key={r.month} style={{borderBottom:"1px solid #0F1A3A"}}>
+                      <td style={{padding:"7px 4px",color:"#E8E2D4",whiteSpace:"nowrap"}}>{fmtM(r.month)}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",color:"#4CAF50",whiteSpace:"nowrap"}}>{fmt(r.sales)}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",color:"#E85B5B",whiteSpace:"nowrap"}}>{fmt(r.expenses)}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",color:r.profit>=0?"#F5C000":"#E85B5B",fontWeight:600,whiteSpace:"nowrap"}}>{r.profit<0?"-":""}{fmt(Math.abs(r.profit))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{borderTop:"2px solid #1A2A4A"}}>
+                    <td style={{padding:"8px 4px",fontWeight:700,color:"#FFFFFF"}}>Total</td>
+                    <td style={{textAlign:"right",padding:"8px 4px",color:"#4CAF50",fontWeight:700}}>{fmt(tots.sales)}</td>
+                    <td style={{textAlign:"right",padding:"8px 4px",color:"#E85B5B",fontWeight:700}}>{fmt(tots.expenses)}</td>
+                    <td style={{textAlign:"right",padding:"8px 4px",color:tots.profit>=0?"#F5C000":"#E85B5B",fontWeight:700}}>{tots.profit<0?"-":""}{fmt(Math.abs(tots.profit))}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
       <button className="btn-g" onClick={loadAll} style={{width:"100%",fontSize:13}}>Refresh</button>
     </div>
   );
