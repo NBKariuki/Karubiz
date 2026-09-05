@@ -39,7 +39,7 @@ const GS = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
     *{box-sizing:border-box;margin:0;padding:0} body{font-family:'DM Sans',sans-serif;background:#050A1F;color:#E8E2D4} input,select,textarea{outline:none;font-family:'DM Sans',sans-serif}
-    .field{margin-bottom:13px} .field label{display:block;font-size:11px;color:#8899AA;margin-bottom:4px;letter-spacing:0.06em;text-transform:uppercase}
+    .field{margin-bottom:13px} .field label{display:block;font-size:12px;color:#FFFFFF;font-weight:600;margin-bottom:5px;letter-spacing:0.04em;text-transform:uppercase}
     .field input,.field select,.field textarea{width:100%;background:#0A1128;border:1px solid #1A2A4A;border-radius:6px;padding:10px 12px;color:#E8E2D4;font-size:14px} .field textarea{resize:vertical;min-height:56px}
     .tog{display:flex;gap:6px} .tog-btn{flex:1;padding:8px 4px;font-size:13px;border:1px solid #1A2A4A;border-radius:6px;background:#0A1128;color:#8899AA;cursor:pointer;text-align:center;transition:all 0.15s}
     .tog-btn.on{background:rgba(245,192,0,0.12);border-color:#F5C000;color:#F5C000;font-weight:600}
@@ -117,7 +117,7 @@ function SaleTab(){
   const [items,setItems]=useState([{id:1,name:"",qty:1,price:""}]);
   const [pay,setPay]=useState("mpesa"); const [mpesaCode,setMpesaCode]=useState("");
   const [notes,setNotes]=useState(""); const [err,setErr]=useState("");
-  const [saving,setSaving]=useState(false); const [receipt,setReceipt]=useState(null);
+  const [saving,setSaving]=useState(false); const [receipt,setReceipt]=useState(null); const [saved,setSaved]=useState(null);
 
   useEffect(()=>{ sb.get("karu_stock","select=*&order=date_in.asc").then(s=>setStockItems(s)).catch(console.error); },[]);
 
@@ -156,7 +156,7 @@ function SaleTab(){
     }
   };
 
-  const genReceipt=async()=>{
+  const genReceipt=async(withReceipt=true)=>{
     if(!cName.trim()){setErr("Customer name required.");return;}
     const vi=items.filter(i=>i.name&&Number(i.price)>0);
     if(!vi.length){setErr("Add at least one item.");return;}
@@ -175,7 +175,7 @@ function SaleTab(){
       await reduceStock(vi);
       const fresh=await sb.get("karu_stock","select=*&order=date_in.asc");
       setStockItems(fresh);
-      setReceipt(data);
+      if(withReceipt){ setReceipt(data); } else { setSaved(data); }
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
   };
@@ -186,6 +186,73 @@ function SaleTab(){
     const m=`*KARU FURNITURE*\n*Receipt ${r.receipt_no}*\n\nDate: ${r.date}  ${r.time_str}\nServed by: ${r.served_by}\n\nCustomer: ${r.customer_name}${r.customer_phone?"\nPhone: "+r.customer_phone:""}\n\n*ITEMS*\n${il}\n\n*TOTAL: KSh ${r.total.toLocaleString()}*\nPayment: ${r.payment_method}${r.mpesa_code?"\nM-Pesa Code: "+r.mpesa_code:""}${r.notes?"\nNote: "+r.notes:""}\n\nThank you - KARU Furniture\nOff Kihara-Gachie-Karura Rd\n0720 772 866`;
     window.open("https://wa.me/?text="+encodeURIComponent(m),"_blank");
   };
+
+  const copyText=()=>{
+    const r=receipt;
+    const il=r.items.map(i=>`  ${i.name} x${i.qty} - KSh ${(Number(i.qty)*Number(i.price)).toLocaleString()}`).join("\n");
+    const txt=`KARU FURNITURE\nReceipt ${r.receipt_no}\nDate: ${r.date} ${r.time_str}\nServed by: ${r.served_by}\nCustomer: ${r.customer_name}${r.customer_phone?"\nPhone: "+r.customer_phone:""}\n\nITEMS\n${il}\n\nTOTAL: KSh ${r.total.toLocaleString()}\nPayment: ${r.payment_method}${r.mpesa_code?"\nCode: "+r.mpesa_code:""}${r.notes?"\nNote: "+r.notes:""}\n\nKARU Furniture · Off Kihara-Gachie-Karura Rd · 0720 772 866`;
+    navigator.clipboard.writeText(txt).then(()=>alert("Receipt text copied to clipboard"));
+  };
+
+  const downloadJPEG=()=>{
+    const r=receipt;
+    const canvas=document.createElement("canvas");
+    canvas.width=760; canvas.height=520+r.items.length*36;
+    const ctx=canvas.getContext("2d");
+    const W=canvas.width;
+    ctx.fillStyle="#050A1F"; ctx.fillRect(0,0,W,canvas.height);
+    ctx.fillStyle="#F5C000"; ctx.font="bold 32px Arial"; ctx.textAlign="center";
+    ctx.fillText("KARU FURNITURE",W/2,52);
+    ctx.fillStyle="#8899AA"; ctx.font="14px Arial";
+    ctx.fillText("Off Kihara-Gachie-Karura Rd, Nairobi  |  0720 772 866",W/2,78);
+    ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,96); ctx.lineTo(W-40,96); ctx.stroke();
+    ctx.textAlign="left"; ctx.fillStyle="#8899AA"; ctx.font="13px Arial";
+    const rows=[["Receipt No.",r.receipt_no],["Date",r.date],["Time",r.time_str],["Served by",r.served_by],["Customer",r.customer_name]];
+    if(r.customer_phone) rows.push(["Phone",r.customer_phone]);
+    rows.forEach(([l,v],i)=>{
+      ctx.fillStyle="#8899AA"; ctx.fillText(l,50,124+i*26);
+      ctx.fillStyle="#FFFFFF"; ctx.textAlign="right"; ctx.fillText(v,W-50,124+i*26);
+      ctx.textAlign="left";
+    });
+    let y=124+rows.length*26+16;
+    ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke(); y+=20;
+    ctx.fillStyle="#8899AA"; ctx.font="12px Arial";
+    ctx.fillText("ITEM",50,y); ctx.textAlign="center"; ctx.fillText("QTY",W/2-60,y); ctx.textAlign="right"; ctx.fillText("UNIT",W-140,y); ctx.fillText("TOTAL",W-50,y);
+    y+=6; ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke(); y+=22;
+    r.items.forEach(i=>{
+      ctx.textAlign="left"; ctx.fillStyle="#FFFFFF"; ctx.font="14px Arial"; ctx.fillText(i.name,50,y);
+      ctx.textAlign="center"; ctx.fillStyle="#8899AA"; ctx.fillText(String(i.qty),W/2-60,y);
+      ctx.textAlign="right"; ctx.fillText("KSh "+Number(i.price).toLocaleString(),W-140,y);
+      ctx.fillStyle="#F5C000"; ctx.fillText("KSh "+(Number(i.qty)*Number(i.price)).toLocaleString(),W-50,y);
+      y+=32;
+    });
+    y+=4; ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke(); y+=24;
+    ctx.fillStyle="#FFFFFF"; ctx.font="bold 18px Arial"; ctx.textAlign="left"; ctx.fillText("TOTAL",50,y);
+    ctx.fillStyle="#F5C000"; ctx.textAlign="right"; ctx.fillText("KSh "+r.total.toLocaleString(),W-50,y); y+=28;
+    ctx.fillStyle="#8899AA"; ctx.font="13px Arial"; ctx.textAlign="left";
+    ctx.fillText("Payment: "+r.payment_method+(r.mpesa_code?"  |  Code: "+r.mpesa_code:""),50,y); y+=24;
+    if(r.notes){ctx.fillText("Note: "+r.notes,50,y);y+=24;}
+    y+=8; ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke(); y+=24;
+    ctx.fillStyle="#556677"; ctx.font="12px Arial"; ctx.textAlign="center";
+    ctx.fillText("Thank you for shopping at KARU Furniture",W/2,y);
+    ctx.fillText("karufurniture.netlify.app",W/2,y+18);
+    const link=document.createElement("a");
+    link.download=`KARU-${r.receipt_no}.jpg`;
+    link.href=canvas.toDataURL("image/jpeg",0.92);
+    link.click();
+  };
+
+  if(saved) return (
+    <div style={{textAlign:"center",padding:"40px 20px"}}>
+      <div style={{fontSize:48,marginBottom:16}}>✅</div>
+      <div style={{fontSize:18,fontWeight:600,marginBottom:8}}>Sale Recorded</div>
+      <div style={{color:"#8899AA",fontSize:14,marginBottom:4}}>{saved.customer_name}</div>
+      <div style={{color:"#F5C000",fontSize:24,fontWeight:600,marginBottom:4}}>KSh {Number(saved.total).toLocaleString()}</div>
+      <div style={{color:"#8899AA",fontSize:13,marginBottom:24}}>{saved.payment_method} · {saved.receipt_no}</div>
+      <div style={{color:"#4CAF50",fontSize:13,marginBottom:32}}>Stock updated automatically</div>
+      <button className="btn-y" onClick={()=>{setSaved(null);setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);}} style={{width:"100%",padding:14}}>New Sale</button>
+    </div>
+  );
 
   if(receipt) return (
     <div>
@@ -215,11 +282,13 @@ function SaleTab(){
         </div>
         <div style={{textAlign:"center",fontSize:10,color:"#888",marginTop:12,paddingTop:10,borderTop:"0.5px solid #ddd",lineHeight:1.7}}>Thank you for shopping at KARU Furniture<br/>karufurniture.netlify.app</div>
       </div>
-      <div style={{display:"flex",gap:8}} className="np">
-        <button className="btn-y" onClick={shareWA} style={{flex:1}}>Share on WhatsApp</button>
-        <button className="btn-g" onClick={()=>window.print()}>Print</button>
-        <button className="btn-g" onClick={()=>{setReceipt(null);setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);}}>New</button>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}} className="np">
+        <button className="btn-y" onClick={shareWA} style={{fontSize:13}}>WhatsApp</button>
+        <button className="btn-g" onClick={copyText} style={{fontSize:13}}>Copy text</button>
+        <button className="btn-g" onClick={downloadJPEG} style={{fontSize:13}}>Download image</button>
+        <button className="btn-g" onClick={()=>window.print()} style={{fontSize:13}}>Print / PDF</button>
       </div>
+      <button className="btn-g" onClick={()=>{setReceipt(null);setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);}} style={{width:"100%",fontSize:13}} className="np">New Sale</button>
     </div>
   );
 
@@ -255,7 +324,10 @@ function SaleTab(){
       {pay==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace",letterSpacing:"0.05em"}}/></div>}
       <div className="field"><label>Notes (optional)</label><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Balance pending"/></div>
       {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
-      <button className="btn-y" onClick={genReceipt} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving and updating stock...":"Generate Receipt"}</button>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <button className="btn-g" onClick={()=>genReceipt(false)} disabled={saving} style={{padding:14,fontSize:13}}>{saving?"Saving...":"Record Sale"}</button>
+        <button className="btn-y" onClick={()=>genReceipt(true)} disabled={saving} style={{padding:14,fontSize:13}}>{saving?"Saving...":"Record + Receipt"}</button>
+      </div>
     </div>
   );
 }
