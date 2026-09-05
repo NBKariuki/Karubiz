@@ -1,0 +1,194 @@
+
+function ExpensesTab() {
+  const [exp,setExp]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [form,setForm]=useState({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:"Burton Kariuki"});
+  const [saving,setSaving]=useState(false);
+  const [err,setErr]=useState("");
+  const [showForm,setShowForm]=useState(false);
+
+  useEffect(()=>{loadExp();},[]);
+  const loadExp=async()=>{
+    setLoading(true);
+    try{ const e=await sb.get("karu_expenses","select=*&order=date.desc,created_at.desc&limit=60"); setExp(e); }
+    catch(e){console.error(e);}
+    setLoading(false);
+  };
+
+  const save=async()=>{
+    if(!form.amount||Number(form.amount)<=0){setErr("Enter a valid amount.");return;}
+    setSaving(true); setErr("");
+    try{
+      await sb.post("karu_expenses",{...form,amount:Number(form.amount)});
+      await loadExp();
+      setShowForm(false);
+      setForm({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:"Burton Kariuki"});
+    }catch(e){setErr("Save failed: "+e.message);}
+    setSaving(false);
+  };
+
+  const thisMonth=exp.filter(e=>e.date.startsWith(new Date().toISOString().slice(0,7)));
+  const monthTotal=thisMonth.reduce((s,e)=>s+Number(e.amount),0);
+
+  return (
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div className="stat"><div className="stat-n" style={{color:"#E85B5B"}}>KSh {monthTotal.toLocaleString()}</div><div className="stat-l">This month</div></div>
+        <div className="stat"><div className="stat-n" style={{color:"#8899AA"}}>{thisMonth.length}</div><div className="stat-l">Entries</div></div>
+      </div>
+      {!showForm&&<button className="btn-y" onClick={()=>setShowForm(true)} style={{width:"100%",marginBottom:14}}>+ Log Expense</button>}
+      {showForm&&(
+        <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:14}}>Log Expense</div>
+          <div className="field"><label>Date</label><input type="date" value={form.date} onChange={e=>setForm(x=>({...x,date:e.target.value}))}/></div>
+          <div className="field"><label>Category</label><select value={form.category} onChange={e=>setForm(x=>({...x,category:e.target.value}))}>{EXP_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+          <div className="field"><label>Description</label><input value={form.description} onChange={e=>setForm(x=>({...x,description:e.target.value}))} placeholder="e.g. October rent payment"/></div>
+          <div className="field"><label>Amount (KSh)</label><input type="number" value={form.amount} onChange={e=>setForm(x=>({...x,amount:e.target.value}))} placeholder="0"/></div>
+          <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${form.recorded_by===s?" on":""}`} onClick={()=>setForm(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
+          {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn-y" onClick={save} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save"}</button>
+            <button className="btn-g" onClick={()=>{setShowForm(false);setErr("");}}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:exp.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No expenses logged yet.</div>:(
+        <div>
+          <div style={{fontSize:12,color:"#556677",marginBottom:10}}>Recent expenses</div>
+          {exp.map(e=>(
+            <div key={e.id} className="card">
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                <div><span className="badge b-r" style={{marginRight:8}}>{e.category}</span><span style={{fontSize:13,fontWeight:500}}>{e.description||e.category}</span></div>
+                <span style={{fontSize:14,fontWeight:600,color:"#E85B5B"}}>KSh {Number(e.amount).toLocaleString()}</span>
+              </div>
+              <div style={{fontSize:11,color:"#556677"}}>{e.date} · {e.recorded_by?.split(" ")[0]}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReportsTab() {
+  const [data,setData]=useState({sales:[],expenses:[],stock:[]});
+  const [loading,setLoading]=useState(true);
+  const [period,setPeriod]=useState("month");
+
+  useEffect(()=>{loadAll();},[]);
+  const loadAll=async()=>{
+    setLoading(true);
+    try{
+      const [sales,expenses,stock]=await Promise.all([
+        sb.get("karu_sales","select=*&order=date.desc"),
+        sb.get("karu_expenses","select=*&order=date.desc"),
+        sb.get("karu_stock","select=*")
+      ]);
+      setData({sales,expenses,stock});
+    }catch(e){console.error(e);}
+    setLoading(false);
+  };
+
+  const now=new Date();
+  const filterDate=arr=>{
+    if(period==="week"){const w=new Date(now);w.setDate(now.getDate()-7);return arr.filter(x=>new Date(x.date)>=w);}
+    if(period==="month") return arr.filter(x=>x.date.startsWith(now.toISOString().slice(0,7)));
+    if(period==="year") return arr.filter(x=>x.date.startsWith(now.getFullYear().toString()));
+    return arr;
+  };
+
+  const fSales=filterDate(data.sales);
+  const fExp=filterDate(data.expenses);
+  const revenue=fSales.reduce((s,x)=>s+Number(x.total),0);
+  const expenses=fExp.reduce((s,x)=>s+Number(x.amount),0);
+  const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold)*i.unit_cost),0);
+  const cogs=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
+  const grossProfit=revenue-cogs;
+  const netProfit=grossProfit-expenses;
+
+  const dailyMap={};
+  fSales.forEach(s=>{dailyMap[s.date]=(dailyMap[s.date]||0)+Number(s.total);});
+  const chartData=Object.entries(dailyMap).sort(([a],[b])=>a.localeCompare(b)).slice(-14).map(([date,total])=>({date:date.slice(5),total}));
+
+  const itemMap={};
+  fSales.forEach(s=>{ if(s.items) s.items.forEach(i=>{ if(!itemMap[i.name]) itemMap[i.name]={qty:0,revenue:0}; itemMap[i.name].qty+=Number(i.qty||1); itemMap[i.name].revenue+=Number(i.qty||1)*Number(i.price||0); }); });
+  const topItems=Object.entries(itemMap).sort(([,a],[,b])=>b.revenue-a.revenue).slice(0,5);
+
+  const expMap={};
+  fExp.forEach(e=>{expMap[e.category]=(expMap[e.category]||0)+Number(e.amount);});
+  const expBreakdown=Object.entries(expMap).sort(([,a],[,b])=>b-a);
+  const mpesa=fSales.filter(s=>s.payment_method==="M-Pesa").reduce((s,x)=>s+Number(x.total),0);
+  const cash=fSales.filter(s=>s.payment_method==="Cash").reduce((s,x)=>s+Number(x.total),0);
+
+  if(loading) return <div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading reports...</div>;
+
+  return (
+    <div>
+      <div className="field" style={{marginBottom:14}}>
+        <div className="tog">
+          {[["week","Week"],["month","Month"],["year","Year"],["all","All"]].map(([id,label])=>(
+            <button key={id} className={`tog-btn${period===id?" on":""}`} onClick={()=>setPeriod(id)} style={{fontSize:12}}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div className="stat"><div className="stat-n" style={{color:"#4CAF50"}}>KSh {revenue.toLocaleString()}</div><div className="stat-l">Revenue</div></div>
+        <div className="stat"><div className="stat-n" style={{color:"#E85B5B"}}>KSh {expenses.toLocaleString()}</div><div className="stat-l">Expenses</div></div>
+        <div className="stat"><div className="stat-n" style={{color:"#F5C000"}}>KSh {grossProfit.toLocaleString()}</div><div className="stat-l">Gross profit</div></div>
+        <div className="stat" style={{border:`1px solid ${netProfit>=0?"rgba(76,175,80,0.4)":"rgba(232,91,91,0.4)"}`}}>
+          <div className="stat-n" style={{color:netProfit>=0?"#4CAF50":"#E85B5B"}}>KSh {Math.abs(netProfit).toLocaleString()}</div>
+          <div className="stat-l">Net {netProfit>=0?"profit":"loss"}</div>
+        </div>
+      </div>
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{fontSize:11,color:"#8899AA",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
+        <div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div>
+        <div style={{fontSize:11,color:"#556677",marginTop:2}}>COGS this period: KSh {cogs.toLocaleString()}</div>
+      </div>
+      {chartData.length>0&&(
+        <div className="card" style={{marginBottom:14}}>
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Daily sales</div>
+          <ResponsiveContainer width="100%" height={130}>
+            <BarChart data={chartData} margin={{left:-20}}>
+              <XAxis dataKey="date" tick={{fill:"#556677",fontSize:9}}/>
+              <YAxis tick={{fill:"#556677",fontSize:9}}/>
+              <Tooltip contentStyle={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,fontSize:12}}/>
+              <Bar dataKey="total" fill="#F5C000" radius={[3,3,0,0]} name="Revenue"/>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div className="card">
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Payment split</div>
+          {revenue>0?<>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#4CAF50"}}>M-Pesa</span><span>KSh {mpesa.toLocaleString()}</span></div>
+            <div style={{height:4,background:"#1A2A4A",borderRadius:2,marginBottom:8}}><div style={{height:4,background:"#4CAF50",borderRadius:2,width:`${revenue>0?Math.round(mpesa/revenue*100):0}%`}}/></div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#F5C000"}}>Cash</span><span>KSh {cash.toLocaleString()}</span></div>
+          </>:<div style={{color:"#556677",fontSize:12}}>No sales yet</div>}
+        </div>
+        <div className="card">
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Expenses</div>
+          {expBreakdown.length>0?expBreakdown.slice(0,4).map(([cat,amt])=>(
+            <div key={cat} style={{marginBottom:6}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}><span style={{color:"#E8E2D4"}}>{cat}</span><span style={{color:"#E85B5B"}}>{expenses>0?Math.round(amt/expenses*100):0}%</span></div>
+              <div style={{height:3,background:"#1A2A4A",borderRadius:2}}><div style={{height:3,background:"#E85B5B",borderRadius:2,width:`${expenses>0?(amt/expenses*100):0}%`}}/></div>
+            </div>
+          )):<div style={{color:"#556677",fontSize:12}}>No expenses yet</div>}
+        </div>
+      </div>
+      {topItems.length>0&&(
+        <div className="card" style={{marginBottom:14}}>
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Top selling items</div>
+          {topItems.map(([name,{qty,revenue:rev}],i)=>(
+            <div key={name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<topItems.length-1?"1px solid #1A2A4A":"none"}}>
+              <div><div style={{fontSize:13,fontWeight:500}}>{name}</div><div style={{fontSize:11,color:"#556677"}}>{qty} sold</div></div>
+              <div style={{fontSize:13,fontWeight:600,color:"#4CAF50"}}>KSh {rev.toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <button className="btn-g" onClick={loadAll} style={{width:"100%",fontSize:13}}>Refresh</button>
+    </div>
+  );
+}
