@@ -25,11 +25,23 @@ const fetchBalances = async () => {
     return {...b, hasData: rows.length>0};
   } catch { return {cash:0,sacco:0,owed_burton:0,owed_martin:0,hasData:false}; }
 };
-const PIN_SALT = "karu-2026-fixed-salt";
-async function hashPin(pin){
-  const data = new TextEncoder().encode(pin + PIN_SALT);
+const LEGACY_SALT = "karu-2026-fixed-salt";
+function genSalt(){
+  const a=new Uint8Array(16); crypto.getRandomValues(a);
+  return Array.from(a).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function hashWith(secret, salt){
+  const data = new TextEncoder().encode(secret + (salt||LEGACY_SALT));
   const buf = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+// Back-compat: old accounts used the fixed salt with no per-user salt
+async function hashPin(pin){ return hashWith(pin, null); }
+function pwStrength(pw){
+  if(pw.length<8) return "At least 8 characters.";
+  if(!/[a-zA-Z]/.test(pw)) return "Include at least one letter.";
+  if(!/[0-9]/.test(pw)) return "Include at least one number.";
+  return "";
 }
 const ROLES = {
   owner:   { label:"Owner",     can:["sale","stock","expenses","reports","money","void","lock","edit","adjust","close","users"] },
@@ -145,9 +157,12 @@ export default function App() {
 }
 
 function LoginScreen({onLogin}){
-  const [stage,setStage]=useState("user"); // user -> pin -> setpin
+  const [stage,setStage]=useState("user");
   const [username,setUsername]=useState(""); const [found,setFound]=useState(null);
-  const [pin,setPin]=useState(""); const [pin2,setPin2]=useState(""); const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
+  const [cred,setCred]=useState(""); const [cred2,setCred2]=useState(""); const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
+
+  const isPassword = found?.auth_type==="password" || (found && found.role!=="attendant");
+  const credLabel = isPassword?"Password":"PIN";
 
   const findUser=async()=>{
     setErr(""); const u=username.trim().toLowerCase(); if(!u){setErr("Enter your username.");return;}
@@ -155,34 +170,50 @@ function LoginScreen({onLogin}){
     try{
       const rows=await sb.get("karu_users",`select=*&username=eq.${u}&active=eq.true`);
       if(!rows.length){setErr("No active account with that username.");setBusy(false);return;}
-      setFound(rows[0]); setStage(rows[0].must_set_pin?"setpin":"pin");
+      const usr=rows[0];
+      setFound(usr);
+      const needsSetup = !usr.pin_hash || usr.must_set_pin;
+      setStage(needsSetup?"setcred":"cred");
+      setCred(""); setCred2("");
     }catch(e){setErr("Login failed: "+e.message);}
     setBusy(false);
   };
 
   const doLogin=async()=>{
-    setErr(""); if(pin.length<4){setErr("Enter your 4-digit PIN.");return;}
+    setErr("");
+    if(isPassword){ if(!cred){setErr("Enter your password.");return;} }
+    else if(cred.length<4){setErr("Enter your 4-digit PIN.");return;}
     setBusy(true);
     try{
-      const h=await hashPin(pin);
+      const h=await hashWith(cred, found.salt); // found.salt null for legacy pin -> legacy salt
       if(h===found.pin_hash){ onLogin(found); }
-      else { setErr("Wrong PIN."); }
+      else { setErr(isPassword?"Wrong password.":"Wrong PIN."); }
     }catch(e){setErr("Error: "+e.message);}
     setBusy(false);
   };
 
-  const doSetPin=async()=>{
+  const doSetCred=async()=>{
     setErr("");
-    if(pin.length!==4||!/^\d{4}$/.test(pin)){setErr("PIN must be 4 digits.");return;}
-    if(pin!==pin2){setErr("PINs do not match.");return;}
+    if(isPassword){
+      const w=pwStrength(cred); if(w){setErr(w);return;}
+      if(cred!==cred2){setErr("Passwords do not match.");return;}
+    } else {
+      if(!/^\d{4}$/.test(cred)){setErr("PIN must be 4 digits.");return;}
+      if(cred!==cred2){setErr("PINs do not match.");return;}
+    }
     setBusy(true);
     try{
-      const h=await hashPin(pin);
-      await sb.patch("karu_users",found.id,{pin_hash:h,must_set_pin:false});
-      onLogin({...found,pin_hash:h,must_set_pin:false});
-    }catch(e){setErr("Could not set PIN: "+e.message);}
+      const salt=genSalt();
+      const h=await hashWith(cred, salt);
+      await sb.patch("karu_users",found.id,{pin_hash:h,salt,must_set_pin:false,auth_type:isPassword?"password":"pin"});
+      onLogin({...found,pin_hash:h,salt,must_set_pin:false});
+    }catch(e){setErr("Could not save: "+e.message);}
     setBusy(false);
   };
+
+  const credInput=(val,setVal,ph,auto)=> isPassword
+    ? <input type="password" value={val} onChange={e=>{setVal(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&(stage==="cred"?doLogin():null)} placeholder={ph} autoFocus={auto}/>
+    : <input type="password" inputMode="numeric" maxLength={4} value={val} onChange={e=>{setVal(e.target.value.replace(/\D/g,""));setErr("");}} onKeyDown={e=>e.key==="Enter"&&(stage==="cred"?doLogin():null)} placeholder="••••" autoFocus={auto} style={{letterSpacing:"0.4em",textAlign:"center",fontSize:20}}/>;
 
   return (<><GS/>
     <div style={{minHeight:"100vh",display:"flex",justifyContent:"center",alignItems:"center",padding:24}}>
@@ -193,19 +224,20 @@ function LoginScreen({onLogin}){
           {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
           <button className="btn-y" onClick={findUser} disabled={busy} style={{width:"100%"}}>{busy?"...":"Continue"}</button>
         </>)}
-        {stage==="pin"&&(<>
+        {stage==="cred"&&(<>
           <div style={{fontSize:13,color:"#8899AA",marginBottom:14}}>Welcome back, <span style={{color:"#FFFFFF",fontWeight:600}}>{found.full_name.split(" ")[0]}</span></div>
-          <div className="field"><label>Your PIN</label><input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>{setPin(e.target.value.replace(/\D/g,""));setErr("");}} onKeyDown={e=>e.key==="Enter"&&doLogin()} placeholder="••••" autoFocus style={{letterSpacing:"0.4em",textAlign:"center",fontSize:20}}/></div>
+          <div className="field"><label>Your {credLabel}</label>{credInput(cred,setCred,"Enter "+credLabel.toLowerCase(),true)}</div>
           {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
           <button className="btn-y" onClick={doLogin} disabled={busy} style={{width:"100%"}}>{busy?"...":"Sign In"}</button>
-          <button className="btn-g" onClick={()=>{setStage("user");setPin("");setErr("");}} style={{width:"100%",marginTop:8,fontSize:13}}>Not you?</button>
+          <button className="btn-g" onClick={()=>{setStage("user");setCred("");setErr("");setFound(null);}} style={{width:"100%",marginTop:8,fontSize:13}}>Not you?</button>
         </>)}
-        {stage==="setpin"&&(<>
-          <div style={{fontSize:13,color:"#8899AA",marginBottom:14}}>First login, <span style={{color:"#FFFFFF",fontWeight:600}}>{found.full_name.split(" ")[0]}</span>. Set a 4-digit PIN you'll remember.</div>
-          <div className="field"><label>New PIN</label><input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>{setPin(e.target.value.replace(/\D/g,""));setErr("");}} placeholder="••••" autoFocus style={{letterSpacing:"0.4em",textAlign:"center",fontSize:20}}/></div>
-          <div className="field"><label>Confirm PIN</label><input type="password" inputMode="numeric" maxLength={4} value={pin2} onChange={e=>{setPin2(e.target.value.replace(/\D/g,""));setErr("");}} placeholder="••••" style={{letterSpacing:"0.4em",textAlign:"center",fontSize:20}}/></div>
+        {stage==="setcred"&&(<>
+          <div style={{fontSize:13,color:"#8899AA",marginBottom:6}}>First login, <span style={{color:"#FFFFFF",fontWeight:600}}>{found.full_name.split(" ")[0]}</span>.</div>
+          <div style={{fontSize:12,color:"#8899AA",marginBottom:14}}>{isPassword?"Set a password — at least 8 characters, with a letter and a number.":"Set a 4-digit PIN you'll remember."}</div>
+          <div className="field"><label>New {credLabel}</label>{credInput(cred,setCred,"New "+credLabel.toLowerCase(),true)}</div>
+          <div className="field"><label>Confirm {credLabel}</label>{credInput(cred2,setCred2,"Confirm "+credLabel.toLowerCase(),false)}</div>
           {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
-          <button className="btn-y" onClick={doSetPin} disabled={busy} style={{width:"100%"}}>{busy?"...":"Set PIN & Continue"}</button>
+          <button className="btn-y" onClick={doSetCred} disabled={busy} style={{width:"100%"}}>{busy?"...":"Save & Continue"}</button>
         </>)}
       </div>
     </div></>);
@@ -366,14 +398,14 @@ function ManageTeam({user,onBack}){
     try{
       const exists=await sb.get("karu_users",`select=id&username=eq.${un}`);
       if(exists.length){setErr("That username is taken.");setSaving(false);return;}
-      await sb.post("karu_users",{username:un,full_name:f.full_name.trim(),phone:f.phone.trim(),role:f.role,pin_hash:null,must_set_pin:true,active:true,created_by:user.full_name});
+      await sb.post("karu_users",{username:un,full_name:f.full_name.trim(),phone:f.phone.trim(),role:f.role,pin_hash:null,salt:null,must_set_pin:true,auth_type:f.role==="attendant"?"pin":"password",active:true,created_by:user.full_name});
       setAdding(false); setF({full_name:"",username:"",phone:"",role:"attendant"});
       await load();
     }catch(e){setErr("Failed: "+e.message);}
     setSaving(false);
   };
   const toggleActive=async(u)=>{ if(u.role==="owner"){alert("Owners cannot be deactivated here.");return;} await sb.patch("karu_users",u.id,{active:!u.active}); await load(); };
-  const resetPin=async(u)=>{ if(!confirm(`Reset ${u.full_name.split(" ")[0]}'s PIN? They will set a new one at next login.`))return; await sb.patch("karu_users",u.id,{pin_hash:null,must_set_pin:true}); await load(); alert("PIN reset. They set a new one at next login."); };
+  const resetCred=async(u)=>{ const w=u.role==="attendant"?"PIN":"password"; if(!confirm(`Reset ${u.full_name.split(" ")[0]}'s ${w}? They will set a new one at next login.`))return; await sb.patch("karu_users",u.id,{pin_hash:null,salt:null,must_set_pin:true}); await load(); alert(w+" reset. They set a new one at next login."); };
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Manage Team</div></div>
@@ -385,7 +417,7 @@ function ManageTeam({user,onBack}){
           <div className="field"><label>Username (they log in with this)</label><input value={f.username} onChange={e=>setF(x=>({...x,username:e.target.value}))} placeholder="e.g. jane" autoCapitalize="none"/></div>
           <div className="field"><label>Phone (optional)</label><input value={f.phone} onChange={e=>setF(x=>({...x,phone:e.target.value}))} placeholder="07XX XXX XXX" type="tel"/></div>
           <div className="field"><label>Role</label><div className="tog"><button className={`tog-btn${f.role==="attendant"?" on":""}`} onClick={()=>setF(x=>({...x,role:"attendant"}))} style={{fontSize:12}}>Attendant</button><button className={`tog-btn${f.role==="manager"?" on":""}`} onClick={()=>setF(x=>({...x,role:"manager"}))} style={{fontSize:12}}>Manager</button><button className={`tog-btn${f.role==="owner"?" on":""}`} onClick={()=>setF(x=>({...x,role:"owner"}))} style={{fontSize:12}}>Owner</button></div></div>
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:10}}>They'll set their own PIN when they first log in with this username.</div>
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:10}}>{f.role==="attendant"?"They'll set a 4-digit PIN at first login.":"They'll set a password at first login (owners and managers use passwords)."}</div>
           {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={addUser} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Add"}</button><button className="btn-g" onClick={()=>{setAdding(false);setErr("");}} style={{fontSize:13}}>Cancel</button></div>
         </div>
@@ -394,11 +426,11 @@ function ManageTeam({user,onBack}){
         <div key={u.id} className="card" style={{opacity:u.active?1:0.5}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
             <div><div style={{fontSize:14,fontWeight:600}}>{u.full_name} {u.id===user.id&&<span style={{color:"#8899AA",fontWeight:400,fontSize:12}}>(you)</span>}</div>
-              <div style={{fontSize:12,color:"#8899AA",marginTop:2}}>@{u.username} · {ROLES[u.role]?.label||u.role}{u.must_set_pin?" · PIN not set":""}{!u.active?" · inactive":""}</div></div>
+              <div style={{fontSize:12,color:"#8899AA",marginTop:2}}>@{u.username} · {ROLES[u.role]?.label||u.role}{u.must_set_pin?(u.role==="attendant"?" · PIN not set":" · password not set"):""}{!u.active?" · inactive":""}</div></div>
             <span className={`badge ${u.role==="owner"?"b-y":u.role==="manager"?"b-g":"b-muted"}`}>{ROLES[u.role]?.label}</span>
           </div>
           {u.id!==user.id&&<div style={{display:"flex",gap:6,marginTop:8}}>
-            <button className="btn-g" onClick={()=>resetPin(u)} style={{fontSize:11,padding:"5px 10px"}}>Reset PIN</button>
+            <button className="btn-g" onClick={()=>resetCred(u)} style={{fontSize:11,padding:"5px 10px"}}>Reset {u.role==="attendant"?"PIN":"password"}</button>
             {u.role!=="owner"&&<button className="btn-g" onClick={()=>toggleActive(u)} style={{fontSize:11,padding:"5px 10px"}}>{u.active?"Deactivate":"Reactivate"}</button>}
           </div>}
         </div>
