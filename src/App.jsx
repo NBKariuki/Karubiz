@@ -25,6 +25,18 @@ const fetchBalances = async () => {
     return {...b, hasData: rows.length>0};
   } catch { return {cash:0,sacco:0,owed_burton:0,owed_martin:0,hasData:false}; }
 };
+const PIN_SALT = "karu-2026-fixed-salt";
+async function hashPin(pin){
+  const data = new TextEncoder().encode(pin + PIN_SALT);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+const ROLES = {
+  owner:   { label:"Owner",     can:["sale","stock","expenses","reports","money","void","lock","edit","adjust","close","users"] },
+  manager: { label:"Manager",   can:["sale","stock","expenses","reports","close","adjust"] },
+  attendant:{ label:"Attendant", can:["sale"] },
+};
+const can = (user, perm) => !!user && (ROLES[user.role]?.can.includes(perm));
 const fmtK = n => "KSh "+Math.round(n).toLocaleString();
 const todayStr = () => new Date().toISOString().split("T")[0];
 const initials = n => (n||"").split(" ").map(w=>w[0]||"").join("").toUpperCase();
@@ -103,42 +115,106 @@ const GS = () => (
 );
 
 export default function App() {
-  const [authed,setAuthed]=useState(false);
-  const [pw,setPw]=useState(""); const [pwErr,setPwErr]=useState(""); const [tab,setTab]=useState("sale");
+  const [user,setUser]=useState(null); const [tab,setTab]=useState("sale");
   const [bal,setBal]=useState({cash:0,sacco:0,owed_burton:0,owed_martin:0,hasData:false});
   const [panel,setPanel]=useState(false);
   const refreshBal=useCallback(async()=>{ setBal(await fetchBalances()); },[]);
-  useEffect(()=>{ if(authed) refreshBal(); },[authed,refreshBal]);
-  const tryLogin=()=>{ if(pw.trim()===APP_PW.trim()){setAuthed(true);}else{setPwErr("Wrong password.");} };
-  if(!authed) return (<><GS/>
-    <div style={{minHeight:"100vh",display:"flex",justifyContent:"center",alignItems:"center",padding:24}}>
-      <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:12,padding:"36px 28px",maxWidth:360,width:"100%"}}>
-        <div style={{textAlign:"center",marginBottom:28}}><div style={{fontSize:24,fontWeight:600,color:"#F5C000",letterSpacing:"0.1em"}}>KARU</div><div style={{fontSize:13,color:"#8899AA",marginTop:4}}>Accounts System</div></div>
-        <div className="field"><label>Password</label><input type="password" value={pw} onChange={e=>{setPw(e.target.value);setPwErr("");}} onKeyDown={e=>e.key==="Enter"&&tryLogin()} placeholder="Enter password"/></div>
-        {pwErr&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{pwErr}</div>}
-        <button className="btn-y" onClick={tryLogin} style={{width:"100%"}}>Sign In</button>
-      </div>
-    </div></>);
+  useEffect(()=>{ if(user) refreshBal(); },[user,refreshBal]);
+  if(!user) return <LoginScreen onLogin={setUser}/>;
+  // Attendants only see the Sale tab; others see tabs they have perms for
+  const tabs=[["sale","Sale","💰","sale"],["stock","Stock","📦","stock"],["expenses","Expenses","🧾","expenses"],["reports","Reports","📊","reports"]].filter(([,,,perm])=>can(user,perm));
+  const activeTab = tabs.some(t=>t[0]===tab)?tab:tabs[0][0];
   return (<><GS/>
     <div style={{maxWidth:500,margin:"0 auto",paddingBottom:72}}>
       <div style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#050A1F",position:"sticky",top:0,zIndex:40,borderBottom:"1px solid #0A1128"}}>
         <span style={{fontSize:16,fontWeight:600,color:"#F5C000",letterSpacing:"0.08em"}}>KARU</span>
-        <span style={{fontSize:12,color:"#556677"}}>{new Date().toLocaleDateString("en-KE",{day:"2-digit",month:"short"})}</span>
+        <span style={{fontSize:12,color:"#556677"}}>{user.full_name.split(" ")[0]} · {ROLES[user.role].label}</span>
         <button onClick={()=>setPanel(true)} style={{background:"none",border:"1px solid #1A2A4A",borderRadius:6,color:"#F5C000",padding:"5px 10px",fontSize:16,cursor:"pointer",lineHeight:1}}>☰</button>
       </div>
       <div style={{padding:16}}>
-        {tab==="sale"&&<SaleTab onMoney={refreshBal}/>}{tab==="stock"&&<StockTab onMoney={refreshBal}/>}{tab==="expenses"&&<ExpensesTab onMoney={refreshBal}/>}{tab==="reports"&&<ReportsTab/>}
+        {activeTab==="sale"&&<SaleTab user={user} onMoney={refreshBal}/>}
+        {activeTab==="stock"&&<StockTab user={user} onMoney={refreshBal}/>}
+        {activeTab==="expenses"&&<ExpensesTab user={user} onMoney={refreshBal}/>}
+        {activeTab==="reports"&&<ReportsTab user={user}/>}
       </div>
     </div>
-    {panel&&<MoneyPanel bal={bal} onClose={()=>setPanel(false)} onChange={refreshBal}/>}
-    <nav className="nav">{[["sale","Sale","💰"],["stock","Stock","📦"],["expenses","Expenses","🧾"],["reports","Reports","📊"]].map(([id,label,icon])=>(
-      <button key={id} className={`nav-btn${tab===id?" on":""}`} onClick={()=>setTab(id)}><span className="ni">{icon}</span>{label}</button>
+    {panel&&<SidePanel user={user} bal={bal} onClose={()=>setPanel(false)} onChange={refreshBal} onLogout={()=>{setUser(null);setPanel(false);}}/>}
+    <nav className="nav">{tabs.map(([id,label,icon])=>(
+      <button key={id} className={`nav-btn${activeTab===id?" on":""}`} onClick={()=>setTab(id)}><span className="ni">{icon}</span>{label}</button>
     ))}</nav></>);
 }
 
-function MoneyPanel({bal,onClose,onChange}){
+function LoginScreen({onLogin}){
+  const [stage,setStage]=useState("user"); // user -> pin -> setpin
+  const [username,setUsername]=useState(""); const [found,setFound]=useState(null);
+  const [pin,setPin]=useState(""); const [pin2,setPin2]=useState(""); const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
+
+  const findUser=async()=>{
+    setErr(""); const u=username.trim().toLowerCase(); if(!u){setErr("Enter your username.");return;}
+    setBusy(true);
+    try{
+      const rows=await sb.get("karu_users",`select=*&username=eq.${u}&active=eq.true`);
+      if(!rows.length){setErr("No active account with that username.");setBusy(false);return;}
+      setFound(rows[0]); setStage(rows[0].must_set_pin?"setpin":"pin");
+    }catch(e){setErr("Login failed: "+e.message);}
+    setBusy(false);
+  };
+
+  const doLogin=async()=>{
+    setErr(""); if(pin.length<4){setErr("Enter your 4-digit PIN.");return;}
+    setBusy(true);
+    try{
+      const h=await hashPin(pin);
+      if(h===found.pin_hash){ onLogin(found); }
+      else { setErr("Wrong PIN."); }
+    }catch(e){setErr("Error: "+e.message);}
+    setBusy(false);
+  };
+
+  const doSetPin=async()=>{
+    setErr("");
+    if(pin.length!==4||!/^\d{4}$/.test(pin)){setErr("PIN must be 4 digits.");return;}
+    if(pin!==pin2){setErr("PINs do not match.");return;}
+    setBusy(true);
+    try{
+      const h=await hashPin(pin);
+      await sb.patch("karu_users",found.id,{pin_hash:h,must_set_pin:false});
+      onLogin({...found,pin_hash:h,must_set_pin:false});
+    }catch(e){setErr("Could not set PIN: "+e.message);}
+    setBusy(false);
+  };
+
+  return (<><GS/>
+    <div style={{minHeight:"100vh",display:"flex",justifyContent:"center",alignItems:"center",padding:24}}>
+      <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:12,padding:"36px 28px",maxWidth:360,width:"100%"}}>
+        <div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:24,fontWeight:600,color:"#F5C000",letterSpacing:"0.1em"}}>KARU</div><div style={{fontSize:13,color:"#8899AA",marginTop:4}}>Accounts System</div></div>
+        {stage==="user"&&(<>
+          <div className="field"><label>Username</label><input value={username} onChange={e=>{setUsername(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&findUser()} placeholder="e.g. burton" autoFocus autoCapitalize="none"/></div>
+          {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
+          <button className="btn-y" onClick={findUser} disabled={busy} style={{width:"100%"}}>{busy?"...":"Continue"}</button>
+        </>)}
+        {stage==="pin"&&(<>
+          <div style={{fontSize:13,color:"#8899AA",marginBottom:14}}>Welcome back, <span style={{color:"#FFFFFF",fontWeight:600}}>{found.full_name.split(" ")[0]}</span></div>
+          <div className="field"><label>Your PIN</label><input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>{setPin(e.target.value.replace(/\D/g,""));setErr("");}} onKeyDown={e=>e.key==="Enter"&&doLogin()} placeholder="••••" autoFocus style={{letterSpacing:"0.4em",textAlign:"center",fontSize:20}}/></div>
+          {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
+          <button className="btn-y" onClick={doLogin} disabled={busy} style={{width:"100%"}}>{busy?"...":"Sign In"}</button>
+          <button className="btn-g" onClick={()=>{setStage("user");setPin("");setErr("");}} style={{width:"100%",marginTop:8,fontSize:13}}>Not you?</button>
+        </>)}
+        {stage==="setpin"&&(<>
+          <div style={{fontSize:13,color:"#8899AA",marginBottom:14}}>First login, <span style={{color:"#FFFFFF",fontWeight:600}}>{found.full_name.split(" ")[0]}</span>. Set a 4-digit PIN you'll remember.</div>
+          <div className="field"><label>New PIN</label><input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>{setPin(e.target.value.replace(/\D/g,""));setErr("");}} placeholder="••••" autoFocus style={{letterSpacing:"0.4em",textAlign:"center",fontSize:20}}/></div>
+          <div className="field"><label>Confirm PIN</label><input type="password" inputMode="numeric" maxLength={4} value={pin2} onChange={e=>{setPin2(e.target.value.replace(/\D/g,""));setErr("");}} placeholder="••••" style={{letterSpacing:"0.4em",textAlign:"center",fontSize:20}}/></div>
+          {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
+          <button className="btn-y" onClick={doSetPin} disabled={busy} style={{width:"100%"}}>{busy?"...":"Set PIN & Continue"}</button>
+        </>)}
+      </div>
+    </div></>);
+}
+
+function SidePanel({user,bal,onClose,onChange,onLogout}){
+  const [view,setView]=useState("home");
   const [act,setAct]=useState(null);
-  const [amt,setAmt]=useState(""); const [who,setWho]=useState("Burton Kariuki"); const [dir,setDir]=useState("in"); const [acc,setAcc]=useState("sacco");
+  const [amt,setAmt]=useState(""); const [who,setWho]=useState(user.full_name); const [dir,setDir]=useState("in"); const [acc,setAcc]=useState("sacco");
   const [openCash,setOpenCash]=useState(""); const [openSacco,setOpenSacco]=useState("");
   const [moves,setMoves]=useState([]); const [saving,setSaving]=useState(false);
   useEffect(()=>{ sb.get("karu_money","select=*&order=created_at.desc&limit=12").then(setMoves).catch(()=>{}); },[bal]);
@@ -171,7 +247,12 @@ function MoneyPanel({bal,onClose,onChange}){
         <div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Money</div>
         <button onClick={onClose} style={{background:"none",border:"none",color:"#8899AA",fontSize:20,cursor:"pointer"}}>×</button>
       </div>
-      {!bal.hasData?(
+      {view==="close"?<CloseDay user={user} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="users"?<ManageTeam user={user} onBack={()=>setView("home")}/>:!can(user,"money")?(
+        <div style={{textAlign:"center",color:"#8899AA",fontSize:14,padding:"20px 0"}}>
+          {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{width:"100%",marginBottom:10,fontSize:13}}>Daily cash close</button>}
+          <div style={{fontSize:12,color:"#556677",marginTop:8}}>Money controls are owner-only.</div>
+        </div>
+      ):!bal.hasData?(
         <div className="qa">
           <div className="qa-title">Set opening balances</div>
           <div style={{fontSize:11,color:"#8899AA",marginBottom:8}}>One time only. What do you have right now?</div>
@@ -191,6 +272,8 @@ function MoneyPanel({bal,onClose,onChange}){
           <button className="btn-y" onClick={()=>setAct("bank")} style={{fontSize:13}}>Bank cash</button>
           <button className="btn-g" onClick={()=>setAct("withdraw")} style={{fontSize:13}}>Withdraw from SACCO</button>
           <button className="btn-g" onClick={()=>setAct("partner")} style={{fontSize:13}}>Partner money in / out</button>
+          {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{fontSize:13}}>Daily cash close</button>}
+          {can(user,"users")&&<button className="btn-g" onClick={()=>setView("users")} style={{fontSize:13}}>Manage team</button>}
         </div>}
         {act==="bank"&&<div className="qa"><div className="qa-title">Bank cash</div><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus/><div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${who===s?" on":""}`} onClick={()=>setWho(s)}>{s.split(" ")[0]}</button>)}</div><div style={{display:"flex",gap:6}}><button className="btn-y" onClick={doBank} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setAct(null);setAmt("");}} style={{fontSize:13}}>Cancel</button></div></div>}
         {act==="withdraw"&&<div className="qa"><div className="qa-title">Withdraw to cash</div><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus/><div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${who===s?" on":""}`} onClick={()=>setWho(s)}>{s.split(" ")[0]}</button>)}</div><div style={{display:"flex",gap:6}}><button className="btn-y" onClick={doWithdraw} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setAct(null);setAmt("");}} style={{fontSize:13}}>Cancel</button></div></div>}
@@ -204,8 +287,124 @@ function MoneyPanel({bal,onClose,onChange}){
           {moves.map(m=><div key={m.id} className="mv"><span style={{color:"#8899AA"}}>{m.date.slice(5)} · {m.description||m.type}</span><span style={{color:m.amount>=0?"#4CAF50":"#E85B5B",fontWeight:600}}>{m.amount>=0?"+":""}{Math.round(m.amount).toLocaleString()}</span></div>)}
         </div>}
       </>)}
+      {view==="home"&&<button className="btn-g" onClick={onLogout} style={{width:"100%",marginTop:20,fontSize:13,borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Log out</button>}
     </div>
   </>);
+}
+
+function CloseDay({user,onBack,onDone}){
+  const [loading,setLoading]=useState(true); const [data,setData]=useState({cash:0,mpesa:0,count:0});
+  const [counted,setCounted]=useState(""); const [reason,setReason]=useState(""); const [notes,setNotes]=useState("");
+  const [saving,setSaving]=useState(false); const [err,setErr]=useState(""); const [alreadyClosed,setAlreadyClosed]=useState(null);
+  useEffect(()=>{(async()=>{
+    try{
+      const today=todayStr();
+      const [sales,closes]=await Promise.all([
+        sb.get("karu_sales",`select=*&date=eq.${today}&voided=eq.false`),
+        sb.get("karu_closes",`select=*&date=eq.${today}`)
+      ]);
+      if(closes.length) setAlreadyClosed(closes[0]);
+      let cash=0,mpesa=0;
+      sales.forEach(s=>{ const paid=Number(s.amount_paid||s.total); if(s.payment_method==="Cash")cash+=paid; else mpesa+=paid; });
+      setData({cash,mpesa,count:sales.length});
+    }catch(e){setErr("Load failed: "+e.message);}
+    setLoading(false);
+  })();},[]);
+  const variance = counted===""?0:Number(counted)-data.cash;
+  const doClose=async()=>{
+    setErr("");
+    if(counted===""){setErr("Enter the counted cash.");return;}
+    if(variance!==0&&!reason.trim()){setErr("Explain the difference before closing.");return;}
+    setSaving(true);
+    try{
+      await sb.post("karu_closes",{date:todayStr(),cash_expected:data.cash,cash_counted:Number(counted),variance,variance_reason:reason||null,mpesa_total:data.mpesa,sales_count:data.count,closed_by:user.full_name,notes});
+      await logAudit({trip_no:null,record_id:null,action:"daily_close",field_changed:todayStr(),old_value:"expected "+data.cash,new_value:"counted "+counted,reason:reason||"balanced",changed_by:user.full_name});
+      onDone();
+    }catch(e){setErr("Close failed: "+e.message);}
+    setSaving(false);
+  };
+  if(loading) return <div style={{textAlign:"center",color:"#8899AA",padding:"30px 0"}}>Loading today...</div>;
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Daily Cash Close</div></div>
+      {alreadyClosed?(
+        <div style={{background:"rgba(76,175,80,0.1)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:16,textAlign:"center"}}>
+          <div style={{fontSize:15,fontWeight:600,color:"#4CAF50",marginBottom:6}}>Today is closed</div>
+          <div style={{fontSize:13,color:"#8899AA"}}>Counted {fmtK(alreadyClosed.cash_counted)} · Variance {alreadyClosed.variance===0?"none":fmtK(alreadyClosed.variance)}</div>
+          <div style={{fontSize:12,color:"#556677",marginTop:4}}>Closed by {alreadyClosed.closed_by?.split(" ")[0]}</div>
+        </div>
+      ):(<>
+        <div className="qa"><div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>Cash sales today</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(data.cash)}</span></div>
+          <div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>M-Pesa today</span><span style={{fontSize:14,color:"#8899AA"}}>{fmtK(data.mpesa)}</span></div>
+          <div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>Sales count</span><span style={{fontSize:14,color:"#8899AA"}}>{data.count}</span></div></div>
+        <div className="field"><label>Count the drawer — actual cash (KSh)</label><input type="number" value={counted} onChange={e=>{setCounted(e.target.value);setErr("");}} placeholder="0" autoFocus/></div>
+        {counted!==""&&(
+          <div style={{background:variance===0?"rgba(76,175,80,0.1)":"rgba(232,91,91,0.1)",border:`1px solid ${variance===0?"rgba(76,175,80,0.3)":"rgba(232,91,91,0.3)"}`,borderRadius:8,padding:12,marginBottom:12,textAlign:"center"}}>
+            <div style={{fontSize:13,color:variance===0?"#4CAF50":"#E85B5B",fontWeight:600}}>{variance===0?"Balanced — drawer matches":variance>0?`Over by ${fmtK(variance)}`:`Short by ${fmtK(Math.abs(variance))}`}</div>
+          </div>
+        )}
+        {counted!==""&&variance!==0&&<div className="field"><label>Explain the {variance<0?"shortfall":"surplus"} (required)</label><textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="e.g. Gave 200 change short, float error..."/></div>}
+        <div className="field"><label>Notes (optional)</label><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Anything worth noting"/></div>
+        {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
+        <button className="btn-y" onClick={doClose} disabled={saving} style={{width:"100%",padding:13}}>{saving?"Closing...":"Close the Day"}</button>
+      </>)}
+    </div>
+  );
+}
+
+function ManageTeam({user,onBack}){
+  const [users,setUsers]=useState([]); const [loading,setLoading]=useState(true);
+  const [adding,setAdding]=useState(false); const [f,setF]=useState({full_name:"",username:"",phone:"",role:"attendant"});
+  const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
+  const load=async()=>{ setLoading(true); try{ setUsers(await sb.get("karu_users","select=*&order=created_at.asc")); }catch(e){console.error(e);} setLoading(false); };
+  useEffect(()=>{load();},[]);
+  const addUser=async()=>{
+    setErr(""); const un=f.username.trim().toLowerCase().replace(/\s+/g,"");
+    if(!f.full_name.trim()){setErr("Full name required.");return;}
+    if(!un){setErr("Username required.");return;}
+    setSaving(true);
+    try{
+      const exists=await sb.get("karu_users",`select=id&username=eq.${un}`);
+      if(exists.length){setErr("That username is taken.");setSaving(false);return;}
+      await sb.post("karu_users",{username:un,full_name:f.full_name.trim(),phone:f.phone.trim(),role:f.role,pin_hash:null,must_set_pin:true,active:true,created_by:user.full_name});
+      setAdding(false); setF({full_name:"",username:"",phone:"",role:"attendant"});
+      await load();
+    }catch(e){setErr("Failed: "+e.message);}
+    setSaving(false);
+  };
+  const toggleActive=async(u)=>{ if(u.role==="owner"){alert("Owners cannot be deactivated here.");return;} await sb.patch("karu_users",u.id,{active:!u.active}); await load(); };
+  const resetPin=async(u)=>{ if(!confirm(`Reset ${u.full_name.split(" ")[0]}'s PIN? They will set a new one at next login.`))return; await sb.patch("karu_users",u.id,{pin_hash:null,must_set_pin:true}); await load(); alert("PIN reset. They set a new one at next login."); };
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Manage Team</div></div>
+      {!adding&&<button className="btn-y" onClick={()=>setAdding(true)} style={{width:"100%",marginBottom:14,fontSize:13}}>+ Add team member</button>}
+      {adding&&(
+        <div className="qa" style={{marginBottom:14}}>
+          <div className="qa-title">New team member</div>
+          <div className="field"><label>Full name</label><input value={f.full_name} onChange={e=>setF(x=>({...x,full_name:e.target.value}))} placeholder="e.g. Jane Wanjiru"/></div>
+          <div className="field"><label>Username (they log in with this)</label><input value={f.username} onChange={e=>setF(x=>({...x,username:e.target.value}))} placeholder="e.g. jane" autoCapitalize="none"/></div>
+          <div className="field"><label>Phone (optional)</label><input value={f.phone} onChange={e=>setF(x=>({...x,phone:e.target.value}))} placeholder="07XX XXX XXX" type="tel"/></div>
+          <div className="field"><label>Role</label><div className="tog"><button className={`tog-btn${f.role==="attendant"?" on":""}`} onClick={()=>setF(x=>({...x,role:"attendant"}))} style={{fontSize:12}}>Attendant</button><button className={`tog-btn${f.role==="manager"?" on":""}`} onClick={()=>setF(x=>({...x,role:"manager"}))} style={{fontSize:12}}>Manager</button><button className={`tog-btn${f.role==="owner"?" on":""}`} onClick={()=>setF(x=>({...x,role:"owner"}))} style={{fontSize:12}}>Owner</button></div></div>
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:10}}>They'll set their own PIN when they first log in with this username.</div>
+          {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
+          <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={addUser} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Add"}</button><button className="btn-g" onClick={()=>{setAdding(false);setErr("");}} style={{fontSize:13}}>Cancel</button></div>
+        </div>
+      )}
+      {loading?<div style={{color:"#8899AA",textAlign:"center",padding:"20px 0"}}>Loading...</div>:users.map(u=>(
+        <div key={u.id} className="card" style={{opacity:u.active?1:0.5}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div><div style={{fontSize:14,fontWeight:600}}>{u.full_name} {u.id===user.id&&<span style={{color:"#8899AA",fontWeight:400,fontSize:12}}>(you)</span>}</div>
+              <div style={{fontSize:12,color:"#8899AA",marginTop:2}}>@{u.username} · {ROLES[u.role]?.label||u.role}{u.must_set_pin?" · PIN not set":""}{!u.active?" · inactive":""}</div></div>
+            <span className={`badge ${u.role==="owner"?"b-y":u.role==="manager"?"b-g":"b-muted"}`}>{ROLES[u.role]?.label}</span>
+          </div>
+          {u.id!==user.id&&<div style={{display:"flex",gap:6,marginTop:8}}>
+            <button className="btn-g" onClick={()=>resetPin(u)} style={{fontSize:11,padding:"5px 10px"}}>Reset PIN</button>
+            {u.role!=="owner"&&<button className="btn-g" onClick={()=>toggleActive(u)} style={{fontSize:11,padding:"5px 10px"}}>{u.active?"Deactivate":"Reactivate"}</button>}
+          </div>}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
@@ -229,11 +428,11 @@ function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
   );
 }
 
-function SaleTab({onMoney}){
+function SaleTab({user,onMoney}){
   const [stockItems,setStockItems]=useState([]);
   const [wiz,setWiz]=useState(false); const [step,setStep]=useState(1);
   const [sms,setSms]=useState(""); const [parsed,setParsed]=useState(null);
-  const [staff,setStaff]=useState("Burton Kariuki");
+  const [staff,setStaff]=useState(user?.full_name||"Burton Kariuki");
   const [cName,setCName]=useState(""); const [cPhone,setCPhone]=useState("");
   const [items,setItems]=useState([{id:1,name:"",qty:1,price:""}]);
   const [pay,setPay]=useState("mpesa"); const [mpesaCode,setMpesaCode]=useState("");
@@ -447,7 +646,7 @@ function SaleTab({onMoney}){
               {histSales.length===0?<div style={{color:"#556677",fontSize:13}}>No sales yet.</div>:histSales.map(s=>(
                 <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1A2A4A",opacity:s.voided?0.45:1}}>
                   <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · {s.date} · {initials(s.served_by)} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div></div>
-                  <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div>{!s.voided&&<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:"2px 0"}}>Void</button>}</div>
+                  <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div>{!s.voided&&can(user,"void")&&<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:"2px 0"}}>Void</button>}</div>
                 </div>
               ))}
             </div>
@@ -555,7 +754,7 @@ function SaleTab({onMoney}){
   );
 }
 
-function StockTab({onMoney}){
+function StockTab({user,onMoney}){
   const [trips,setTrips]=useState([]); const [stock,setStock]=useState([]); const [audit,setAudit]=useState([]);
   const [loading,setLoading]=useState(true); const [view,setView]=useState("list");
   const [expanded,setExpanded]=useState({}); const [editItem,setEditItem]=useState(null);
@@ -565,7 +764,7 @@ function StockTab({onMoney}){
   const [addingToTrip,setAddingToTrip]=useState(null);
   const [adjItem,setAdjItem]=useState(null); const [adjQty,setAdjQty]=useState(1); const [adjReason,setAdjReason]=useState("Damaged"); const [adjNotes,setAdjNotes]=useState(""); const [adjStaff,setAdjStaff]=useState("Burton Kariuki");
   const [addExtraItems,setAddExtraItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
-  const [trip,setTrip]=useState({date:new Date().toISOString().split("T")[0],notes:"",created_by:"Burton Kariuki",paid_from:"sacco"});
+  const [trip,setTrip]=useState({date:new Date().toISOString().split("T")[0],notes:"",created_by:user?.full_name||"Burton Kariuki",paid_from:"sacco"});
   const [tripItems,setTripItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
 
   useEffect(()=>{loadAll();},[]);
@@ -805,8 +1004,8 @@ function StockTab({onMoney}){
                       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
                         <span className={`badge ${avail>0?"b-g":"b-r"}`}>{avail>0?`${avail} left`:"None left"}</span>
                         <div style={{display:"flex",gap:4}}>
-                          {avail>0&&<button className="btn-g" onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{fontSize:11,padding:"4px 8px"}}>Adjust</button>}
-                          {!locked&&<button className="btn-r" onClick={()=>startEdit(s,t)} style={{fontSize:11,padding:"4px 8px"}}>Edit</button>}
+                          {avail>0&&can(user,"adjust")&&<button className="btn-g" onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{fontSize:11,padding:"4px 8px"}}>Adjust</button>}
+                          {!locked&&can(user,"edit")&&<button className="btn-r" onClick={()=>startEdit(s,t)} style={{fontSize:11,padding:"4px 8px"}}>Edit</button>}
                         </div>
                       </div>
                     </div>
@@ -841,7 +1040,7 @@ function StockTab({onMoney}){
                     )}
                   </div>
                 )}
-                {!locked&&(
+                {!locked&&can(user,"lock")&&(
                   <div style={{marginTop:12}}>
                     <div style={{fontSize:11,color:"#8899AA",marginBottom:6}}>Lock confirmed by</div>
                     <div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${lockStaff===s?" on":""}`} onClick={()=>setLockStaff(s)}>{s.split(" ")[0]}</button>)}</div>
@@ -871,10 +1070,10 @@ function StockTab({onMoney}){
   );
 }
 
-function ExpensesTab({onMoney}){
+function ExpensesTab({user,onMoney}){
   const [exp,setExp]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [form,setForm]=useState({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:"Burton Kariuki",paid_from:"sacco"});
+  const [form,setForm]=useState({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:user?.full_name||"Burton Kariuki",paid_from:"sacco"});
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
   const [showForm,setShowForm]=useState(false);
@@ -951,7 +1150,7 @@ function ExpensesTab({onMoney}){
   );
 }
 
-function ReportsTab(){
+function ReportsTab({user}){
   const [data,setData]=useState({sales:[],expenses:[],stock:[]});
   const [loading,setLoading]=useState(true);
   const [period,setPeriod]=useState("month");
