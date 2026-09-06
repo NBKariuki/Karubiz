@@ -105,7 +105,6 @@ export default function App() {
         <span style={{fontSize:12,color:"#556677"}}>{new Date().toLocaleDateString("en-KE",{day:"2-digit",month:"short"})}</span>
         <button onClick={()=>setPanel(true)} style={{background:"none",border:"1px solid #1A2A4A",borderRadius:6,color:"#F5C000",padding:"5px 10px",fontSize:16,cursor:"pointer",lineHeight:1}}>☰</button>
       </div>
-      <div className="strip"><span>Cash <b>{fmtK(bal.cash)}</b></span><span>SACCO <b>{fmtK(bal.sacco)}</b></span></div>
       <div style={{padding:16}}>
         {tab==="sale"&&<SaleTab onMoney={refreshBal}/>}{tab==="stock"&&<StockTab onMoney={refreshBal}/>}{tab==="expenses"&&<ExpensesTab onMoney={refreshBal}/>}{tab==="reports"&&<ReportsTab/>}
       </div>
@@ -190,7 +189,7 @@ function MoneyPanel({bal,onClose,onChange}){
 
 function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
   const [open,setOpen]=useState(false);
-  const matches=value.length>0?stockItems.filter(s=>s.name.toLowerCase().includes(value.toLowerCase())&&(s.qty_in-s.qty_sold)>0):[];
+  const matches=value.length>0?stockItems.filter(s=>s.name.toLowerCase().includes(value.toLowerCase())&&(s.qty_in-s.qty_sold-(s.qty_adjusted||0))>0):[];
   return (
     <div style={{position:"relative"}}>
       <input value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),200)}
@@ -200,7 +199,7 @@ function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
           {matches.map(s=>(
             <div key={s.id} className="ac-item" onMouseDown={()=>onSelect(s)}>
               <div style={{fontSize:13,fontWeight:500}}>{s.name}</div>
-              <div style={{fontSize:11,color:"#8899AA"}}>{s.qty_in-s.qty_sold} available · KSh {Number(s.selling_price).toLocaleString()} · {s.trip_no}</div>
+              <div style={{fontSize:11,color:"#8899AA"}}>{s.qty_in-s.qty_sold-(s.qty_adjusted||0)} available · KSh {Number(s.selling_price).toLocaleString()} · {s.trip_no}</div>
             </div>
           ))}
         </div>
@@ -224,13 +223,43 @@ function SaleTab({onMoney}){
   const [addPayCode,setAddPayCode]=useState(""); const [addPayNotes,setAddPayNotes]=useState("");
   const [addPayStaff,setAddPayStaff]=useState("Burton Kariuki"); const [addPaySaving,setAddPaySaving]=useState(false);
   const [showPending,setShowPending]=useState(false);
+  const [todaySales,setTodaySales]=useState([]); const [showHistory,setShowHistory]=useState(false);
+  const [histSales,setHistSales]=useState([]); const [voidSale,setVoidSale]=useState(null);
+  const [voidReason,setVoidReason]=useState(""); const [voidStaff,setVoidStaff]=useState("Burton Kariuki"); const [voiding,setVoiding]=useState(false);
 
   const loadPendingSales=async()=>{
-    try{ const ps=await sb.get("karu_sales","select=*&balance_due=gt.0&order=created_at.desc"); setPendingSales(ps); }catch(e){console.error(e);}
+    try{ const ps=await sb.get("karu_sales","select=*&balance_due=gt.0&voided=eq.false&order=created_at.desc"); setPendingSales(ps); }catch(e){console.error(e);}
+  };
+  const loadToday=async()=>{
+    try{ const t=await sb.get("karu_sales",`select=*&date=eq.${todayStr()}&order=created_at.desc`); setTodaySales(t); }catch(e){console.error(e);}
+  };
+  const loadHistory=async()=>{
+    try{ const h=await sb.get("karu_sales","select=*&order=created_at.desc&limit=60"); setHistSales(h); }catch(e){console.error(e);}
+  };
+  const doVoid=async()=>{
+    if(!voidReason.trim()){alert("Reason required.");return;}
+    setVoiding(true);
+    try{
+      const s=voidSale;
+      await sb.patch("karu_sales",s.id,{voided:true,void_reason:voidReason,voided_by:voidStaff,voided_at:new Date().toISOString()});
+      if(s.items){ for(const it of s.items){
+        const matches=stockItems.filter(x=>x.name.toLowerCase()===String(it.name).toLowerCase()&&x.qty_sold>0).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
+        let q=Number(it.qty||1);
+        for(const m of matches){ if(q<=0)break; const r=Math.min(q,m.qty_sold); await sb.patch("karu_stock",m.id,{qty_sold:m.qty_sold-r}); q-=r; }
+      }}
+      const paid=Number(s.amount_paid||s.total);
+      await recordMoney({account:s.payment_method==="M-Pesa"?"sacco":"cash",amount:-paid,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name}`,date:todayStr(),recorded_by:voidStaff});
+      await logAudit({trip_no:null,record_id:s.id,action:"void_sale",field_changed:s.receipt_no,old_value:String(s.total),new_value:"0",reason:voidReason,changed_by:voidStaff});
+      if(onMoney) onMoney();
+      setVoidSale(null); setVoidReason("");
+      const fresh=await sb.get("karu_stock","select=*&order=date_in.asc"); setStockItems(fresh);
+      await Promise.all([loadToday(),loadHistory(),loadPendingSales()]);
+    }catch(e){alert("Void failed: "+e.message);}
+    setVoiding(false);
   };
   useEffect(()=>{
     sb.get("karu_stock","select=*&order=date_in.asc").then(s=>setStockItems(s)).catch(console.error);
-    loadPendingSales();
+    loadPendingSales(); loadToday();
   },[]);
 
   const handleSms=v=>{
@@ -257,10 +286,10 @@ function SaleTab({onMoney}){
     for(const sold of soldItems){
       if(!sold.name) continue;
       let qtyLeft=Number(sold.qty||1);
-      const matches=stockItems.filter(s=>s.name.toLowerCase()===sold.name.toLowerCase()&&(s.qty_in-s.qty_sold)>0).sort((a,b)=>new Date(a.date_in)-new Date(b.date_in));
+      const matches=stockItems.filter(s=>s.name.toLowerCase()===sold.name.toLowerCase()&&(s.qty_in-s.qty_sold-(s.qty_adjusted||0))>0).sort((a,b)=>new Date(a.date_in)-new Date(b.date_in));
       for(const si of matches){
         if(qtyLeft<=0) break;
-        const avail=si.qty_in-si.qty_sold;
+        const avail=si.qty_in-si.qty_sold-(si.qty_adjusted||0);
         const reduce=Math.min(qtyLeft,avail);
         await sb.patch("karu_stock",si.id,{qty_sold:si.qty_sold+reduce});
         qtyLeft-=reduce;
@@ -296,6 +325,7 @@ function SaleTab({onMoney}){
       if(onMoney) onMoney();
       const fresh=await sb.get("karu_stock","select=*&order=date_in.asc");
       setStockItems(fresh);
+      await loadToday();
       if(withReceipt){ setReceipt(data); } else { setSaved(data); }
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
@@ -435,6 +465,41 @@ function SaleTab({onMoney}){
 
   return (
     <div>
+      {(()=>{ const live=todaySales.filter(s=>!s.voided); const tot=live.reduce((a,s)=>a+Number(s.amount_paid||s.total),0); return (
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+          <div><div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em"}}>Today</div><div style={{fontSize:14,fontWeight:600,color:"#FFFFFF"}}>{live.length} sale{live.length!==1?"s":""} · <span style={{color:"#F5C000"}}>{fmtK(tot)}</span></div></div>
+          <button className="btn-g" onClick={()=>{setShowHistory(x=>!x);if(!showHistory)loadHistory();}} style={{fontSize:12,padding:"6px 12px"}}>{showHistory?"Hide":"History"}</button>
+        </div>
+      );})()}
+      {showHistory&&(
+        <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:14}}>
+          {voidSale?(
+            <div>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:4,color:"#E85B5B"}}>Void {voidSale.receipt_no}</div>
+              <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>{voidSale.customer_name} · {fmtK(Number(voidSale.total))}. Stock will be returned and money reversed.</div>
+              <div className="field"><label>Reason (required)</label><textarea value={voidReason} onChange={e=>setVoidReason(e.target.value)} placeholder="e.g. Wrong item recorded, customer returned"/></div>
+              <div className="field"><label>Voided by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${voidStaff===s?" on":""}`} onClick={()=>setVoidStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
+              <div style={{display:"flex",gap:8}}><button className="btn-r" onClick={doVoid} disabled={voiding} style={{flex:1,padding:10}}>{voiding?"Voiding...":"Confirm Void"}</button><button className="btn-g" onClick={()=>{setVoidSale(null);setVoidReason("");}} style={{fontSize:13}}>Cancel</button></div>
+            </div>
+          ):(
+            <div>
+              <div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Recent sales</div>
+              {histSales.length===0?<div style={{color:"#556677",fontSize:13}}>No sales yet.</div>:histSales.map(s=>(
+                <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1A2A4A",opacity:s.voided?0.45:1}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div>
+                    <div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · {s.date} · {s.served_by?.split(" ")[0]} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div>
+                  </div>
+                  <div style={{textAlign:"right",marginLeft:8}}>
+                    <div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div>
+                    {!s.voided&&<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:"2px 0"}}>Void</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {pendingSales.length>0&&(
         <div style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.4)",borderRadius:8,padding:12,marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setShowPending(x=>!x)}>
@@ -526,6 +591,7 @@ function StockTab({onMoney}){
   const [editStaff,setEditStaff]=useState("Burton Kariuki"); const [lockStaff,setLockStaff]=useState("Burton Kariuki");
   const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
   const [addingToTrip,setAddingToTrip]=useState(null);
+  const [adjItem,setAdjItem]=useState(null); const [adjQty,setAdjQty]=useState(1); const [adjReason,setAdjReason]=useState("Damaged"); const [adjNotes,setAdjNotes]=useState(""); const [adjStaff,setAdjStaff]=useState("Burton Kariuki");
   const [addExtraItems,setAddExtraItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
   const [trip,setTrip]=useState({date:new Date().toISOString().split("T")[0],notes:"",created_by:"Burton Kariuki",paid_from:"sacco"});
   const [tripItems,setTripItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
@@ -581,6 +647,20 @@ function StockTab({onMoney}){
     setSaving(false);
   };
 
+  const doAdjust=async()=>{
+    const q=Number(adjQty); const avail=adjItem.qty_in-adjItem.qty_sold-(adjItem.qty_adjusted||0);
+    if(!q||q<1){alert("Enter quantity.");return;} if(q>avail){alert(`Only ${avail} available.`);return;}
+    setSaving(true);
+    try{
+      await sb.post("karu_adjustments",{stock_id:adjItem.id,item_name:adjItem.name,trip_no:adjItem.trip_no,qty:q,reason:adjReason,notes:adjNotes,recorded_by:adjStaff,date:todayStr()});
+      await sb.patch("karu_stock",adjItem.id,{qty_adjusted:(adjItem.qty_adjusted||0)+q});
+      await logAudit({trip_no:adjItem.trip_no,record_id:adjItem.id,action:"adjust",field_changed:adjItem.name,old_value:String(avail),new_value:String(avail-q),reason:`${adjReason}${adjNotes?" · "+adjNotes:""}`,changed_by:adjStaff});
+      setAdjItem(null); setAdjQty(1); setAdjNotes("");
+      await loadAll();
+    }catch(e){alert("Failed: "+e.message);}
+    setSaving(false);
+  };
+
   const saveAddItems=async(t)=>{
     const vi=addExtraItems.filter(i=>i.name&&Number(i.unit_cost)>0);
     if(!vi.length){alert("Add at least one item with name and cost.");return;}
@@ -630,8 +710,25 @@ function StockTab({onMoney}){
     setSaving(false);
   };
 
-  const totalSV=stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold)*i.unit_cost),0);
-  const totalU=stock.reduce((s,i)=>s+(i.qty_in-i.qty_sold),0);
+  const totalSV=stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
+  const totalU=stock.reduce((s,i)=>s+(i.qty_in-i.qty_sold-(i.qty_adjusted||0)),0);
+
+  if(adjItem) return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+        <button className="btn-g" onClick={()=>{setAdjItem(null);setAdjNotes("");}}>Cancel</button>
+        <div style={{fontSize:15,fontWeight:600}}>Stock Adjustment</div>
+      </div>
+      <div style={{background:"#0A1128",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12,marginBottom:14,fontSize:12,color:"#8899AA"}}>
+        <strong style={{color:"#E8E2D4"}}>{adjItem.name}</strong> · {adjItem.trip_no} · {adjItem.qty_in-adjItem.qty_sold-(adjItem.qty_adjusted||0)} available
+      </div>
+      <div className="field"><label>Reason</label><div className="tog">{["Damaged","Display","Personal use","Other"].map(r=><button key={r} className={`tog-btn${adjReason===r?" on":""}`} onClick={()=>setAdjReason(r)} style={{fontSize:12}}>{r}</button>)}</div></div>
+      <div className="field"><label>Quantity</label><input type="number" value={adjQty} min={1} onChange={e=>setAdjQty(e.target.value)}/></div>
+      <div className="field"><label>Notes (optional)</label><input value={adjNotes} onChange={e=>setAdjNotes(e.target.value)} placeholder="e.g. Leg broke during delivery"/></div>
+      <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${adjStaff===s?" on":""}`} onClick={()=>setAdjStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
+      <button className="btn-y" onClick={doAdjust} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":"Remove from Stock"}</button>
+    </div>
+  );
 
   if(editItem) return (
     <div>
@@ -725,17 +822,20 @@ function StockTab({onMoney}){
             {isOpen&&(
               <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #1A2A4A"}}>
                 {tItems.map(s=>{
-                  const avail=s.qty_in-s.qty_sold;
+                  const adj=s.qty_adjusted||0; const avail=s.qty_in-s.qty_sold-adj;
                   return (
                     <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"8px 0",borderBottom:"1px solid #0F1A3A"}}>
                       <div style={{flex:1}}>
                         <div style={{fontSize:13,fontWeight:500}}>{s.name}</div>
                         <div style={{fontSize:11,color:"#8899AA",marginTop:2}}>{catLabel(s.category)} · Cost: KSh {Number(s.unit_cost).toLocaleString()} · Sell: KSh {Number(s.selling_price).toLocaleString()}</div>
-                        <div style={{fontSize:11,color:"#556677",marginTop:1}}>In: {s.qty_in} · Sold: {s.qty_sold} · Left: {avail}</div>
+                        <div style={{fontSize:11,color:"#556677",marginTop:1}}>In: {s.qty_in} · Sold: {s.qty_sold}{adj>0?` · Adjusted: ${adj}`:""} · Left: {avail}</div>
                       </div>
                       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-                        <span className={`badge ${avail>0?"b-g":"b-r"}`}>{avail>0?`${avail} left`:"Sold out"}</span>
-                        {!locked&&<button className="btn-r" onClick={()=>startEdit(s,t)}>Edit</button>}
+                        <span className={`badge ${avail>0?"b-g":"b-r"}`}>{avail>0?`${avail} left`:"None left"}</span>
+                        <div style={{display:"flex",gap:4}}>
+                          {avail>0&&<button className="btn-g" onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{fontSize:11,padding:"4px 8px"}}>Adjust</button>}
+                          {!locked&&<button className="btn-r" onClick={()=>startEdit(s,t)} style={{fontSize:11,padding:"4px 8px"}}>Edit</button>}
+                        </div>
                       </div>
                     </div>
                   );
@@ -889,13 +989,38 @@ function ReportsTab(){
     setLoading(true);
     try{
       const [sales,expenses,stock]=await Promise.all([
-        sb.get("karu_sales","select=*&order=date.desc"),
+        sb.get("karu_sales","select=*&voided=eq.false&order=date.desc"),
         sb.get("karu_expenses","select=*&order=date.desc"),
         sb.get("karu_stock","select=*")
       ]);
       setData({sales,expenses,stock});
     }catch(e){console.error(e);}
     setLoading(false);
+  };
+
+  const exportCSV=async(kind)=>{
+    const esc=v=>{const s=v==null?"":String(v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+    const dl=(name,rows)=>{
+      if(!rows.length){alert("Nothing to export.");return;}
+      const cols=Object.keys(rows[0]);
+      const csv=[cols.join(","),...rows.map(r=>cols.map(c=>esc(r[c])).join(","))].join("\n");
+      const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download=`karu-${name}-${todayStr()}.csv`; a.click();
+    };
+    try{
+      if(kind==="sales"){
+        const all=await sb.get("karu_sales","select=*&order=date.desc");
+        dl("sales",all.map(s=>({receipt_no:s.receipt_no,date:s.date,time:s.time_str,served_by:s.served_by,customer:s.customer_name,phone:s.customer_phone,items:(s.items||[]).map(i=>`${i.name} x${i.qty} @${i.price}`).join("; "),total:s.total,amount_paid:s.amount_paid??s.total,balance_due:s.balance_due||0,payment:s.payment_method,mpesa_code:s.mpesa_code,notes:s.notes,voided:s.voided?"YES":"",void_reason:s.void_reason})));
+      } else if(kind==="expenses"){
+        const all=await sb.get("karu_expenses","select=*&order=date.desc");
+        dl("expenses",all.map(e=>({date:e.date,category:e.category,description:e.description,amount:e.amount,paid_from:e.paid_from,recorded_by:e.recorded_by})));
+      } else if(kind==="stock"){
+        const all=await sb.get("karu_stock","select=*&order=trip_no.asc");
+        dl("stock",all.map(s=>({trip_no:s.trip_no,date_in:s.date_in,item:s.name,category:s.category,qty_in:s.qty_in,qty_sold:s.qty_sold,qty_adjusted:s.qty_adjusted||0,qty_available:s.qty_in-s.qty_sold-(s.qty_adjusted||0),unit_cost:s.unit_cost,selling_price:s.selling_price,stock_value:(s.qty_in-s.qty_sold-(s.qty_adjusted||0))*s.unit_cost})));
+      } else if(kind==="money"){
+        const all=await sb.get("karu_money","select=*&order=date.desc,created_at.desc");
+        dl("money",all.map(m=>({date:m.date,account:m.account,type:m.type,amount:m.amount,description:m.description,ref:m.ref,partner:m.partner,recorded_by:m.recorded_by})));
+      }
+    }catch(e){alert("Export failed: "+e.message);}
   };
 
   const now=new Date();
@@ -910,7 +1035,7 @@ function ReportsTab(){
   const fExp=filterDate(data.expenses);
   const revenue=fSales.reduce((s,x)=>s+Number(x.total),0);
   const expenses=fExp.reduce((s,x)=>s+Number(x.amount),0);
-  const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold)*i.unit_cost),0);
+  const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
   const cogs=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
   const grossProfit=revenue-cogs;
   const netProfit=grossProfit-expenses;
@@ -1036,6 +1161,12 @@ function ReportsTab(){
           </div>
         );
       })()}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <button className="btn-g" onClick={()=>exportCSV("sales")} style={{fontSize:12}}>Export sales</button>
+        <button className="btn-g" onClick={()=>exportCSV("expenses")} style={{fontSize:12}}>Export expenses</button>
+        <button className="btn-g" onClick={()=>exportCSV("stock")} style={{fontSize:12}}>Export stock</button>
+        <button className="btn-g" onClick={()=>exportCSV("money")} style={{fontSize:12}}>Export money</button>
+      </div>
       <button className="btn-g" onClick={loadAll} style={{width:"100%",fontSize:13}}>Refresh</button>
     </div>
   );
