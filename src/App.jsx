@@ -300,12 +300,21 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
           {bal.owed_burton>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes Burton</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.owed_burton)}</span></div>}
           {bal.owed_martin>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes Martin</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.owed_martin)}</span></div>}
         </div>
-        {!act&&<div style={{display:"grid",gap:8,marginBottom:16}}>
-          <button className="btn-y" onClick={()=>setAct("bank")} style={{fontSize:13}}>Bank cash</button>
-          <button className="btn-g" onClick={()=>setAct("withdraw")} style={{fontSize:13}}>Withdraw from SACCO</button>
-          <button className="btn-g" onClick={()=>setAct("partner")} style={{fontSize:13}}>Partner money in / out</button>
-          {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{fontSize:13}}>Daily cash close</button>}
-          {can(user,"users")&&<button className="btn-g" onClick={()=>setView("users")} style={{fontSize:13}}>Manage team</button>}
+        {!act&&<div style={{marginBottom:16}}>
+          <div style={{fontSize:10,color:"#556677",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Money actions</div>
+          <div style={{display:"grid",gap:8,marginBottom:16}}>
+            <button className="btn-g" onClick={()=>setAct("bank")} style={{fontSize:13}}>Bank cash</button>
+            <button className="btn-g" onClick={()=>setAct("withdraw")} style={{fontSize:13}}>Withdraw from SACCO</button>
+            <button className="btn-g" onClick={()=>setAct("partner")} style={{fontSize:13}}>Partner money in / out</button>
+          </div>
+          {(can(user,"close")||can(user,"users"))&&<>
+            <div style={{borderTop:"1px solid #1A2A4A",margin:"4px 0 12px"}}/>
+            <div style={{fontSize:10,color:"#556677",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Admin</div>
+            <div style={{display:"grid",gap:8}}>
+              {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{fontSize:13}}>Daily cash close</button>}
+              {can(user,"users")&&<button className="btn-g" onClick={()=>setView("users")} style={{fontSize:13}}>Manage team</button>}
+            </div>
+          </>}
         </div>}
         {act==="bank"&&<div className="qa"><div className="qa-title">Bank cash</div><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus/><div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${who===s?" on":""}`} onClick={()=>setWho(s)}>{s.split(" ")[0]}</button>)}</div><div style={{display:"flex",gap:6}}><button className="btn-y" onClick={doBank} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setAct(null);setAmt("");}} style={{fontSize:13}}>Cancel</button></div></div>}
         {act==="withdraw"&&<div className="qa"><div className="qa-title">Withdraw to cash</div><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus/><div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${who===s?" on":""}`} onClick={()=>setWho(s)}>{s.split(" ")[0]}</button>)}</div><div style={{display:"flex",gap:6}}><button className="btn-y" onClick={doWithdraw} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setAct(null);setAmt("");}} style={{fontSize:13}}>Cancel</button></div></div>}
@@ -715,10 +724,7 @@ function SaleTab({user,onMoney}){
       )}
 
       <div style={{marginTop:6}}>
-        <div style={{fontSize:12,color:"#FFFFFF",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:10}}>New sale · who is serving?</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          {STAFF.map(s=><button key={s} className="staff-btn" onClick={()=>openWiz(s)}>{s.split(" ")[0]}</button>)}
-        </div>
+        <button className="btn-y" onClick={()=>openWiz(user.full_name)} style={{width:"100%",padding:16,fontSize:16}}>+ New Sale</button>
       </div>
 
       {wiz&&(
@@ -761,6 +767,9 @@ function SaleTab({user,onMoney}){
               </>)}
               {step===3&&(<>
                 <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:12}}>Payment</div>
+                {can(user,"users")&&(
+                  <div className="field"><label>Serving as</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${staff===s?" on":""}`} onClick={()=>setStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
+                )}
                 <div style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:14}}>
                   <div style={{fontSize:13,fontWeight:600,marginBottom:2}}>{cName}{cPhone?<span style={{color:"#8899AA",fontWeight:400}}> · {cPhone}</span>:null}</div>
                   {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#8899AA",padding:"2px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
@@ -1109,14 +1118,17 @@ function ExpensesTab({user,onMoney}){
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
   const [showForm,setShowForm]=useState(false);
+  const monthStart=new Date().toISOString().slice(0,7)+"-01";
+  const [from,setFrom]=useState(monthStart); const [to,setTo]=useState(todayStr());
+  const [showRange,setShowRange]=useState(false);
 
-  useEffect(()=>{loadExp();},[]);
   const loadExp=async()=>{
     setLoading(true);
-    try{ const e=await sb.get("karu_expenses","select=*&order=date.desc,created_at.desc&limit=60"); setExp(e); }
+    try{ setExp(await sb.get("karu_expenses",`select=*&date=gte.${from}&date=lte.${to}&order=date.desc,created_at.desc`)); }
     catch(e){console.error(e);}
     setLoading(false);
   };
+  useEffect(()=>{loadExp();},[from,to]);
 
   const save=async()=>{
     if(!form.amount||Number(form.amount)<=0){setErr("Enter a valid amount.");return;}
@@ -1124,28 +1136,38 @@ function ExpensesTab({user,onMoney}){
     try{
       await sb.post("karu_expenses",{...form,amount:Number(form.amount)});
       const a=Number(form.amount); const short=form.recorded_by.split(" ")[0]; const lbl=`${form.category}${form.description?" · "+form.description:""}`;
-      if(form.paid_from==="personal"){
-        await recordMoney({account:"owed_"+short.toLowerCase(),amount:a,type:"expense_personal",partner:form.recorded_by,description:`${lbl} (paid by ${short})`,date:form.date,recorded_by:form.recorded_by});
-      } else {
-        await recordMoney({account:form.paid_from,amount:-a,type:"expense",description:lbl,date:form.date,recorded_by:form.recorded_by});
-      }
+      if(form.paid_from==="personal") await recordMoney({account:"owed_"+short.toLowerCase(),amount:a,type:"expense_personal",partner:form.recorded_by,description:`${lbl} (paid by ${short})`,date:form.date,recorded_by:form.recorded_by});
+      else await recordMoney({account:form.paid_from,amount:-a,type:"expense",description:lbl,date:form.date,recorded_by:form.recorded_by});
       if(onMoney) onMoney();
-      await loadExp();
       setShowForm(false);
-      setForm({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:"Burton Kariuki",paid_from:"sacco"});
+      setForm({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:user?.full_name||"Burton Kariuki",paid_from:"sacco"});
+      await loadExp();
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
   };
 
-  const thisMonth=exp.filter(e=>e.date.startsWith(new Date().toISOString().slice(0,7)));
-  const monthTotal=thisMonth.reduce((s,e)=>s+Number(e.amount),0);
+  const total=exp.reduce((s,e)=>s+Number(e.amount),0);
+  const isThisMonth = from===monthStart && to===todayStr();
+  const rangeLabel = isThisMonth ? "This month" : `${from.slice(5)} to ${to.slice(5)}`;
 
   return (
     <div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-        <div className="stat"><div className="stat-n" style={{color:"#E85B5B"}}>KSh {monthTotal.toLocaleString()}</div><div className="stat-l">This month</div></div>
-        <div className="stat"><div className="stat-n" style={{color:"#8899AA"}}>{thisMonth.length}</div><div className="stat-l">Entries</div></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+        <div className="stat"><div className="stat-n" style={{color:"#E85B5B"}}>{fmtK(total)}</div><div className="stat-l">{rangeLabel}</div></div>
+        <div className="stat"><div className="stat-n" style={{color:"#8899AA"}}>{exp.length}</div><div className="stat-l">Entries</div></div>
       </div>
+
+      <div style={{display:"flex",gap:8,marginBottom:12}}>
+        <button className="btn-g" onClick={()=>{setFrom(monthStart);setTo(todayStr());setShowRange(false);}} style={{flex:1,fontSize:12,...(isThisMonth?{borderColor:"#F5C000",color:"#F5C000"}:{})}}>This month</button>
+        <button className="btn-g" onClick={()=>setShowRange(x=>!x)} style={{flex:1,fontSize:12,...(!isThisMonth?{borderColor:"#F5C000",color:"#F5C000"}:{})}}>Date range</button>
+      </div>
+      {showRange&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13}}/></div>
+          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13}}/></div>
+        </div>
+      )}
+
       {!showForm&&<button className="btn-y" onClick={()=>setShowForm(true)} style={{width:"100%",marginBottom:14}}>+ Log Expense</button>}
       {showForm&&(
         <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
@@ -1158,22 +1180,18 @@ function ExpensesTab({user,onMoney}){
           <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${form.paid_from==="cash"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${form.paid_from==="sacco"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${form.paid_from==="personal"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
           {form.paid_from==="personal"&&<div style={{fontSize:11,color:"#E8A45B",marginTop:5}}>Business will owe {form.recorded_by.split(" ")[0]} this amount</div>}</div>
           {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
-          <div style={{display:"flex",gap:8}}>
-            <button className="btn-y" onClick={save} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save"}</button>
-            <button className="btn-g" onClick={()=>{setShowForm(false);setErr("");}}>Cancel</button>
-          </div>
+          <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={save} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save"}</button><button className="btn-g" onClick={()=>{setShowForm(false);setErr("");}}>Cancel</button></div>
         </div>
       )}
-      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:exp.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No expenses logged yet.</div>:(
-        <div>
-          <div style={{fontSize:12,color:"#556677",marginBottom:10}}>Recent expenses</div>
-          {exp.map(e=>(
-            <div key={e.id} className="card">
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
-                <div><span className="badge b-r" style={{marginRight:8}}>{e.category}</span><span style={{fontSize:13,fontWeight:500}}>{e.description||e.category}</span></div>
-                <span style={{fontSize:14,fontWeight:600,color:"#E85B5B"}}>KSh {Number(e.amount).toLocaleString()}</span>
+      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:exp.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No expenses in this period.</div>:(
+        <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,overflow:"hidden"}}>
+          {exp.map((e,i)=>(
+            <div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderBottom:i<exp.length-1?"1px solid #0F1A3A":"none"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.description||e.category}</div>
+                <div style={{fontSize:11,color:"#556677"}}>{e.category} · {e.date.slice(5)} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+e.paid_from:""}</div>
               </div>
-              <div style={{fontSize:11,color:"#556677"}}>{e.date} · {e.recorded_by?.split(" ")[0]}</div>
+              <span style={{fontSize:14,fontWeight:600,color:"#E85B5B",marginLeft:10,whiteSpace:"nowrap"}}>{fmtK(Number(e.amount))}</span>
             </div>
           ))}
         </div>
@@ -1236,11 +1254,13 @@ function ReportsTab({user}){
 
   const fSales=filterDate(data.sales);
   const fExp=filterDate(data.expenses);
-  const revenue=fSales.reduce((s,x)=>s+Number(x.total),0);
+  const salesValue=fSales.reduce((s,x)=>s+Number(x.total),0);
+  const collected=fSales.reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
+  const receivables=fSales.reduce((s,x)=>s+Number(x.balance_due||0),0);
   const expenses=fExp.reduce((s,x)=>s+Number(x.amount),0);
   const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
   const cogs=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
-  const grossProfit=revenue-cogs;
+  const grossProfit=salesValue-cogs;
   const netProfit=grossProfit-expenses;
 
   const dailyMap={};
@@ -1254,8 +1274,8 @@ function ReportsTab({user}){
   const expMap={};
   fExp.forEach(e=>{expMap[e.category]=(expMap[e.category]||0)+Number(e.amount);});
   const expBreakdown=Object.entries(expMap).sort(([,a],[,b])=>b-a);
-  const mpesa=fSales.filter(s=>s.payment_method==="M-Pesa").reduce((s,x)=>s+Number(x.total),0);
-  const cash=fSales.filter(s=>s.payment_method==="Cash").reduce((s,x)=>s+Number(x.total),0);
+  const mpesa=fSales.filter(s=>s.payment_method==="M-Pesa").reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
+  const cash=fSales.filter(s=>s.payment_method==="Cash").reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
 
   if(loading) return <div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading reports...</div>;
 
@@ -1266,15 +1286,22 @@ function ReportsTab({user}){
           <button key={id} className={`tog-btn${period===id?" on":""}`} onClick={()=>setPeriod(id)} style={{fontSize:12}}>{label}</button>
         ))}</div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-        <div className="stat"><div className="stat-n" style={{color:"#4CAF50"}}>KSh {revenue.toLocaleString()}</div><div className="stat-l">Revenue</div></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+        <div className="stat"><div className="stat-n" style={{color:"#4CAF50"}}>KSh {collected.toLocaleString()}</div><div className="stat-l">Collected</div></div>
         <div className="stat"><div className="stat-n" style={{color:"#E85B5B"}}>KSh {expenses.toLocaleString()}</div><div className="stat-l">Expenses</div></div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+        <div className="stat"><div className="stat-n" style={{fontSize:18,color:"#8899AA"}}>KSh {salesValue.toLocaleString()}</div><div className="stat-l">Sales value (invoiced)</div></div>
+        <div className="stat" style={receivables>0?{border:"1px solid rgba(232,164,91,0.4)"}:{}}><div className="stat-n" style={{fontSize:18,color:receivables>0?"#E8A45B":"#8899AA"}}>KSh {receivables.toLocaleString()}</div><div className="stat-l">Owed to us</div></div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
         <div className="stat"><div className="stat-n" style={{color:"#F5C000"}}>KSh {grossProfit.toLocaleString()}</div><div className="stat-l">Gross profit</div></div>
         <div className="stat" style={{border:`1px solid ${netProfit>=0?"rgba(76,175,80,0.4)":"rgba(232,91,91,0.4)"}`}}>
           <div className="stat-n" style={{color:netProfit>=0?"#4CAF50":"#E85B5B"}}>KSh {Math.abs(netProfit).toLocaleString()}</div>
           <div className="stat-l">Net {netProfit>=0?"profit":"loss"}</div>
         </div>
       </div>
+      <div style={{fontSize:11,color:"#556677",marginBottom:14,lineHeight:1.5,padding:"0 2px"}}>Profit is on sales value (what's invoiced). Collected is cash actually received; Owed to us is the outstanding balance on instalment sales.</div>
       <div className="card" style={{marginBottom:14}}>
         <div style={{fontSize:11,color:"#8899AA",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
         <div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div>
@@ -1296,9 +1323,9 @@ function ReportsTab({user}){
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
         <div className="card">
           <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Payment split</div>
-          {revenue>0?<>
+          {collected>0?<>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#4CAF50"}}>M-Pesa</span><span>KSh {mpesa.toLocaleString()}</span></div>
-            <div style={{height:4,background:"#1A2A4A",borderRadius:2,marginBottom:8}}><div style={{height:4,background:"#4CAF50",borderRadius:2,width:`${revenue>0?Math.round(mpesa/revenue*100):0}%`}}/></div>
+            <div style={{height:4,background:"#1A2A4A",borderRadius:2,marginBottom:8}}><div style={{height:4,background:"#4CAF50",borderRadius:2,width:`${collected>0?Math.round(mpesa/collected*100):0}%`}}/></div>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#F5C000"}}>Cash</span><span>KSh {cash.toLocaleString()}</span></div>
           </>:<div style={{color:"#556677",fontSize:12}}>No sales yet</div>}
         </div>
@@ -1326,7 +1353,7 @@ function ReportsTab({user}){
       {/* Month-on-month table */}
       {(()=>{
         const mmap={};
-        data.sales.forEach(s=>{const m=s.date.slice(0,7);if(!mmap[m])mmap[m]={sales:0,expenses:0};mmap[m].sales+=Number(s.total);});
+        data.sales.forEach(s=>{const m=s.date.slice(0,7);if(!mmap[m])mmap[m]={sales:0,expenses:0};mmap[m].sales+=Number(s.amount_paid!=null?s.amount_paid:s.total);});
         data.expenses.forEach(e=>{const m=e.date.slice(0,7);if(!mmap[m])mmap[m]={sales:0,expenses:0};mmap[m].expenses+=Number(e.amount);});
         const rows=Object.entries(mmap).sort(([a],[b])=>b.localeCompare(a)).map(([month,d])=>({month,sales:d.sales,expenses:d.expenses,profit:d.sales-d.expenses}));
         if(!rows.length) return null;
@@ -1339,7 +1366,7 @@ function ReportsTab({user}){
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:320}}>
                 <thead>
-                  <tr>{["Month","Sales","Expenses","Profit"].map(h=><th key={h} style={{textAlign:h==="Month"?"left":"right",padding:"4px 4px 8px",color:"#8899AA",fontWeight:500,borderBottom:"1px solid #1A2A4A",whiteSpace:"nowrap"}}>{h}</th>)}</tr>
+                  <tr>{["Month","Collected","Expenses","Profit"].map(h=><th key={h} style={{textAlign:h==="Month"?"left":"right",padding:"4px 4px 8px",color:"#8899AA",fontWeight:500,borderBottom:"1px solid #1A2A4A",whiteSpace:"nowrap"}}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {rows.map(r=>(
