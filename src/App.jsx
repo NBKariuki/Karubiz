@@ -27,6 +27,7 @@ const fetchBalances = async () => {
 };
 const fmtK = n => "KSh "+Math.round(n).toLocaleString();
 const todayStr = () => new Date().toISOString().split("T")[0];
+const initials = n => (n||"").split(" ").map(w=>w[0]||"").join("").toUpperCase();
 
 function parseMpesa(sms) {
   const s = sms.trim();
@@ -77,7 +78,27 @@ const GS = () => (
     .qa input{width:100%;background:#0A1128;border:1px solid #1A2A4A;border-radius:6px;padding:9px 11px;color:#E8E2D4;font-size:14px;margin-bottom:8px}
     .mv{font-size:11px;padding:6px 0;border-bottom:1px solid #0F1A3A;display:flex;justify-content:space-between}
     .mv:last-child{border-bottom:none}
-    @media print{.nav,.np,.strip{display:none!important}}
+    .wiz-overlay{position:fixed;inset:0;background:rgba(5,10,31,0.94);z-index:120;overflow-y:auto;padding:12px}
+    .wiz{max-width:480px;margin:0 auto;background:#0A1128;border:1px solid #1A2A4A;border-radius:12px;min-height:calc(100vh - 24px);display:flex;flex-direction:column}
+    .wiz-hd{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #1A2A4A}
+    .wiz-steps{display:flex;gap:6px;padding:12px 16px 4px}
+    .wiz-dot{flex:1;height:4px;border-radius:2px;background:#1A2A4A} .wiz-dot.on{background:#F5C000}
+    .wiz-body{padding:16px;flex:1}
+    .wiz-ft{padding:12px 16px 16px;border-top:1px solid #1A2A4A;display:flex;gap:8px}
+    .staff-btn{background:#0A1128;border:2px solid #1A2A4A;border-radius:12px;padding:22px 12px;color:#FFFFFF;font-size:17px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s}
+    .staff-btn:hover{border-color:#F5C000;color:#F5C000}
+    .rcpt{background:#fff;color:#111;border-radius:8px;padding:18px 16px;max-width:340px;margin:0 auto 14px;font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5}
+    .rcpt-hd{text-align:center;padding-bottom:10px;border-bottom:1px dashed #999;margin-bottom:10px}
+    .rcpt-logo{font-size:20px;font-weight:700;letter-spacing:0.1em}
+    .rcpt-sub{font-size:12px;color:#555;margin-top:2px}
+    .rcpt-row{display:flex;justify-content:space-between;padding:3px 0;font-size:14px}
+    .rcpt-row .l{color:#555} .rcpt-row .v{font-weight:600}
+    .rcpt-items{border-top:1px dashed #999;border-bottom:1px dashed #999;padding:8px 0;margin:8px 0}
+    .rcpt-it{display:flex;justify-content:space-between;padding:4px 0;font-size:14px}
+    .rcpt-it .n{flex:1;padding-right:8px}
+    .rcpt-tot{display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding:8px 0}
+    .rcpt-ft{text-align:center;font-size:12px;color:#555;margin-top:10px;padding-top:10px;border-top:1px dashed #999;line-height:1.6}
+    @media print{.nav,.np,.strip{display:none!important} body{background:#fff} .rcpt{max-width:80mm;border-radius:0;padding:4mm;font-size:13px} .rcpt-logo{font-size:18px}}
   `}</style>
 );
 
@@ -210,6 +231,7 @@ function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
 
 function SaleTab({onMoney}){
   const [stockItems,setStockItems]=useState([]);
+  const [wiz,setWiz]=useState(false); const [step,setStep]=useState(1);
   const [sms,setSms]=useState(""); const [parsed,setParsed]=useState(null);
   const [staff,setStaff]=useState("Burton Kariuki");
   const [cName,setCName]=useState(""); const [cPhone,setCPhone]=useState("");
@@ -227,40 +249,15 @@ function SaleTab({onMoney}){
   const [histSales,setHistSales]=useState([]); const [voidSale,setVoidSale]=useState(null);
   const [voidReason,setVoidReason]=useState(""); const [voidStaff,setVoidStaff]=useState("Burton Kariuki"); const [voiding,setVoiding]=useState(false);
 
-  const loadPendingSales=async()=>{
-    try{ const ps=await sb.get("karu_sales","select=*&balance_due=gt.0&voided=eq.false&order=created_at.desc"); setPendingSales(ps); }catch(e){console.error(e);}
-  };
-  const loadToday=async()=>{
-    try{ const t=await sb.get("karu_sales",`select=*&date=eq.${todayStr()}&order=created_at.desc`); setTodaySales(t); }catch(e){console.error(e);}
-  };
-  const loadHistory=async()=>{
-    try{ const h=await sb.get("karu_sales","select=*&order=created_at.desc&limit=60"); setHistSales(h); }catch(e){console.error(e);}
-  };
-  const doVoid=async()=>{
-    if(!voidReason.trim()){alert("Reason required.");return;}
-    setVoiding(true);
-    try{
-      const s=voidSale;
-      await sb.patch("karu_sales",s.id,{voided:true,void_reason:voidReason,voided_by:voidStaff,voided_at:new Date().toISOString()});
-      if(s.items){ for(const it of s.items){
-        const matches=stockItems.filter(x=>x.name.toLowerCase()===String(it.name).toLowerCase()&&x.qty_sold>0).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
-        let q=Number(it.qty||1);
-        for(const m of matches){ if(q<=0)break; const r=Math.min(q,m.qty_sold); await sb.patch("karu_stock",m.id,{qty_sold:m.qty_sold-r}); q-=r; }
-      }}
-      const paid=Number(s.amount_paid||s.total);
-      await recordMoney({account:s.payment_method==="M-Pesa"?"sacco":"cash",amount:-paid,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name}`,date:todayStr(),recorded_by:voidStaff});
-      await logAudit({trip_no:null,record_id:s.id,action:"void_sale",field_changed:s.receipt_no,old_value:String(s.total),new_value:"0",reason:voidReason,changed_by:voidStaff});
-      if(onMoney) onMoney();
-      setVoidSale(null); setVoidReason("");
-      const fresh=await sb.get("karu_stock","select=*&order=date_in.asc"); setStockItems(fresh);
-      await Promise.all([loadToday(),loadHistory(),loadPendingSales()]);
-    }catch(e){alert("Void failed: "+e.message);}
-    setVoiding(false);
-  };
-  useEffect(()=>{
-    sb.get("karu_stock","select=*&order=date_in.asc").then(s=>setStockItems(s)).catch(console.error);
-    loadPendingSales(); loadToday();
-  },[]);
+  const loadPendingSales=async()=>{ try{ setPendingSales(await sb.get("karu_sales","select=*&balance_due=gt.0&voided=eq.false&order=created_at.desc")); }catch(e){console.error(e);} };
+  const loadToday=async()=>{ try{ setTodaySales(await sb.get("karu_sales",`select=*&date=eq.${todayStr()}&order=created_at.desc`)); }catch(e){console.error(e);} };
+  const loadHistory=async()=>{ try{ setHistSales(await sb.get("karu_sales","select=*&order=created_at.desc&limit=60")); }catch(e){console.error(e);} };
+  const loadStock=async()=>{ try{ setStockItems(await sb.get("karu_stock","select=*&order=date_in.asc")); }catch(e){console.error(e);} };
+  useEffect(()=>{ loadStock(); loadPendingSales(); loadToday(); },[]);
+
+  const resetForm=()=>{ setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);setPayType("full");setInitPay("");setErr("");setStep(1); };
+  const openWiz=s=>{ setStaff(s); resetForm(); setWiz(true); };
+  const closeWiz=()=>{ setWiz(false); resetForm(); };
 
   const handleSms=v=>{
     setSms(v);
@@ -268,65 +265,55 @@ function SaleTab({onMoney}){
       const p=parseMpesa(v);
       if(p.amount>0||p.name||p.code){
         setParsed(p);
-        if(p.name) setCName(p.name);
-        if(p.phone) setCPhone(p.phone);
-        if(p.code) setMpesaCode(p.code);
+        if(p.name) setCName(p.name); if(p.phone) setCPhone(p.phone); if(p.code) setMpesaCode(p.code);
         if(p.amount>0) setItems(prev=>prev.some(i=>i.name||i.price)?prev:[{id:Date.now(),name:"",qty:1,price:String(p.amount)}]);
         setPay("mpesa");
       }
     }
   };
-
   const addItem=()=>setItems(x=>[...x,{id:Date.now(),name:"",qty:1,price:""}]);
-  const rmItem=id=>setItems(x=>x.filter(i=>i.id!==id));
+  const rmItem=id=>setItems(x=>x.length>1?x.filter(i=>i.id!==id):x);
   const upItem=(id,f,v)=>setItems(x=>x.map(i=>i.id===id?{...i,[f]:v}:i));
   const selectStock=(id,s)=>setItems(x=>x.map(i=>i.id===id?{...i,name:s.name,price:String(s.selling_price)}:i));
+  const total=items.reduce((s,i)=>s+(Number(i.qty||0)*Number(i.price||0)),0);
+  const validItems=items.filter(i=>i.name&&Number(i.price)>0);
 
   const reduceStock=async(soldItems)=>{
     for(const sold of soldItems){
-      if(!sold.name) continue;
       let qtyLeft=Number(sold.qty||1);
       const matches=stockItems.filter(s=>s.name.toLowerCase()===sold.name.toLowerCase()&&(s.qty_in-s.qty_sold-(s.qty_adjusted||0))>0).sort((a,b)=>new Date(a.date_in)-new Date(b.date_in));
-      for(const si of matches){
-        if(qtyLeft<=0) break;
-        const avail=si.qty_in-si.qty_sold-(si.qty_adjusted||0);
-        const reduce=Math.min(qtyLeft,avail);
-        await sb.patch("karu_stock",si.id,{qty_sold:si.qty_sold+reduce});
-        qtyLeft-=reduce;
-      }
+      for(const si of matches){ if(qtyLeft<=0)break; const avail=si.qty_in-si.qty_sold-(si.qty_adjusted||0); const r=Math.min(qtyLeft,avail); await sb.patch("karu_stock",si.id,{qty_sold:si.qty_sold+r}); qtyLeft-=r; }
     }
   };
 
+  const nextStep=()=>{
+    setErr("");
+    if(step===1){ if(!cName.trim()){setErr("Customer name is required.");return;} setStep(2); }
+    else if(step===2){ if(!validItems.length){setErr("Add at least one item with a price.");return;} setStep(3); }
+  };
+
   const genReceipt=async(withReceipt=true)=>{
-    if(!cName.trim()){setErr("Customer name required.");return;}
-    const vi=items.filter(i=>i.name&&Number(i.price)>0);
-    if(!vi.length){setErr("Add at least one item.");return;}
+    setErr("");
     if(pay==="mpesa"&&!mpesaCode.trim()){setErr("M-Pesa code required.");return;}
-    setSaving(true); setErr("");
+    if(payType==="instalment"&&(!initPay||Number(initPay)<=0)){setErr("Enter the initial payment.");return;}
+    if(payType==="instalment"&&Number(initPay)>total){setErr("Initial payment cannot exceed total.");return;}
+    setSaving(true);
     try{
-      const now=new Date();
-      const date=now.toISOString().split("T")[0];
+      const now=new Date(); const date=todayStr();
       const time_str=now.toLocaleTimeString("en-KE",{hour:"2-digit",minute:"2-digit",hour12:true});
-      const sales=await sb.get("karu_sales","select=receipt_no&order=created_at.desc&limit=1");
-      const lastNo=sales.length?parseInt(sales[0].receipt_no.split("-").pop()||"0"):0;
+      const last=await sb.get("karu_sales","select=receipt_no&order=created_at.desc&limit=1");
+      const lastNo=last.length?parseInt(last[0].receipt_no.split("-").pop()||"0"):0;
       const receipt_no=`KARU-${now.getFullYear().toString().slice(2)}${String(now.getMonth()+1).padStart(2,"0")}-${String(lastNo+1).padStart(3,"0")}`;
-      const total=vi.reduce((s,i)=>s+(Number(i.qty)*Number(i.price)),0);
-      if(payType==="instalment"&&(!initPay||Number(initPay)<=0)){setErr("Enter the initial payment amount.");setSaving(false);return;}
-      if(payType==="instalment"&&Number(initPay)>total){setErr("Initial payment cannot exceed total.");setSaving(false);return;}
-      const amtPaid=payType==="instalment"?Number(initPay):total;
-      const balDue=payType==="instalment"?total-amtPaid:0;
-      const data={receipt_no,date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:vi,payment_method:pay==="mpesa"?"M-Pesa":"Cash",mpesa_code:mpesaCode.toUpperCase(),total,amount_paid:amtPaid,balance_due:balDue,payment_type:payType,notes};
+      const amtPaid=payType==="instalment"?Number(initPay):total; const balDue=payType==="instalment"?total-amtPaid:0;
+      const data={receipt_no,date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:validItems,payment_method:pay==="mpesa"?"M-Pesa":"Cash",mpesa_code:mpesaCode.toUpperCase(),total,amount_paid:amtPaid,balance_due:balDue,payment_type:payType,notes};
       const [newSale]=await sb.post("karu_sales",data);
-      if(payType==="instalment"&&newSale?.id){
-        await sb.post("karu_payments",{sale_id:newSale.id,receipt_no,customer_name:cName,amount:amtPaid,payment_method:pay==="mpesa"?"M-Pesa":"Cash",mpesa_code:mpesaCode.toUpperCase(),date,recorded_by:staff,notes:"Initial instalment payment"});
-      }
-      await reduceStock(vi);
+      if(payType==="instalment"&&newSale?.id) await sb.post("karu_payments",{sale_id:newSale.id,receipt_no,customer_name:cName,amount:amtPaid,payment_method:data.payment_method,mpesa_code:data.mpesa_code,date,recorded_by:staff,notes:"Initial instalment payment"});
+      await reduceStock(validItems);
       await recordMoney({account:pay==="mpesa"?"sacco":"cash",amount:amtPaid,type:"sale",ref:receipt_no,description:`Sale ${receipt_no} · ${cName}`,date,recorded_by:staff});
       if(onMoney) onMoney();
-      const fresh=await sb.get("karu_stock","select=*&order=date_in.asc");
-      setStockItems(fresh);
-      await loadToday();
-      if(withReceipt){ setReceipt(data); } else { setSaved(data); }
+      await loadStock(); await loadToday(); await loadPendingSales();
+      setWiz(false);
+      if(withReceipt) setReceipt(data); else setSaved(data);
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
   };
@@ -336,80 +323,65 @@ function SaleTab({onMoney}){
     if(addPayMethod==="mpesa"&&!addPayCode.trim()){alert("M-Pesa code required.");return;}
     setAddPaySaving(true);
     try{
-      const now=new Date(); const date=now.toISOString().split("T")[0];
-      const newPaid=Number(addPaySale.amount_paid||0)+Number(addPayAmt);
-      const newBal=Math.max(0,Number(addPaySale.total)-newPaid);
+      const date=todayStr(); const newPaid=Number(addPaySale.amount_paid||0)+Number(addPayAmt); const newBal=Math.max(0,Number(addPaySale.total)-newPaid);
       await sb.post("karu_payments",{sale_id:addPaySale.id,receipt_no:addPaySale.receipt_no,customer_name:addPaySale.customer_name,amount:Number(addPayAmt),payment_method:addPayMethod==="mpesa"?"M-Pesa":"Cash",mpesa_code:addPayCode.toUpperCase(),date,recorded_by:addPayStaff,notes:addPayNotes||"Instalment payment"});
       await sb.patch("karu_sales",addPaySale.id,{amount_paid:newPaid,balance_due:newBal,payment_type:newBal<=0?"full":"instalment"});
       await recordMoney({account:addPayMethod==="mpesa"?"sacco":"cash",amount:Number(addPayAmt),type:"sale",ref:addPaySale.receipt_no,description:`Instalment ${addPaySale.receipt_no} · ${addPaySale.customer_name}`,date,recorded_by:addPayStaff});
       if(onMoney) onMoney();
-      setAddPaySale(null); setAddPayAmt(""); setAddPayCode(""); setAddPayNotes("");
+      setAddPaySale(null);setAddPayAmt("");setAddPayCode("");setAddPayNotes("");
       await loadPendingSales();
-      alert(newBal<=0?"Fully paid! Account cleared.":"Payment recorded. Balance: KSh "+newBal.toLocaleString());
+      alert(newBal<=0?"Fully paid. Account cleared.":"Payment recorded. Balance: "+fmtK(newBal));
     }catch(e){alert("Failed: "+e.message);}
     setAddPaySaving(false);
   };
 
-  const shareWA=()=>{
-    const r=receipt;
-    const il=r.items.map(i=>`  ${i.name} x${i.qty} - KSh ${(Number(i.qty)*Number(i.price)).toLocaleString()}`).join("\n");
-    const m=`*KARU FURNITURE*\n*Receipt ${r.receipt_no}*\n\nDate: ${r.date}  ${r.time_str}\nServed by: ${r.served_by}\n\nCustomer: ${r.customer_name}${r.customer_phone?"\nPhone: "+r.customer_phone:""}\n\n*ITEMS*\n${il}\n\n*TOTAL: KSh ${r.total.toLocaleString()}*\nPayment: ${r.payment_method}${r.mpesa_code?"\nM-Pesa Code: "+r.mpesa_code:""}${r.notes?"\nNote: "+r.notes:""}\n\nThank you - KARU Furniture\nOff Kihara-Gachie-Karura Rd\n0720 772 866`;
-    window.open("https://wa.me/?text="+encodeURIComponent(m),"_blank");
+  const doVoid=async()=>{
+    if(!voidReason.trim()){alert("Reason required.");return;}
+    setVoiding(true);
+    try{
+      const s=voidSale;
+      await sb.patch("karu_sales",s.id,{voided:true,void_reason:voidReason,voided_by:voidStaff,voided_at:new Date().toISOString()});
+      if(s.items){ for(const it of s.items){
+        const matches=stockItems.filter(x=>x.name.toLowerCase()===String(it.name).toLowerCase()&&x.qty_sold>0).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
+        let q=Number(it.qty||1); for(const m of matches){ if(q<=0)break; const r=Math.min(q,m.qty_sold); await sb.patch("karu_stock",m.id,{qty_sold:m.qty_sold-r}); q-=r; }
+      }}
+      const paid=Number(s.amount_paid||s.total);
+      await recordMoney({account:s.payment_method==="M-Pesa"?"sacco":"cash",amount:-paid,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name}`,date:todayStr(),recorded_by:voidStaff});
+      await logAudit({trip_no:null,record_id:s.id,action:"void_sale",field_changed:s.receipt_no,old_value:String(s.total),new_value:"0",reason:voidReason,changed_by:voidStaff});
+      if(onMoney) onMoney();
+      setVoidSale(null); setVoidReason("");
+      await loadStock(); await Promise.all([loadToday(),loadHistory(),loadPendingSales()]);
+    }catch(e){alert("Void failed: "+e.message);}
+    setVoiding(false);
   };
 
-  const copyText=()=>{
-    const r=receipt;
-    const il=r.items.map(i=>`  ${i.name} x${i.qty} - KSh ${(Number(i.qty)*Number(i.price)).toLocaleString()}`).join("\n");
-    const txt=`KARU FURNITURE\nReceipt ${r.receipt_no}\nDate: ${r.date} ${r.time_str}\nServed by: ${r.served_by}\nCustomer: ${r.customer_name}${r.customer_phone?"\nPhone: "+r.customer_phone:""}\n\nITEMS\n${il}\n\nTOTAL: KSh ${r.total.toLocaleString()}\nPayment: ${r.payment_method}${r.mpesa_code?"\nCode: "+r.mpesa_code:""}${r.notes?"\nNote: "+r.notes:""}\n\nKARU Furniture · Off Kihara-Gachie-Karura Rd · 0720 772 866`;
-    navigator.clipboard.writeText(txt).then(()=>alert("Receipt text copied to clipboard"));
+  const rcptText=r=>{
+    const il=r.items.map(i=>`${i.name} x${i.qty}  KSh ${(Number(i.qty)*Number(i.price)).toLocaleString()}`).join("\n");
+    return `KARU FURNITURE\nReceipt ${r.receipt_no}\nDate: ${r.date} ${r.time_str}\nServed by: ${initials(r.served_by)}\n\nCustomer: ${r.customer_name}${r.customer_phone?"\nPhone: "+r.customer_phone:""}\n\n${il}\n\nTOTAL: KSh ${r.total.toLocaleString()}${r.payment_type==="instalment"?`\nPaid: KSh ${Number(r.amount_paid).toLocaleString()}\nBalance: KSh ${Number(r.balance_due).toLocaleString()}`:""}\nPayment: ${r.payment_method}${r.mpesa_code?"\nCode: "+r.mpesa_code:""}${r.notes?"\nNote: "+r.notes:""}\n\nThank you for shopping with us\nOff Kihara-Gachie-Karura Rd\n0720 772 866`;
   };
+  const shareWA=()=>window.open("https://wa.me/?text="+encodeURIComponent("*KARU FURNITURE*\n"+rcptText(receipt).replace("KARU FURNITURE\n","")),"_blank");
+  const copyText=()=>navigator.clipboard.writeText(rcptText(receipt)).then(()=>alert("Receipt copied"));
 
   const downloadJPEG=()=>{
-    const r=receipt;
-    const canvas=document.createElement("canvas");
-    canvas.width=760; canvas.height=520+r.items.length*36;
-    const ctx=canvas.getContext("2d");
-    const W=canvas.width;
-    ctx.fillStyle="#050A1F"; ctx.fillRect(0,0,W,canvas.height);
-    ctx.fillStyle="#F5C000"; ctx.font="bold 32px Arial"; ctx.textAlign="center";
-    ctx.fillText("KARU FURNITURE",W/2,52);
-    ctx.fillStyle="#8899AA"; ctx.font="14px Arial";
-    ctx.fillText("Off Kihara-Gachie-Karura Rd, Nairobi  |  0720 772 866",W/2,78);
-    ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,96); ctx.lineTo(W-40,96); ctx.stroke();
-    ctx.textAlign="left"; ctx.fillStyle="#8899AA"; ctx.font="13px Arial";
-    const rows=[["Receipt No.",r.receipt_no],["Date",r.date],["Time",r.time_str],["Served by",r.served_by],["Customer",r.customer_name]];
-    if(r.customer_phone) rows.push(["Phone",r.customer_phone]);
-    rows.forEach(([l,v],i)=>{
-      ctx.fillStyle="#8899AA"; ctx.fillText(l,50,124+i*26);
-      ctx.fillStyle="#FFFFFF"; ctx.textAlign="right"; ctx.fillText(v,W-50,124+i*26);
-      ctx.textAlign="left";
-    });
-    let y=124+rows.length*26+16;
-    ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke(); y+=20;
-    ctx.fillStyle="#8899AA"; ctx.font="12px Arial";
-    ctx.fillText("ITEM",50,y); ctx.textAlign="center"; ctx.fillText("QTY",W/2-60,y); ctx.textAlign="right"; ctx.fillText("UNIT",W-140,y); ctx.fillText("TOTAL",W-50,y);
-    y+=6; ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke(); y+=22;
-    r.items.forEach(i=>{
-      ctx.textAlign="left"; ctx.fillStyle="#FFFFFF"; ctx.font="14px Arial"; ctx.fillText(i.name,50,y);
-      ctx.textAlign="center"; ctx.fillStyle="#8899AA"; ctx.fillText(String(i.qty),W/2-60,y);
-      ctx.textAlign="right"; ctx.fillText("KSh "+Number(i.price).toLocaleString(),W-140,y);
-      ctx.fillStyle="#F5C000"; ctx.fillText("KSh "+(Number(i.qty)*Number(i.price)).toLocaleString(),W-50,y);
-      y+=32;
-    });
-    y+=4; ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke(); y+=24;
-    ctx.fillStyle="#FFFFFF"; ctx.font="bold 18px Arial"; ctx.textAlign="left"; ctx.fillText("TOTAL",50,y);
-    ctx.fillStyle="#F5C000"; ctx.textAlign="right"; ctx.fillText("KSh "+r.total.toLocaleString(),W-50,y); y+=28;
-    ctx.fillStyle="#8899AA"; ctx.font="13px Arial"; ctx.textAlign="left";
-    ctx.fillText("Payment: "+r.payment_method+(r.mpesa_code?"  |  Code: "+r.mpesa_code:""),50,y); y+=24;
-    if(r.notes){ctx.fillText("Note: "+r.notes,50,y);y+=24;}
-    y+=8; ctx.strokeStyle="#1A2A4A"; ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke(); y+=24;
-    ctx.fillStyle="#556677"; ctx.font="12px Arial"; ctx.textAlign="center";
-    ctx.fillText("Thank you for shopping at KARU Furniture",W/2,y);
-    ctx.fillText("karufurniture.netlify.app",W/2,y+18);
-    const link=document.createElement("a");
-    link.download=`KARU-${r.receipt_no}.jpg`;
-    link.href=canvas.toDataURL("image/jpeg",0.92);
-    link.click();
+    const r=receipt; const S=2;
+    const c=document.createElement("canvas"); const W=380*S; const lines=r.items.length; const H=(430+lines*30+(r.payment_type==="instalment"?50:0)+(r.notes?24:0))*S;
+    c.width=W; c.height=H; const x=c.getContext("2d"); x.scale(S,S);
+    x.fillStyle="#fff"; x.fillRect(0,0,380,H/S);
+    x.fillStyle="#111"; x.textAlign="center"; x.font="bold 22px Arial"; x.fillText("KARU FURNITURE",190,34);
+    x.fillStyle="#555"; x.font="12px Arial"; x.fillText("Off Kihara-Gachie-Karura Rd, Nairobi",190,52); x.fillText("0720 772 866",190,68);
+    const dash=y=>{x.strokeStyle="#999";x.setLineDash([3,3]);x.beginPath();x.moveTo(18,y);x.lineTo(362,y);x.stroke();x.setLineDash([]);};
+    dash(82); let y=104; x.font="14px Arial";
+    const row=(l,v)=>{x.textAlign="left";x.fillStyle="#555";x.fillText(l,18,y);x.textAlign="right";x.fillStyle="#111";x.font="bold 14px Arial";x.fillText(v,362,y);x.font="14px Arial";y+=22;};
+    row("Receipt",r.receipt_no); row("Date",r.date+"  "+r.time_str); row("Served by",initials(r.served_by)); row("Customer",r.customer_name); if(r.customer_phone) row("Phone",r.customer_phone);
+    y+=4; dash(y); y+=22;
+    r.items.forEach(i=>{ x.textAlign="left";x.fillStyle="#111";x.font="14px Arial";x.fillText(`${i.name}  x${i.qty}`,18,y); x.textAlign="right";x.font="bold 14px Arial";x.fillText("KSh "+(Number(i.qty)*Number(i.price)).toLocaleString(),362,y); y+=26; });
+    y+=2; dash(y); y+=28;
+    x.textAlign="left";x.fillStyle="#111";x.font="bold 20px Arial";x.fillText("TOTAL",18,y); x.textAlign="right";x.fillText("KSh "+r.total.toLocaleString(),362,y); y+=26;
+    if(r.payment_type==="instalment"){ x.font="14px Arial"; row("Paid","KSh "+Number(r.amount_paid).toLocaleString()); row("Balance","KSh "+Number(r.balance_due).toLocaleString()); }
+    x.font="14px Arial"; row("Payment",r.payment_method+(r.mpesa_code?"  "+r.mpesa_code:"")); if(r.notes) row("Note",r.notes);
+    y+=6; dash(y); y+=22;
+    x.textAlign="center";x.fillStyle="#555";x.font="12px Arial";x.fillText("Thank you for shopping with us",190,y); x.fillText("karufurniture.netlify.app",190,y+18);
+    const a=document.createElement("a"); a.download=`KARU-${r.receipt_no}.jpg`; a.href=c.toDataURL("image/jpeg",0.95); a.click();
   };
 
   if(saved) return (
@@ -417,41 +389,29 @@ function SaleTab({onMoney}){
       <div style={{fontSize:48,marginBottom:16}}>✅</div>
       <div style={{fontSize:18,fontWeight:600,marginBottom:8}}>Sale Recorded</div>
       <div style={{color:"#8899AA",fontSize:14,marginBottom:4}}>{saved.customer_name}</div>
-      <div style={{color:"#F5C000",fontSize:24,fontWeight:600,marginBottom:4}}>KSh {Number(saved.total).toLocaleString()}</div>
-      {saved.payment_type==="instalment"&&<div style={{color:"#E8A45B",fontSize:14,marginBottom:4}}>Paid: KSh {Number(saved.amount_paid).toLocaleString()} · Balance: KSh {Number(saved.balance_due).toLocaleString()}</div>}
-      <div style={{color:"#8899AA",fontSize:13,marginBottom:24}}>{saved.payment_method} · {saved.receipt_no}</div>
-      <div style={{color:"#4CAF50",fontSize:13,marginBottom:32}}>Stock updated automatically</div>
-      <button className="btn-y" onClick={()=>{setSaved(null);setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);}} style={{width:"100%",padding:14}}>New Sale</button>
+      <div style={{color:"#F5C000",fontSize:24,fontWeight:600,marginBottom:4}}>{fmtK(Number(saved.total))}</div>
+      {saved.payment_type==="instalment"&&<div style={{color:"#E8A45B",fontSize:14,marginBottom:4}}>Paid: {fmtK(Number(saved.amount_paid))} · Balance: {fmtK(Number(saved.balance_due))}</div>}
+      <div style={{color:"#8899AA",fontSize:13,marginBottom:24}}>{saved.payment_method} · {saved.receipt_no} · {initials(saved.served_by)}</div>
+      <div style={{color:"#4CAF50",fontSize:13,marginBottom:32}}>Stock and money updated</div>
+      <button className="btn-y" onClick={()=>setSaved(null)} style={{width:"100%",padding:14}}>Done</button>
     </div>
   );
 
   if(receipt) return (
     <div>
-      <div style={{background:"#fff",color:"#111",borderRadius:10,padding:20,marginBottom:16}}>
-        <div style={{textAlign:"center",marginBottom:14,paddingBottom:14,borderBottom:"0.5px solid #ddd"}}>
-          <div style={{fontSize:16,fontWeight:600,letterSpacing:"0.08em"}}>KARU FURNITURE</div>
-          <div style={{fontSize:10,color:"#888",marginTop:2}}>Off Kihara-Gachie-Karura Rd · 0720 772 866</div>
-        </div>
-        <div style={{marginBottom:10}}>
-          {[["Receipt",receipt.receipt_no],["Date",receipt.date],["Time",receipt.time_str],["Served by",receipt.served_by]].map(([l,v])=>(
-            <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"2px 0"}}><span style={{color:"#666"}}>{l}</span><span style={{fontWeight:500}}>{v}</span></div>
-          ))}
-        </div>
-        <div style={{padding:"8px 0",borderTop:"0.5px solid #ddd",marginBottom:8}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"2px 0"}}><span style={{color:"#666"}}>Customer</span><span style={{fontWeight:500}}>{receipt.customer_name}</span></div>
-          {receipt.customer_phone&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#666"}}>Phone</span><span>{receipt.customer_phone}</span></div>}
-        </div>
-        <table style={{width:"100%",fontSize:11,borderCollapse:"collapse",margin:"6px 0"}}>
-          <thead><tr>{["Item","Qty","Unit","Total"].map(h=><th key={h} style={{color:"#888",fontWeight:500,textAlign:h==="Item"?"left":"right",padding:"3px 0",borderBottom:"0.5px solid #ddd"}}>{h}</th>)}</tr></thead>
-          <tbody>{receipt.items.map((i,idx)=><tr key={idx}><td style={{padding:"3px 0"}}>{i.name}</td><td style={{textAlign:"right"}}>{i.qty}</td><td style={{textAlign:"right"}}>KSh {Number(i.price).toLocaleString()}</td><td style={{textAlign:"right"}}>KSh {(Number(i.qty)*Number(i.price)).toLocaleString()}</td></tr>)}</tbody>
-        </table>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:600,padding:"6px 0",borderTop:"0.5px solid #ddd"}}><span>Total</span><span>KSh {receipt.total.toLocaleString()}</span></div>
-        <div style={{marginTop:8}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"2px 0"}}><span style={{color:"#666"}}>Payment</span><span>{receipt.payment_method}</span></div>
-          {receipt.mpesa_code&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#666"}}>Code</span><span style={{fontFamily:"monospace"}}>{receipt.mpesa_code}</span></div>}
-          {receipt.notes&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#666"}}>Note</span><span>{receipt.notes}</span></div>}
-        </div>
-        <div style={{textAlign:"center",fontSize:10,color:"#888",marginTop:12,paddingTop:10,borderTop:"0.5px solid #ddd",lineHeight:1.7}}>Thank you for shopping at KARU Furniture<br/>karufurniture.netlify.app</div>
+      <div className="rcpt">
+        <div className="rcpt-hd"><div className="rcpt-logo">KARU FURNITURE</div><div className="rcpt-sub">Off Kihara-Gachie-Karura Rd, Nairobi</div><div className="rcpt-sub">0720 772 866</div></div>
+        <div className="rcpt-row"><span className="l">Receipt</span><span className="v">{receipt.receipt_no}</span></div>
+        <div className="rcpt-row"><span className="l">Date</span><span className="v">{receipt.date} {receipt.time_str}</span></div>
+        <div className="rcpt-row"><span className="l">Served by</span><span className="v">{initials(receipt.served_by)}</span></div>
+        <div className="rcpt-row"><span className="l">Customer</span><span className="v">{receipt.customer_name}</span></div>
+        {receipt.customer_phone&&<div className="rcpt-row"><span className="l">Phone</span><span className="v">{receipt.customer_phone}</span></div>}
+        <div className="rcpt-items">{receipt.items.map((i,idx)=><div key={idx} className="rcpt-it"><span className="n">{i.name} <span style={{color:"#555"}}>x{i.qty}</span></span><span style={{fontWeight:600}}>KSh {(Number(i.qty)*Number(i.price)).toLocaleString()}</span></div>)}</div>
+        <div className="rcpt-tot"><span>TOTAL</span><span>KSh {receipt.total.toLocaleString()}</span></div>
+        {receipt.payment_type==="instalment"&&<><div className="rcpt-row"><span className="l">Paid</span><span className="v">KSh {Number(receipt.amount_paid).toLocaleString()}</span></div><div className="rcpt-row"><span className="l">Balance</span><span className="v" style={{color:"#B45309"}}>KSh {Number(receipt.balance_due).toLocaleString()}</span></div></>}
+        <div className="rcpt-row"><span className="l">Payment</span><span className="v">{receipt.payment_method}{receipt.mpesa_code?" · "+receipt.mpesa_code:""}</span></div>
+        {receipt.notes&&<div className="rcpt-row"><span className="l">Note</span><span className="v">{receipt.notes}</span></div>}
+        <div className="rcpt-ft">Thank you for shopping with us<br/>karufurniture.netlify.app</div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}} className="np">
         <button className="btn-y" onClick={shareWA} style={{fontSize:13}}>WhatsApp</button>
@@ -459,25 +419,25 @@ function SaleTab({onMoney}){
         <button className="btn-g" onClick={downloadJPEG} style={{fontSize:13}}>Download image</button>
         <button className="btn-g" onClick={()=>window.print()} style={{fontSize:13}}>Print / PDF</button>
       </div>
-      <button className="btn-g" onClick={()=>{setReceipt(null);setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);}} style={{width:"100%",fontSize:13}} className="np">New Sale</button>
+      <button className="btn-g np" onClick={()=>setReceipt(null)} style={{width:"100%",fontSize:13}}>Done</button>
     </div>
   );
 
+  const liveToday=todaySales.filter(s=>!s.voided); const todayTot=liveToday.reduce((a,s)=>a+Number(s.amount_paid||s.total),0);
+
   return (
     <div>
-      {(()=>{ const live=todaySales.filter(s=>!s.voided); const tot=live.reduce((a,s)=>a+Number(s.amount_paid||s.total),0); return (
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
-          <div><div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em"}}>Today</div><div style={{fontSize:14,fontWeight:600,color:"#FFFFFF"}}>{live.length} sale{live.length!==1?"s":""} · <span style={{color:"#F5C000"}}>{fmtK(tot)}</span></div></div>
-          <button className="btn-g" onClick={()=>{setShowHistory(x=>!x);if(!showHistory)loadHistory();}} style={{fontSize:12,padding:"6px 12px"}}>{showHistory?"Hide":"History"}</button>
-        </div>
-      );})()}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+        <div><div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em"}}>Today</div><div style={{fontSize:14,fontWeight:600,color:"#FFFFFF"}}>{liveToday.length} sale{liveToday.length!==1?"s":""} · <span style={{color:"#F5C000"}}>{fmtK(todayTot)}</span></div></div>
+        <button className="btn-g" onClick={()=>{setShowHistory(x=>!x);if(!showHistory)loadHistory();}} style={{fontSize:12,padding:"6px 12px"}}>{showHistory?"Hide":"History"}</button>
+      </div>
       {showHistory&&(
         <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:14}}>
           {voidSale?(
             <div>
               <div style={{fontSize:13,fontWeight:600,marginBottom:4,color:"#E85B5B"}}>Void {voidSale.receipt_no}</div>
-              <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>{voidSale.customer_name} · {fmtK(Number(voidSale.total))}. Stock will be returned and money reversed.</div>
-              <div className="field"><label>Reason (required)</label><textarea value={voidReason} onChange={e=>setVoidReason(e.target.value)} placeholder="e.g. Wrong item recorded, customer returned"/></div>
+              <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>{voidSale.customer_name} · {fmtK(Number(voidSale.total))}. Stock returned, money reversed.</div>
+              <div className="field"><label>Reason (required)</label><textarea value={voidReason} onChange={e=>setVoidReason(e.target.value)} placeholder="e.g. Wrong item, customer returned"/></div>
               <div className="field"><label>Voided by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${voidStaff===s?" on":""}`} onClick={()=>setVoidStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
               <div style={{display:"flex",gap:8}}><button className="btn-r" onClick={doVoid} disabled={voiding} style={{flex:1,padding:10}}>{voiding?"Voiding...":"Confirm Void"}</button><button className="btn-g" onClick={()=>{setVoidSale(null);setVoidReason("");}} style={{fontSize:13}}>Cancel</button></div>
             </div>
@@ -486,14 +446,8 @@ function SaleTab({onMoney}){
               <div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Recent sales</div>
               {histSales.length===0?<div style={{color:"#556677",fontSize:13}}>No sales yet.</div>:histSales.map(s=>(
                 <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1A2A4A",opacity:s.voided?0.45:1}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div>
-                    <div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · {s.date} · {s.served_by?.split(" ")[0]} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div>
-                  </div>
-                  <div style={{textAlign:"right",marginLeft:8}}>
-                    <div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div>
-                    {!s.voided&&<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:"2px 0"}}>Void</button>}
-                  </div>
+                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · {s.date} · {initials(s.served_by)} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div></div>
+                  <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div>{!s.voided&&<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:"2px 0"}}>Void</button>}</div>
                 </div>
               ))}
             </div>
@@ -510,75 +464,93 @@ function SaleTab({onMoney}){
             <div style={{marginTop:10}}>
               {addPaySale?(
                 <div>
-                  <div style={{fontSize:13,fontWeight:600,marginBottom:10}}>{addPaySale.customer_name} — Balance: KSh {Number(addPaySale.balance_due).toLocaleString()}</div>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:10}}>{addPaySale.customer_name} · Balance {fmtK(Number(addPaySale.balance_due))}</div>
                   <div className="field"><label>Amount received (KSh)</label><input type="number" value={addPayAmt} onChange={e=>setAddPayAmt(e.target.value)} placeholder="0"/></div>
                   <div className="field"><label>Method</label><div className="tog"><button className={`tog-btn${addPayMethod==="mpesa"?" on":""}`} onClick={()=>setAddPayMethod("mpesa")}>M-Pesa</button><button className={`tog-btn${addPayMethod==="cash"?" on":""}`} onClick={()=>setAddPayMethod("cash")}>Cash</button></div></div>
                   {addPayMethod==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={addPayCode} onChange={e=>setAddPayCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>}
                   <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${addPayStaff===s?" on":""}`} onClick={()=>setAddPayStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
                   <div className="field"><label>Notes (optional)</label><input value={addPayNotes} onChange={e=>setAddPayNotes(e.target.value)} placeholder="e.g. Second instalment"/></div>
-                  <div style={{display:"flex",gap:8}}>
-                    <button className="btn-y" onClick={addPaymentToSale} disabled={addPaySaving} style={{flex:1,fontSize:13}}>{addPaySaving?"Saving...":"Record Payment"}</button>
-                    <button className="btn-g" onClick={()=>setAddPaySale(null)} style={{fontSize:13}}>Cancel</button>
-                  </div>
+                  <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={addPaymentToSale} disabled={addPaySaving} style={{flex:1,fontSize:13}}>{addPaySaving?"Saving...":"Record Payment"}</button><button className="btn-g" onClick={()=>setAddPaySale(null)} style={{fontSize:13}}>Cancel</button></div>
                 </div>
               ):pendingSales.map(s=>(
                 <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1A2A4A"}}>
-                  <div><div style={{fontSize:13,fontWeight:500}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · Total KSh {Number(s.total).toLocaleString()} · Paid KSh {Number(s.amount_paid||0).toLocaleString()}</div></div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>KSh {Number(s.balance_due).toLocaleString()}</div>
-                    <button className="btn-g" onClick={()=>setAddPaySale(s)} style={{fontSize:11,padding:"4px 10px",marginTop:4}}>Add payment</button>
-                  </div>
+                  <div><div style={{fontSize:13,fontWeight:500}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · Total {fmtK(Number(s.total))} · Paid {fmtK(Number(s.amount_paid||0))}</div></div>
+                  <div style={{textAlign:"right"}}><div style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(Number(s.balance_due))}</div><button className="btn-g" onClick={()=>setAddPaySale(s)} style={{fontSize:11,padding:"4px 10px",marginTop:4}}>Add payment</button></div>
                 </div>
               ))}
             </div>
           )}
         </div>
       )}
-      <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:14}}>
-        <div style={{fontSize:11,color:"#8899AA",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>Paste M-Pesa or Nawiri SACCO SMS to auto-fill</div>
-        <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste confirmation SMS here..." style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,resize:"none",minHeight:56,fontFamily:"'DM Sans',sans-serif"}}/>
-        {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:12,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"Nawiri SACCO":"M-Pesa"} detected — Ref: {parsed.code||"n/a"} | KSh {parsed.amount.toLocaleString()} | {parsed.name||"Name not found"}</div>}
+
+      <div style={{marginTop:6}}>
+        <div style={{fontSize:12,color:"#FFFFFF",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:10}}>New sale · who is serving?</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {STAFF.map(s=><button key={s} className="staff-btn" onClick={()=>openWiz(s)}>{s.split(" ")[0]}</button>)}
+        </div>
       </div>
-      <div className="field"><label>Served by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${staff===s?" on":""}`} onClick={()=>setStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
-      <div className="field"><label>Customer name</label><input value={cName} onChange={e=>setCName(e.target.value)} placeholder="Full name"/></div>
-      <div className="field"><label>Phone (optional)</label><input value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="07XX XXX XXX" type="tel"/></div>
-      <div className="field">
-        <label>Items — type to search from stock</label>
-        {items.map(i=>(
-          <div key={i.id} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:8}}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
-              <AutocompleteInput value={i.name} onChange={v=>upItem(i.id,"name",v)} onSelect={s=>selectStock(i.id,s)} stockItems={stockItems} placeholder="Search stock..."/>
-              <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16,paddingTop:6}}>x</button>
+
+      {wiz&&(
+        <div className="wiz-overlay">
+          <div className="wiz">
+            <div className="wiz-hd">
+              <div><div style={{fontSize:14,fontWeight:600,color:"#FFFFFF"}}>New Sale</div><div style={{fontSize:12,color:"#8899AA"}}>{staff.split(" ")[0]} · Step {step} of 3</div></div>
+              <button onClick={closeWiz} style={{background:"none",border:"none",color:"#8899AA",fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
-              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>UNIT PRICE (KSh)</div><input type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13}}/></div>
+            <div className="wiz-steps">{[1,2,3].map(n=><div key={n} className={`wiz-dot${step>=n?" on":""}`}/>)}</div>
+            <div className="wiz-body">
+              {step===1&&(<>
+                <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:14}}>Customer</div>
+                <div style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:14}}>
+                  <div style={{fontSize:11,color:"#8899AA",marginBottom:6}}>Paste M-Pesa or SACCO SMS to auto-fill (optional)</div>
+                  <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste SMS here..." style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,resize:"none",minHeight:52,fontFamily:"'DM Sans',sans-serif"}}/>
+                  {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:12,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"SACCO":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||"no name"}</div>}
+                </div>
+                <div className="field"><label>Customer name</label><input value={cName} onChange={e=>setCName(e.target.value)} placeholder="Full name" autoFocus/></div>
+                <div className="field"><label>Phone (optional)</label><input value={cPhone} onChange={e=>setCPhone(e.target.value)} placeholder="07XX XXX XXX" type="tel"/></div>
+              </>)}
+              {step===2&&(<>
+                <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:4}}>Items</div>
+                <div style={{fontSize:12,color:"#8899AA",marginBottom:14}}>Type to search stock. Price fills automatically.</div>
+                {items.map(i=>(
+                  <div key={i.id} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:8}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
+                      <AutocompleteInput value={i.name} onChange={v=>upItem(i.id,"name",v)} onSelect={s=>selectStock(i.id,s)} stockItems={stockItems} placeholder="Search stock..."/>
+                      <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16,paddingTop:6}}>x</button>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                      <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
+                      <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>UNIT PRICE (KSh)</div><input type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13}}/></div>
+                    </div>
+                    {i.name&&i.price&&i.qty&&<div style={{fontSize:11,color:"#F5C000",marginTop:5,textAlign:"right"}}>{fmtK(Number(i.qty)*Number(i.price))}</div>}
+                  </div>
+                ))}
+                <button className="btn-g" onClick={addItem} style={{width:"100%",fontSize:13}}>+ Add another item</button>
+                {total>0&&<div style={{textAlign:"right",marginTop:12,fontSize:16,fontWeight:600,color:"#F5C000"}}>Total {fmtK(total)}</div>}
+              </>)}
+              {step===3&&(<>
+                <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:12}}>Payment</div>
+                <div style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:14}}>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:2}}>{cName}{cPhone?<span style={{color:"#8899AA",fontWeight:400}}> · {cPhone}</span>:null}</div>
+                  {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#8899AA",padding:"2px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:600,color:"#F5C000",marginTop:6,paddingTop:6,borderTop:"1px solid #1A2A4A"}}><span>Total</span><span>{fmtK(total)}</span></div>
+                </div>
+                <div className="field"><label>Payment type</label><div className="tog"><button className={`tog-btn${payType==="full"?" on":""}`} onClick={()=>setPayType("full")}>Full</button><button className={`tog-btn${payType==="instalment"?" on":""}`} onClick={()=>setPayType("instalment")}>Instalment</button></div></div>
+                {payType==="instalment"&&<div className="field" style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12}}><label style={{color:"#E8A45B"}}>Paying now (KSh)</label><input type="number" value={initPay} onChange={e=>setInitPay(e.target.value)} placeholder="Amount"/>{initPay&&<div style={{fontSize:12,color:"#E8A45B",marginTop:6}}>Balance: {fmtK(Math.max(0,total-Number(initPay)))}</div>}</div>}
+                <div className="field"><label>Method</label><div className="tog"><button className={`tog-btn${pay==="mpesa"?" on":""}`} onClick={()=>setPay("mpesa")}>M-Pesa</button><button className={`tog-btn${pay==="cash"?" on":""}`} onClick={()=>setPay("cash")}>Cash</button></div></div>
+                {pay==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace",letterSpacing:"0.05em"}}/></div>}
+                <div className="field"><label>Notes (optional)</label><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Deliver Saturday"/></div>
+              </>)}
+              {err&&<div style={{color:"#E85B5B",fontSize:13,marginTop:8}}>{err}</div>}
             </div>
-            {i.name&&i.price&&i.qty&&<div style={{fontSize:11,color:"#F5C000",marginTop:5,textAlign:"right"}}>KSh {(Number(i.qty)*Number(i.price)).toLocaleString()}</div>}
+            <div className="wiz-ft">
+              {step>1&&<button className="btn-g" onClick={()=>{setErr("");setStep(step-1);}} style={{fontSize:13}}>Back</button>}
+              {step<3&&<button className="btn-y" onClick={nextStep} style={{flex:1,fontSize:14}}>Next</button>}
+              {step===3&&<><button className="btn-g" onClick={()=>genReceipt(false)} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Record Sale"}</button><button className="btn-y" onClick={()=>genReceipt(true)} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Record + Receipt"}</button></>}
+            </div>
           </div>
-        ))}
-        <button className="btn-g" onClick={addItem} style={{width:"100%",fontSize:13}}>+ Add another item</button>
-        {items.some(i=>i.price&&i.qty)&&<div style={{textAlign:"right",marginTop:8,fontSize:14,fontWeight:600,color:"#F5C000"}}>Total: KSh {items.reduce((s,i)=>s+(Number(i.qty||0)*Number(i.price||0)),0).toLocaleString()}</div>}
-      </div>
-      <div className="field"><label>Payment type</label><div className="tog">
-        <button className={`tog-btn${payType==="full"?" on":""}`} onClick={()=>setPayType("full")}>Full Payment</button>
-        <button className={`tog-btn${payType==="instalment"?" on":""}`} onClick={()=>setPayType("instalment")}>Instalment</button>
-      </div></div>
-      {payType==="instalment"&&(
-        <div className="field" style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12,marginBottom:12}}>
-          <label style={{color:"#E8A45B"}}>Initial payment today (KSh)</label>
-          <input type="number" value={initPay} onChange={e=>setInitPay(e.target.value)} placeholder="Amount customer is paying now"/>
-          {initPay&&items.some(i=>i.price&&i.qty)&&<div style={{fontSize:12,color:"#E8A45B",marginTop:6}}>Balance will be: KSh {Math.max(0,items.reduce((s,i)=>s+(Number(i.qty||0)*Number(i.price||0)),0)-Number(initPay)).toLocaleString()}</div>}
         </div>
       )}
-      <div className="field"><label>Payment method</label><div className="tog"><button className={`tog-btn${pay==="mpesa"?" on":""}`} onClick={()=>setPay("mpesa")}>M-Pesa</button><button className={`tog-btn${pay==="cash"?" on":""}`} onClick={()=>setPay("cash")}>Cash</button></div></div>
-      {pay==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace",letterSpacing:"0.05em"}}/></div>}
-      <div className="field"><label>Notes (optional)</label><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Balance pending"/></div>
-      {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-        <button className="btn-g" onClick={()=>genReceipt(false)} disabled={saving} style={{padding:14,fontSize:13}}>{saving?"Saving...":"Record Sale"}</button>
-        <button className="btn-y" onClick={()=>genReceipt(true)} disabled={saving} style={{padding:14,fontSize:13}}>{saving?"Saving...":"Record + Receipt"}</button>
-      </div>
     </div>
   );
 }
