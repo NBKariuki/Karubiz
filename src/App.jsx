@@ -6,7 +6,7 @@ const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const APP_PW = "GwituMucii@22";
 const C = { navy:"#050A1F",mid:"#0A1128",light:"#0F1A3A",yellow:"#F5C000",white:"#FFFFFF",muted:"#8899AA",dark:"#556677",green:"#4CAF50",red:"#E85B5B" };
 const STAFF = ["Burton Kariuki","Martin Ruguru"];
-const EXP_CATS = ["Rent","Transport","Stock Purchase","Utilities","Marketing","Staff","Other"];
+const EXP_CATS = ["Rent","Transport","Utilities","Marketing","Staff","Other"];
 const CAT_OPTS = [{id:"living",label:"Living Room"},{id:"bedroom",label:"Bedroom"},{id:"decor",label:"Decor"},{id:"other",label:"Other"}];
 const catLabel = id => ({living:"Living Room",bedroom:"Bedroom",decor:"Decor",other:"Other"}[id]||id);
 const H = {"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"};
@@ -16,6 +16,17 @@ const sb = {
   patch: async (t,id,d) => { const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",headers:H,body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
 };
 const logAudit = async d => { try { await sb.post("karu_audit",d); } catch(e){ console.error(e); } };
+const recordMoney = async rows => { try { await sb.post("karu_money", Array.isArray(rows)?rows:[rows]); } catch(e){ console.error("money:",e); } };
+const fetchBalances = async () => {
+  try {
+    const rows = await sb.get("karu_money","select=account,amount");
+    const b = {cash:0,sacco:0,owed_burton:0,owed_martin:0};
+    rows.forEach(r=>{ b[r.account]=(b[r.account]||0)+Number(r.amount); });
+    return {...b, hasData: rows.length>0};
+  } catch { return {cash:0,sacco:0,owed_burton:0,owed_martin:0,hasData:false}; }
+};
+const fmtK = n => "KSh "+Math.round(n).toLocaleString();
+const todayStr = () => new Date().toISOString().split("T")[0];
 
 function parseMpesa(sms) {
   const s = sms.trim();
@@ -55,13 +66,28 @@ const GS = () => (
     .ac-item{padding:9px 12px;cursor:pointer;border-bottom:1px solid #1A2A4A} .ac-item:hover{background:#0F1A3A} .ac-item:last-child{border-bottom:none}
     .audit-entry{font-size:11px;color:#556677;padding:5px 0;border-bottom:1px solid #0F1A3A;line-height:1.5} .audit-entry:last-child{border-bottom:none}
     .trip-hdr{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:2px 0}
-    @media print{.nav,.np{display:none!important}}
+    .strip{display:flex;justify-content:center;gap:16px;padding:6px 16px;background:#0A1128;border-bottom:1px solid #1A2A4A;font-size:12px}
+    .strip span{color:#8899AA} .strip b{color:#F5C000;font-weight:600}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100}
+    .panel{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:88vw;background:#0A1128;border-left:1px solid #1A2A4A;z-index:101;overflow-y:auto;padding:20px 18px 40px}
+    .bal-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1A2A4A}
+    .bal-row:last-child{border-bottom:none}
+    .qa{background:#050A1F;border:1px solid #1A2A4A;border-radius:8px;padding:12px;margin-bottom:10px}
+    .qa-title{font-size:13px;font-weight:600;color:#FFFFFF;margin-bottom:8px}
+    .qa input{width:100%;background:#0A1128;border:1px solid #1A2A4A;border-radius:6px;padding:9px 11px;color:#E8E2D4;font-size:14px;margin-bottom:8px}
+    .mv{font-size:11px;padding:6px 0;border-bottom:1px solid #0F1A3A;display:flex;justify-content:space-between}
+    .mv:last-child{border-bottom:none}
+    @media print{.nav,.np,.strip{display:none!important}}
   `}</style>
 );
 
 export default function App() {
   const [authed,setAuthed]=useState(false);
   const [pw,setPw]=useState(""); const [pwErr,setPwErr]=useState(""); const [tab,setTab]=useState("sale");
+  const [bal,setBal]=useState({cash:0,sacco:0,owed_burton:0,owed_martin:0,hasData:false});
+  const [panel,setPanel]=useState(false);
+  const refreshBal=useCallback(async()=>{ setBal(await fetchBalances()); },[]);
+  useEffect(()=>{ if(authed) refreshBal(); },[authed,refreshBal]);
   const tryLogin=()=>{ if(pw.trim()===APP_PW.trim()){setAuthed(true);}else{setPwErr("Wrong password.");} };
   if(!authed) return (<><GS/>
     <div style={{minHeight:"100vh",display:"flex",justifyContent:"center",alignItems:"center",padding:24}}>
@@ -74,18 +100,92 @@ export default function App() {
     </div></>);
   return (<><GS/>
     <div style={{maxWidth:500,margin:"0 auto",paddingBottom:72}}>
-      <div style={{padding:"14px 16px 12px",borderBottom:"1px solid #0A1128",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#050A1F",position:"sticky",top:0,zIndex:40}}>
+      <div style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#050A1F",position:"sticky",top:0,zIndex:40,borderBottom:"1px solid #0A1128"}}>
         <span style={{fontSize:16,fontWeight:600,color:"#F5C000",letterSpacing:"0.08em"}}>KARU</span>
-        <span style={{fontSize:12,color:"#556677"}}>Accounts</span>
         <span style={{fontSize:12,color:"#556677"}}>{new Date().toLocaleDateString("en-KE",{day:"2-digit",month:"short"})}</span>
+        <button onClick={()=>setPanel(true)} style={{background:"none",border:"1px solid #1A2A4A",borderRadius:6,color:"#F5C000",padding:"5px 10px",fontSize:16,cursor:"pointer",lineHeight:1}}>☰</button>
       </div>
+      <div className="strip"><span>Cash <b>{fmtK(bal.cash)}</b></span><span>SACCO <b>{fmtK(bal.sacco)}</b></span></div>
       <div style={{padding:16}}>
-        {tab==="sale"&&<SaleTab/>}{tab==="stock"&&<StockTab/>}{tab==="expenses"&&<ExpensesTab/>}{tab==="reports"&&<ReportsTab/>}
+        {tab==="sale"&&<SaleTab onMoney={refreshBal}/>}{tab==="stock"&&<StockTab onMoney={refreshBal}/>}{tab==="expenses"&&<ExpensesTab onMoney={refreshBal}/>}{tab==="reports"&&<ReportsTab/>}
       </div>
     </div>
+    {panel&&<MoneyPanel bal={bal} onClose={()=>setPanel(false)} onChange={refreshBal}/>}
     <nav className="nav">{[["sale","Sale","💰"],["stock","Stock","📦"],["expenses","Expenses","🧾"],["reports","Reports","📊"]].map(([id,label,icon])=>(
       <button key={id} className={`nav-btn${tab===id?" on":""}`} onClick={()=>setTab(id)}><span className="ni">{icon}</span>{label}</button>
     ))}</nav></>);
+}
+
+function MoneyPanel({bal,onClose,onChange}){
+  const [act,setAct]=useState(null);
+  const [amt,setAmt]=useState(""); const [who,setWho]=useState("Burton Kariuki"); const [dir,setDir]=useState("in"); const [acc,setAcc]=useState("sacco");
+  const [openCash,setOpenCash]=useState(""); const [openSacco,setOpenSacco]=useState("");
+  const [moves,setMoves]=useState([]); const [saving,setSaving]=useState(false);
+  useEffect(()=>{ sb.get("karu_money","select=*&order=created_at.desc&limit=12").then(setMoves).catch(()=>{}); },[bal]);
+  const rb=()=>{setAmt("");setAct(null);onChange();};
+  const doOpening=async()=>{
+    if(!openCash&&!openSacco) return;
+    setSaving(true);
+    const rows=[];
+    if(Number(openCash)>0) rows.push({account:"cash",amount:Number(openCash),type:"opening",description:"Opening balance",date:todayStr(),recorded_by:who});
+    if(Number(openSacco)>0) rows.push({account:"sacco",amount:Number(openSacco),type:"opening",description:"Opening balance",date:todayStr(),recorded_by:who});
+    await recordMoney(rows); setSaving(false); rb();
+  };
+  const doBank=async()=>{ const a=Number(amt); if(!a) return; setSaving(true);
+    await recordMoney([{account:"cash",amount:-a,type:"bank",description:"Banked cash",date:todayStr(),recorded_by:who},{account:"sacco",amount:a,type:"bank",description:"Banked cash",date:todayStr(),recorded_by:who}]);
+    setSaving(false); rb(); };
+  const doWithdraw=async()=>{ const a=Number(amt); if(!a) return; setSaving(true);
+    await recordMoney([{account:"sacco",amount:-a,type:"withdraw",description:"Withdrew to cash",date:todayStr(),recorded_by:who},{account:"cash",amount:a,type:"withdraw",description:"Withdrew to cash",date:todayStr(),recorded_by:who}]);
+    setSaving(false); rb(); };
+  const doPartner=async()=>{ const a=Number(amt); if(!a) return; setSaving(true);
+    const short=who.split(" ")[0].toLowerCase(); const owedKey="owed_"+short;
+    if(dir==="in") await recordMoney([{account:acc,amount:a,type:"partner_in",partner:who,description:`${who.split(" ")[0]} put in`,date:todayStr(),recorded_by:who}]);
+    else if(dir==="out") await recordMoney([{account:acc,amount:-a,type:"partner_out",partner:who,description:`${who.split(" ")[0]} took out`,date:todayStr(),recorded_by:who}]);
+    else await recordMoney([{account:acc,amount:-a,type:"partner_repay",partner:who,description:`Repaid ${who.split(" ")[0]}`,date:todayStr(),recorded_by:who},{account:owedKey,amount:-a,type:"partner_repay",partner:who,description:`Repaid ${who.split(" ")[0]}`,date:todayStr(),recorded_by:who}]);
+    setSaving(false); rb(); };
+  const total=bal.cash+bal.sacco;
+  return (<>
+    <div className="overlay" onClick={onClose}/>
+    <div className="panel">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+        <div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Money</div>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#8899AA",fontSize:20,cursor:"pointer"}}>×</button>
+      </div>
+      {!bal.hasData?(
+        <div className="qa">
+          <div className="qa-title">Set opening balances</div>
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:8}}>One time only. What do you have right now?</div>
+          <input type="number" value={openCash} onChange={e=>setOpenCash(e.target.value)} placeholder="Cash at hand (KSh)"/>
+          <input type="number" value={openSacco} onChange={e=>setOpenSacco(e.target.value)} placeholder="SACCO balance (KSh)"/>
+          <button className="btn-y" onClick={doOpening} disabled={saving} style={{width:"100%"}}>{saving?"Saving...":"Save"}</button>
+        </div>
+      ):(<>
+        <div style={{marginBottom:16}}>
+          <div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>Cash at hand</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(bal.cash)}</span></div>
+          <div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>SACCO</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(bal.sacco)}</span></div>
+          <div className="bal-row"><span style={{color:"#FFFFFF",fontSize:13,fontWeight:600}}>Total</span><span style={{fontSize:17,fontWeight:700,color:"#F5C000"}}>{fmtK(total)}</span></div>
+          {bal.owed_burton>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes Burton</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.owed_burton)}</span></div>}
+          {bal.owed_martin>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes Martin</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.owed_martin)}</span></div>}
+        </div>
+        {!act&&<div style={{display:"grid",gap:8,marginBottom:16}}>
+          <button className="btn-y" onClick={()=>setAct("bank")} style={{fontSize:13}}>Bank cash</button>
+          <button className="btn-g" onClick={()=>setAct("withdraw")} style={{fontSize:13}}>Withdraw from SACCO</button>
+          <button className="btn-g" onClick={()=>setAct("partner")} style={{fontSize:13}}>Partner money in / out</button>
+        </div>}
+        {act==="bank"&&<div className="qa"><div className="qa-title">Bank cash</div><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus/><div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${who===s?" on":""}`} onClick={()=>setWho(s)}>{s.split(" ")[0]}</button>)}</div><div style={{display:"flex",gap:6}}><button className="btn-y" onClick={doBank} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setAct(null);setAmt("");}} style={{fontSize:13}}>Cancel</button></div></div>}
+        {act==="withdraw"&&<div className="qa"><div className="qa-title">Withdraw to cash</div><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus/><div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${who===s?" on":""}`} onClick={()=>setWho(s)}>{s.split(" ")[0]}</button>)}</div><div style={{display:"flex",gap:6}}><button className="btn-y" onClick={doWithdraw} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setAct(null);setAmt("");}} style={{fontSize:13}}>Cancel</button></div></div>}
+        {act==="partner"&&<div className="qa"><div className="qa-title">Partner money</div>
+          <div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${who===s?" on":""}`} onClick={()=>setWho(s)}>{s.split(" ")[0]}</button>)}</div>
+          <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${dir==="in"?" on":""}`} onClick={()=>setDir("in")}>Puts in</button><button className={`tog-btn${dir==="out"?" on":""}`} onClick={()=>setDir("out")}>Takes out</button><button className={`tog-btn${dir==="repay"?" on":""}`} onClick={()=>setDir("repay")}>Repay</button></div>
+          <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${acc==="cash"?" on":""}`} onClick={()=>setAcc("cash")}>Cash</button><button className={`tog-btn${acc==="sacco"?" on":""}`} onClick={()=>setAcc("sacco")}>SACCO</button></div>
+          <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)"/>
+          <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={doPartner} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setAct(null);setAmt("");}} style={{fontSize:13}}>Cancel</button></div></div>}
+        {moves.length>0&&<div><div style={{fontSize:11,color:"#556677",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Recent movements</div>
+          {moves.map(m=><div key={m.id} className="mv"><span style={{color:"#8899AA"}}>{m.date.slice(5)} · {m.description||m.type}</span><span style={{color:m.amount>=0?"#4CAF50":"#E85B5B",fontWeight:600}}>{m.amount>=0?"+":""}{Math.round(m.amount).toLocaleString()}</span></div>)}
+        </div>}
+      </>)}
+    </div>
+  </>);
 }
 
 function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
@@ -109,7 +209,7 @@ function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
   );
 }
 
-function SaleTab(){
+function SaleTab({onMoney}){
   const [stockItems,setStockItems]=useState([]);
   const [sms,setSms]=useState(""); const [parsed,setParsed]=useState(null);
   const [staff,setStaff]=useState("Burton Kariuki");
@@ -192,6 +292,8 @@ function SaleTab(){
         await sb.post("karu_payments",{sale_id:newSale.id,receipt_no,customer_name:cName,amount:amtPaid,payment_method:pay==="mpesa"?"M-Pesa":"Cash",mpesa_code:mpesaCode.toUpperCase(),date,recorded_by:staff,notes:"Initial instalment payment"});
       }
       await reduceStock(vi);
+      await recordMoney({account:pay==="mpesa"?"sacco":"cash",amount:amtPaid,type:"sale",ref:receipt_no,description:`Sale ${receipt_no} · ${cName}`,date,recorded_by:staff});
+      if(onMoney) onMoney();
       const fresh=await sb.get("karu_stock","select=*&order=date_in.asc");
       setStockItems(fresh);
       if(withReceipt){ setReceipt(data); } else { setSaved(data); }
@@ -209,6 +311,8 @@ function SaleTab(){
       const newBal=Math.max(0,Number(addPaySale.total)-newPaid);
       await sb.post("karu_payments",{sale_id:addPaySale.id,receipt_no:addPaySale.receipt_no,customer_name:addPaySale.customer_name,amount:Number(addPayAmt),payment_method:addPayMethod==="mpesa"?"M-Pesa":"Cash",mpesa_code:addPayCode.toUpperCase(),date,recorded_by:addPayStaff,notes:addPayNotes||"Instalment payment"});
       await sb.patch("karu_sales",addPaySale.id,{amount_paid:newPaid,balance_due:newBal,payment_type:newBal<=0?"full":"instalment"});
+      await recordMoney({account:addPayMethod==="mpesa"?"sacco":"cash",amount:Number(addPayAmt),type:"sale",ref:addPaySale.receipt_no,description:`Instalment ${addPaySale.receipt_no} · ${addPaySale.customer_name}`,date,recorded_by:addPayStaff});
+      if(onMoney) onMoney();
       setAddPaySale(null); setAddPayAmt(""); setAddPayCode(""); setAddPayNotes("");
       await loadPendingSales();
       alert(newBal<=0?"Fully paid! Account cleared.":"Payment recorded. Balance: KSh "+newBal.toLocaleString());
@@ -414,7 +518,7 @@ function SaleTab(){
   );
 }
 
-function StockTab(){
+function StockTab({onMoney}){
   const [trips,setTrips]=useState([]); const [stock,setStock]=useState([]); const [audit,setAudit]=useState([]);
   const [loading,setLoading]=useState(true); const [view,setView]=useState("list");
   const [expanded,setExpanded]=useState({}); const [editItem,setEditItem]=useState(null);
@@ -423,7 +527,7 @@ function StockTab(){
   const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
   const [addingToTrip,setAddingToTrip]=useState(null);
   const [addExtraItems,setAddExtraItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
-  const [trip,setTrip]=useState({date:new Date().toISOString().split("T")[0],notes:"",created_by:"Burton Kariuki"});
+  const [trip,setTrip]=useState({date:new Date().toISOString().split("T")[0],notes:"",created_by:"Burton Kariuki",paid_from:"sacco"});
   const [tripItems,setTripItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
 
   useEffect(()=>{loadAll();},[]);
@@ -485,6 +589,10 @@ function StockTab(){
       await sb.post("karu_stock",vi.map(i=>({trip_id:t.id,trip_no:t.trip_no,name:i.name,category:i.category,qty_in:Number(i.qty_in),qty_sold:0,unit_cost:Number(i.unit_cost),selling_price:Number(i.selling_price||0),date_in:t.date})));
       const addedCost=vi.reduce((s,i)=>s+(Number(i.qty_in)*Number(i.unit_cost)),0);
       await sb.patch("karu_trips",t.id,{total_cost:Number(t.total_cost)+addedCost});
+      const pf=t.paid_from||"sacco"; const ashort=lockStaff.split(" ")[0];
+      if(pf==="personal") await recordMoney({account:"owed_"+ashort.toLowerCase(),amount:addedCost,type:"trip_personal",partner:lockStaff,description:`${t.trip_no} extra items (paid by ${ashort})`,date:t.date,recorded_by:lockStaff});
+      else await recordMoney({account:pf,amount:-addedCost,type:"trip",ref:t.trip_no,description:`${t.trip_no} extra items`,date:t.date,recorded_by:lockStaff});
+      if(onMoney) onMoney();
       await logAudit({trip_no:t.trip_no,record_id:t.id,action:"add_items",reason:`Added ${vi.length} item(s) to trip`,changed_by:lockStaff});
       setAddingToTrip(null);
       setAddExtraItems([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
@@ -504,13 +612,20 @@ function StockTab(){
     try{
       const tripNo=`KARU-TRIP-${String(trips.length+1).padStart(3,"0")}`;
       const totalCost=vi.reduce((s,i)=>s+(Number(i.qty_in)*Number(i.unit_cost)),0);
-      const [newTrip]=await sb.post("karu_trips",{trip_no:tripNo,date:trip.date,notes:trip.notes,total_cost:totalCost,created_by:trip.created_by,status:"open"});
+      const [newTrip]=await sb.post("karu_trips",{trip_no:tripNo,date:trip.date,notes:trip.notes,total_cost:totalCost,created_by:trip.created_by,status:"open",paid_from:trip.paid_from});
+      const tshort=trip.created_by.split(" ")[0];
+      if(trip.paid_from==="personal"){
+        await recordMoney({account:"owed_"+tshort.toLowerCase(),amount:totalCost,type:"trip_personal",partner:trip.created_by,description:`${tripNo} (paid by ${tshort})`,date:trip.date,recorded_by:trip.created_by});
+      } else {
+        await recordMoney({account:trip.paid_from,amount:-totalCost,type:"trip",ref:tripNo,description:`Sourcing ${tripNo}`,date:trip.date,recorded_by:trip.created_by});
+      }
+      if(onMoney) onMoney();
       await sb.post("karu_stock",vi.map(i=>({trip_id:newTrip.id,trip_no:tripNo,name:i.name,category:i.category,qty_in:Number(i.qty_in),qty_sold:0,unit_cost:Number(i.unit_cost),selling_price:Number(i.selling_price||0),date_in:trip.date})));
       await logAudit({trip_no:tripNo,record_id:newTrip.id,action:"create",reason:"New sourcing trip",changed_by:trip.created_by});
       await loadAll();
       setView("list");
       setTripItems([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
-      setTrip({date:new Date().toISOString().split("T")[0],notes:"",created_by:"Burton Kariuki"});
+      setTrip({date:new Date().toISOString().split("T")[0],notes:"",created_by:"Burton Kariuki",paid_from:"sacco"});
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
   };
@@ -551,6 +666,8 @@ function StockTab(){
       <div className="field"><label>Date</label><input type="date" value={trip.date} onChange={e=>setTrip(x=>({...x,date:e.target.value}))}/></div>
       <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${trip.created_by===s?" on":""}`} onClick={()=>setTrip(x=>({...x,created_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
       <div className="field"><label>Notes</label><input value={trip.notes} onChange={e=>setTrip(x=>({...x,notes:e.target.value}))} placeholder="e.g. Gachie sourcing run"/></div>
+      <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${trip.paid_from==="cash"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${trip.paid_from==="sacco"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${trip.paid_from==="personal"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
+      {trip.paid_from==="personal"&&<div style={{fontSize:11,color:"#E8A45B",marginTop:5}}>Business will owe {trip.created_by.split(" ")[0]} this amount</div>}</div>
       <div className="field">
         <label>Items purchased</label>
         {tripItems.map(i=>(
@@ -682,10 +799,10 @@ function StockTab(){
   );
 }
 
-function ExpensesTab(){
+function ExpensesTab({onMoney}){
   const [exp,setExp]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [form,setForm]=useState({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:"Burton Kariuki"});
+  const [form,setForm]=useState({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:"Burton Kariuki",paid_from:"sacco"});
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
   const [showForm,setShowForm]=useState(false);
@@ -703,9 +820,16 @@ function ExpensesTab(){
     setSaving(true); setErr("");
     try{
       await sb.post("karu_expenses",{...form,amount:Number(form.amount)});
+      const a=Number(form.amount); const short=form.recorded_by.split(" ")[0]; const lbl=`${form.category}${form.description?" · "+form.description:""}`;
+      if(form.paid_from==="personal"){
+        await recordMoney({account:"owed_"+short.toLowerCase(),amount:a,type:"expense_personal",partner:form.recorded_by,description:`${lbl} (paid by ${short})`,date:form.date,recorded_by:form.recorded_by});
+      } else {
+        await recordMoney({account:form.paid_from,amount:-a,type:"expense",description:lbl,date:form.date,recorded_by:form.recorded_by});
+      }
+      if(onMoney) onMoney();
       await loadExp();
       setShowForm(false);
-      setForm({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:"Burton Kariuki"});
+      setForm({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:"Burton Kariuki",paid_from:"sacco"});
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
   };
@@ -728,6 +852,8 @@ function ExpensesTab(){
           <div className="field"><label>Description</label><input value={form.description} onChange={e=>setForm(x=>({...x,description:e.target.value}))} placeholder="e.g. October rent payment"/></div>
           <div className="field"><label>Amount (KSh)</label><input type="number" value={form.amount} onChange={e=>setForm(x=>({...x,amount:e.target.value}))} placeholder="0"/></div>
           <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${form.recorded_by===s?" on":""}`} onClick={()=>setForm(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
+          <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${form.paid_from==="cash"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${form.paid_from==="sacco"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${form.paid_from==="personal"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
+          {form.paid_from==="personal"&&<div style={{fontSize:11,color:"#E8A45B",marginTop:5}}>Business will owe {form.recorded_by.split(" ")[0]} this amount</div>}</div>
           {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
           <div style={{display:"flex",gap:8}}>
             <button className="btn-y" onClick={save} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save"}</button>
