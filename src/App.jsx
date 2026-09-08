@@ -53,6 +53,9 @@ const can = (user, perm) => !!user && (ROLES[user.role]?.can.includes(perm));
 const fmtK = n => "KSh "+Math.round(n).toLocaleString();
 const todayStr = () => new Date().toISOString().split("T")[0];
 const initials = n => (n||"").split(" ").map(w=>w[0]||"").join("").toUpperCase();
+const EDIT_WINDOW_MS = 24*60*60*1000;
+const withinWindow = createdAt => { if(!createdAt) return true; return (Date.now()-new Date(createdAt).getTime()) < EDIT_WINDOW_MS; };
+const windowNote = "Locked — records can only be changed within 24 hours. Use reconciliation for later corrections.";
 
 function parseMpesa(sms) {
   const s = sms.trim();
@@ -280,7 +283,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
         <div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Money</div>
         <button onClick={onClose} style={{background:"none",border:"none",color:"#8899AA",fontSize:20,cursor:"pointer"}}>×</button>
       </div>
-      {view==="close"?<CloseDay user={user} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="users"?<ManageTeam user={user} onBack={()=>setView("home")}/>:!can(user,"money")?(
+      {view==="close"?<CloseDay user={user} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="users"?<ManageTeam user={user} onBack={()=>setView("home")}/>:view==="reconcile"?<Reconcile user={user} bal={bal} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:!can(user,"money")?(
         <div style={{textAlign:"center",color:"#8899AA",fontSize:14,padding:"20px 0"}}>
           {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{width:"100%",marginBottom:10,fontSize:13}}>Daily cash close</button>}
           <div style={{fontSize:12,color:"#556677",marginTop:8}}>Money controls are owner-only.</div>
@@ -307,6 +310,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
             <button className="btn-g" onClick={()=>setAct("bank")} style={{fontSize:13}}>Bank cash</button>
             <button className="btn-g" onClick={()=>setAct("withdraw")} style={{fontSize:13}}>Withdraw from SACCO</button>
             <button className="btn-g" onClick={()=>setAct("partner")} style={{fontSize:13}}>Partner money in / out</button>
+            <button className="btn-g" onClick={()=>setView("reconcile")} style={{fontSize:13}}>Reconcile a balance</button>
           </div>
           {(can(user,"close")||can(user,"users"))&&<>
             <div style={{borderTop:"1px solid #1A2A4A",margin:"4px 0 12px"}}/>
@@ -390,6 +394,43 @@ function CloseDay({user,onBack,onDone}){
         {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
         <button className="btn-y" onClick={doClose} disabled={saving} style={{width:"100%",padding:13}}>{saving?"Closing...":"Close the Day"}</button>
       </>)}
+    </div>
+  );
+}
+
+function Reconcile({user,bal,onBack,onDone}){
+  const [acc,setAcc]=useState("sacco"); const [actual,setActual]=useState(""); const [reason,setReason]=useState("");
+  const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
+  const current = acc==="sacco"?bal.sacco:bal.cash;
+  const diff = actual===""?0:Number(actual)-current;
+  const doReconcile=async()=>{
+    setErr("");
+    if(actual===""){setErr("Enter the actual balance from your statement.");return;}
+    if(diff===0){setErr("No difference — nothing to reconcile.");return;}
+    if(!reason.trim()){setErr("A reason is required for the correction.");return;}
+    setSaving(true);
+    try{
+      await recordMoney({account:acc,amount:diff,type:"reconciliation",description:`Reconciliation: ${reason}`,date:todayStr(),recorded_by:user.full_name});
+      await logAudit({trip_no:null,record_id:null,action:"reconcile",field_changed:acc.toUpperCase(),old_value:String(Math.round(current)),new_value:String(Math.round(Number(actual))),reason,changed_by:user.full_name});
+      onDone();
+    }catch(e){setErr("Failed: "+e.message);}
+    setSaving(false);
+  };
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Reconcile Balance</div></div>
+      <div style={{fontSize:12,color:"#8899AA",marginBottom:14,lineHeight:1.5}}>Enter the true balance from your SACCO statement or a physical cash count. The app posts a logged correction for the difference. It cannot be undone quietly — every reconciliation is recorded.</div>
+      <div className="field"><label>Account</label><div className="tog"><button className={`tog-btn${acc==="cash"?" on":""}`} onClick={()=>setAcc("cash")}>Cash</button><button className={`tog-btn${acc==="sacco"?" on":""}`} onClick={()=>setAcc("sacco")}>SACCO</button></div></div>
+      <div className="qa"><div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>App shows</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(current)}</span></div></div>
+      <div className="field"><label>Actual balance (KSh)</label><input type="number" step="0.01" value={actual} onChange={e=>{setActual(e.target.value);setErr("");}} placeholder="From statement / count" autoFocus/></div>
+      {actual!==""&&diff!==0&&(
+        <div style={{background:diff>0?"rgba(76,175,80,0.1)":"rgba(232,91,91,0.1)",border:`1px solid ${diff>0?"rgba(76,175,80,0.3)":"rgba(232,91,91,0.3)"}`,borderRadius:8,padding:12,marginBottom:12,textAlign:"center"}}>
+          <div style={{fontSize:13,color:diff>0?"#4CAF50":"#E85B5B",fontWeight:600}}>{diff>0?`App is short by ${fmtK(diff)} — will add`:`App is over by ${fmtK(Math.abs(diff))} — will deduct`}</div>
+        </div>
+      )}
+      <div className="field"><label>Reason (required)</label><textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="e.g. SACCO interest earned, untracked bank charge, missed deposit"/></div>
+      {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
+      <button className="btn-y" onClick={doReconcile} disabled={saving} style={{width:"100%",padding:13}}>{saving?"Posting...":"Post Reconciliation"}</button>
     </div>
   );
 }
@@ -688,7 +729,7 @@ function SaleTab({user,onMoney}){
               {histSales.length===0?<div style={{color:"#556677",fontSize:13}}>No sales yet.</div>:histSales.map(s=>(
                 <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1A2A4A",opacity:s.voided?0.45:1}}>
                   <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · {s.date} · {initials(s.served_by)} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div></div>
-                  <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div>{!s.voided&&can(user,"void")&&<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:"2px 0"}}>Void</button>}</div>
+                  <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div>{!s.voided&&can(user,"void")&&(withinWindow(s.created_at)?<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:"2px 0"}}>Void</button>:<span style={{fontSize:10,color:"#556677"}}>🔒</span>)}</div>
                 </div>
               ))}
             </div>
@@ -1047,7 +1088,7 @@ function StockTab({user,onMoney}){
                         <span className={`badge ${avail>0?"b-g":"b-r"}`}>{avail>0?`${avail} left`:"None left"}</span>
                         <div style={{display:"flex",gap:4}}>
                           {avail>0&&can(user,"adjust")&&<button className="btn-g" onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{fontSize:11,padding:"4px 8px"}}>Adjust</button>}
-                          {!locked&&can(user,"edit")&&<button className="btn-r" onClick={()=>startEdit(s,t)} style={{fontSize:11,padding:"4px 8px"}}>Edit</button>}
+                          {!locked&&can(user,"edit")&&withinWindow(s.created_at)&&<button className="btn-r" onClick={()=>startEdit(s,t)} style={{fontSize:11,padding:"4px 8px"}}>Edit</button>}
                         </div>
                       </div>
                     </div>
@@ -1248,10 +1289,10 @@ function ExpensesTab({user,onMoney}){
                 </div>
                 <span style={{fontSize:14,fontWeight:600,color:"#E85B5B",marginLeft:10,whiteSpace:"nowrap"}}>{fmtK(Number(e.amount))}</span>
               </div>
-              {can(user,"edit_expense")&&<div style={{display:"flex",gap:6,marginTop:6}}>
+              {can(user,"edit_expense")&&(withinWindow(e.created_at)?<div style={{display:"flex",gap:6,marginTop:6}}>
                 <button className="btn-g" onClick={()=>startEdit(e)} style={{fontSize:11,padding:"4px 10px"}}>Edit</button>
                 {can(user,"void")&&<button className="btn-g" onClick={()=>delExpense(e)} style={{fontSize:11,padding:"4px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Delete</button>}
-              </div>}
+              </div>:<div style={{fontSize:10,color:"#556677",marginTop:6}}>🔒 Locked (over 24h)</div>)}
             </div>
           ))}
         </div>
