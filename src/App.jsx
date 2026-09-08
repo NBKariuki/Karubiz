@@ -14,6 +14,7 @@ const sb = {
   get: async (t,p="") => { const r=await fetch(`${SB_URL}/rest/v1/${t}?${p}`,{headers:H}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
   post: async (t,d) => { const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:"POST",headers:H,body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
   patch: async (t,id,d) => { const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",headers:H,body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  del: async (t,id) => { const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:"DELETE",headers:H}); if(!r.ok) throw new Error("Delete failed"); },
 };
 const logAudit = async d => { try { await sb.post("karu_audit",d); } catch(e){ console.error(e); } };
 const recordMoney = async rows => { try { await sb.post("karu_money", Array.isArray(rows)?rows:[rows]); } catch(e){ console.error("money:",e); } };
@@ -44,8 +45,8 @@ function pwStrength(pw){
   return "";
 }
 const ROLES = {
-  owner:   { label:"Owner",     can:["sale","stock","expenses","reports","money","void","lock","edit","adjust","close","users"] },
-  manager: { label:"Manager",   can:["sale","stock","expenses","reports","close","adjust"] },
+  owner:   { label:"Owner",     can:["sale","stock","expenses","reports","money","void","lock","edit","adjust","close","users","edit_expense"] },
+  manager: { label:"Manager",   can:["sale","stock","expenses","reports","close","adjust","edit_expense"] },
   attendant:{ label:"Attendant", can:["sale"] },
 };
 const can = (user, perm) => !!user && (ROLES[user.role]?.can.includes(perm));
@@ -1121,6 +1122,7 @@ function ExpensesTab({user,onMoney}){
   const monthStart=new Date().toISOString().slice(0,7)+"-01";
   const [from,setFrom]=useState(monthStart); const [to,setTo]=useState(todayStr());
   const [showRange,setShowRange]=useState(false);
+  const [editing,setEditing]=useState(null); const [editReason,setEditReason]=useState("");
 
   const loadExp=async()=>{
     setLoading(true);
@@ -1144,6 +1146,43 @@ function ExpensesTab({user,onMoney}){
       await loadExp();
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
+  };
+
+  const startEdit=(e)=>{ setEditing({...e}); setEditReason(""); setErr(""); setShowForm(false); };
+  const saveEdit=async()=>{
+    if(!editing.amount||Number(editing.amount)<=0){setErr("Enter a valid amount.");return;}
+    if(!editReason.trim()){setErr("Reason for the change is required.");return;}
+    setSaving(true); setErr("");
+    try{
+      const orig=exp.find(x=>x.id===editing.id);
+      const oldAmt=Number(orig.amount); const newAmt=Number(editing.amount);
+      const oShort=orig.recorded_by.split(" ")[0].toLowerCase(); const nShort=editing.recorded_by.split(" ")[0].toLowerCase();
+      // Reverse original money effect
+      if(orig.paid_from==="personal") await recordMoney({account:"owed_"+oShort,amount:-oldAmt,type:"expense_edit_reverse",description:`Reverse (edit) ${orig.category}`,date:orig.date,recorded_by:user.full_name});
+      else await recordMoney({account:orig.paid_from||"sacco",amount:oldAmt,type:"expense_edit_reverse",description:`Reverse (edit) ${orig.category}`,date:orig.date,recorded_by:user.full_name});
+      // Apply new money effect
+      const lbl=`${editing.category}${editing.description?" · "+editing.description:""}`;
+      if(editing.paid_from==="personal") await recordMoney({account:"owed_"+nShort,amount:newAmt,type:"expense_personal",partner:editing.recorded_by,description:`${lbl} (edited)`,date:editing.date,recorded_by:user.full_name});
+      else await recordMoney({account:editing.paid_from||"sacco",amount:-newAmt,type:"expense",description:`${lbl} (edited)`,date:editing.date,recorded_by:user.full_name});
+      // Update the expense row
+      await sb.patch("karu_expenses",editing.id,{date:editing.date,category:editing.category,description:editing.description,amount:newAmt,recorded_by:editing.recorded_by,paid_from:editing.paid_from});
+      await logAudit({trip_no:null,record_id:editing.id,action:"edit_expense",field_changed:editing.category,old_value:`${oldAmt} ${orig.paid_from}`,new_value:`${newAmt} ${editing.paid_from}`,reason:editReason,changed_by:user.full_name});
+      if(onMoney) onMoney();
+      setEditing(null); await loadExp();
+    }catch(e){setErr("Save failed: "+e.message);}
+    setSaving(false);
+  };
+  const delExpense=async(e)=>{
+    if(!confirm(`Delete this expense of ${fmtK(Number(e.amount))}? This reverses its money effect.`))return;
+    try{
+      const short=e.recorded_by.split(" ")[0].toLowerCase(); const amt=Number(e.amount);
+      if(e.paid_from==="personal") await recordMoney({account:"owed_"+short,amount:-amt,type:"expense_delete",description:`Deleted ${e.category}`,date:e.date,recorded_by:user.full_name});
+      else await recordMoney({account:e.paid_from||"sacco",amount:amt,type:"expense_delete",description:`Deleted ${e.category}`,date:e.date,recorded_by:user.full_name});
+      await sb.del("karu_expenses",e.id);
+      await logAudit({trip_no:null,record_id:e.id,action:"delete_expense",field_changed:e.category,old_value:String(amt),new_value:"0",reason:"Expense deleted",changed_by:user.full_name});
+      if(onMoney) onMoney();
+      await loadExp();
+    }catch(err){alert("Delete failed: "+err.message);}
   };
 
   const total=exp.reduce((s,e)=>s+Number(e.amount),0);
@@ -1183,15 +1222,36 @@ function ExpensesTab({user,onMoney}){
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={save} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save"}</button><button className="btn-g" onClick={()=>{setShowForm(false);setErr("");}}>Cancel</button></div>
         </div>
       )}
+      {editing&&(
+        <div className="card" style={{marginBottom:14,border:"1px solid rgba(232,164,91,0.4)"}}>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:4,color:"#E8A45B"}}>Edit Expense</div>
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:12}}>The money effect will be corrected automatically.</div>
+          <div className="field"><label>Date</label><input type="date" value={editing.date} onChange={e=>setEditing(x=>({...x,date:e.target.value}))}/></div>
+          <div className="field"><label>Category</label><select value={editing.category} onChange={e=>setEditing(x=>({...x,category:e.target.value}))}>{EXP_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+          <div className="field"><label>Description</label><input value={editing.description||""} onChange={e=>setEditing(x=>({...x,description:e.target.value}))}/></div>
+          <div className="field"><label>Amount (KSh)</label><input type="number" value={editing.amount} onChange={e=>setEditing(x=>({...x,amount:e.target.value}))}/></div>
+          <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${editing.recorded_by===s?" on":""}`} onClick={()=>setEditing(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
+          <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${editing.paid_from==="cash"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${editing.paid_from==="sacco"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${editing.paid_from==="personal"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"personal"}))}>Personal</button></div></div>
+          <div className="field"><label>Reason for change (required)</label><textarea value={editReason} onChange={e=>setEditReason(e.target.value)} placeholder="e.g. Wrong amount entered, corrected"/></div>
+          {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
+          <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={saveEdit} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save Changes"}</button><button className="btn-g" onClick={()=>{setEditing(null);setErr("");}}>Cancel</button></div>
+        </div>
+      )}
       {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:exp.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No expenses in this period.</div>:(
         <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,overflow:"hidden"}}>
           {exp.map((e,i)=>(
-            <div key={e.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderBottom:i<exp.length-1?"1px solid #0F1A3A":"none"}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.description||e.category}</div>
-                <div style={{fontSize:11,color:"#556677"}}>{e.category} · {e.date.slice(5)} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+e.paid_from:""}</div>
+            <div key={e.id} style={{padding:"10px 12px",borderBottom:i<exp.length-1?"1px solid #0F1A3A":"none"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.description||e.category}</div>
+                  <div style={{fontSize:11,color:"#556677"}}>{e.category} · {e.date.slice(5)} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+e.paid_from:""}</div>
+                </div>
+                <span style={{fontSize:14,fontWeight:600,color:"#E85B5B",marginLeft:10,whiteSpace:"nowrap"}}>{fmtK(Number(e.amount))}</span>
               </div>
-              <span style={{fontSize:14,fontWeight:600,color:"#E85B5B",marginLeft:10,whiteSpace:"nowrap"}}>{fmtK(Number(e.amount))}</span>
+              {can(user,"edit_expense")&&<div style={{display:"flex",gap:6,marginTop:6}}>
+                <button className="btn-g" onClick={()=>startEdit(e)} style={{fontSize:11,padding:"4px 10px"}}>Edit</button>
+                {can(user,"void")&&<button className="btn-g" onClick={()=>delExpense(e)} style={{fontSize:11,padding:"4px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Delete</button>}
+              </div>}
             </div>
           ))}
         </div>
