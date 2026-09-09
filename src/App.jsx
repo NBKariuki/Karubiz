@@ -284,7 +284,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
         <div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Money</div>
         <button onClick={onClose} style={{background:"none",border:"none",color:"#8899AA",fontSize:20,cursor:"pointer"}}>×</button>
       </div>
-      {view==="close"?<CloseDay user={user} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="users"?<ManageTeam user={user} onBack={()=>setView("home")}/>:view==="reconcile"?<Reconcile user={user} bal={bal} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:!can(user,"money")?(
+      {view==="close"?<CloseDay user={user} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="users"?<ManageTeam user={user} onBack={()=>setView("home")}/>:view==="reconcile"?<Reconcile user={user} bal={bal} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="products"?<ProductList user={user} onBack={()=>setView("home")}/>:!can(user,"money")?(
         <div style={{textAlign:"center",color:"#8899AA",fontSize:14,padding:"20px 0"}}>
           {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{width:"100%",marginBottom:10,fontSize:13}}>Daily cash close</button>}
           <div style={{fontSize:12,color:"#556677",marginTop:8}}>Money controls are owner-only.</div>
@@ -318,6 +318,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
             <div style={{fontSize:10,color:"#556677",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Admin</div>
             <div style={{display:"grid",gap:8}}>
               {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{fontSize:13}}>Daily cash close</button>}
+              {can(user,"users")&&<button className="btn-g" onClick={()=>setView("products")} style={{fontSize:13}}>Product list</button>}
               {can(user,"users")&&<button className="btn-g" onClick={()=>setView("users")} style={{fontSize:13}}>Manage team</button>}
             </div>
           </>}
@@ -395,6 +396,57 @@ function CloseDay({user,onBack,onDone}){
         {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
         <button className="btn-y" onClick={doClose} disabled={saving} style={{width:"100%",padding:13}}>{saving?"Closing...":"Close the Day"}</button>
       </>)}
+    </div>
+  );
+}
+
+function ProductList({user,onBack}){
+  const [products,setProducts]=useState([]); const [loading,setLoading]=useState(true);
+  const [q,setQ]=useState(""); const [editing,setEditing]=useState(null); const [saving,setSaving]=useState(false);
+  const load=async()=>{ setLoading(true); try{ setProducts(await sb.get("karu_products","select=*&order=name.asc")); }catch(e){console.error(e);} setLoading(false); };
+  useEffect(()=>{load();},[]);
+  const save=async()=>{
+    if(!editing.name.trim()){alert("Name required.");return;}
+    setSaving(true);
+    try{
+      await sb.patch("karu_products",editing.id,{name:editing.name.trim(),category:editing.category,tags:(editing.tags||"").trim(),default_cost:Number(editing.default_cost)||0,default_price:Number(editing.default_price)||0,active:editing.active});
+      setEditing(null); await load();
+    }catch(e){alert("Failed: "+e.message);}
+    setSaving(false);
+  };
+  const ql=q.toLowerCase().trim();
+  const shown=ql?products.filter(p=>p.name.toLowerCase().includes(ql)||(p.tags||"").toLowerCase().includes(ql)):products;
+
+  if(editing) return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><button className="btn-g" onClick={()=>setEditing(null)} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Edit Product</div></div>
+      <div className="field"><label>Name</label><input value={editing.name} onChange={e=>setEditing(x=>({...x,name:e.target.value}))}/></div>
+      <div className="field"><label>Search tags (comma separated)</label><input value={editing.tags||""} onChange={e=>setEditing(x=>({...x,tags:e.target.value}))} placeholder="sofa, 3s, seater, living"/></div>
+      <div className="field"><label>Category</label><select value={editing.category} onChange={e=>setEditing(x=>({...x,category:e.target.value}))}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <div className="field"><label>Default cost</label><input type="number" value={editing.default_cost} onChange={e=>setEditing(x=>({...x,default_cost:e.target.value}))}/></div>
+        <div className="field"><label>Default price</label><input type="number" value={editing.default_price} onChange={e=>setEditing(x=>({...x,default_price:e.target.value}))}/></div>
+      </div>
+      <div className="field"><label>Status</label><div className="tog"><button className={`tog-btn${editing.active?" on":""}`} onClick={()=>setEditing(x=>({...x,active:true}))}>Active</button><button className={`tog-btn${!editing.active?" on":""}`} onClick={()=>setEditing(x=>({...x,active:false}))}>Retired</button></div></div>
+      <button className="btn-y" onClick={save} disabled={saving} style={{width:"100%",padding:13}}>{saving?"Saving...":"Save Product"}</button>
+    </div>
+  );
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Product List</div><span style={{fontSize:12,color:"#556677"}}>{products.length}</span></div>
+      <div style={{fontSize:11,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Add tags so people find items fast — "sofa", "3s", "seater" all point to one product. New products are added while recording a sale or trip.</div>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search products or tags..." style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 11px",color:"#E8E2D4",fontSize:13,marginBottom:12}}/>
+      {loading?<div style={{color:"#556677",textAlign:"center",padding:"20px 0"}}>Loading...</div>:shown.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0"}}>No products.</div>:shown.map(p=>(
+        <div key={p.id} className="card" style={{opacity:p.active?1:0.5,padding:"10px 12px"}} onClick={()=>setEditing({...p})}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600}}>{p.name}{!p.active&&<span style={{color:"#556677",fontWeight:400}}> · retired</span>}</div>
+              <div style={{fontSize:11,color:"#556677",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{catLabel(p.category)}{p.tags?` · ${p.tags}`:" · no tags yet"}</div>
+            </div>
+            <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,color:"#F5C000",fontWeight:600}}>{p.default_price>0?fmtK(Number(p.default_price)):"—"}</div><div style={{fontSize:10,color:"#556677"}}>edit</div></div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -487,6 +539,68 @@ function ManageTeam({user,onBack}){
           </div>}
         </div>
       ))}
+    </div>
+  );
+}
+
+function ProductSearch({user, value, onChange, onPick, placeholder, priceMode}){
+  // priceMode: "price" fills default_price, "cost" fills default_cost, "none" fills nothing
+  const [products,setProducts]=useState([]); const [open,setOpen]=useState(false);
+  const [adding,setAdding]=useState(false); const [saving,setSaving]=useState(false);
+  const [nf,setNf]=useState({name:"",category:"living",tags:"",default_cost:"",default_price:""});
+  const load=async()=>{ try{ setProducts(await sb.get("karu_products","select=*&active=eq.true&order=name.asc")); }catch(e){console.error(e);} };
+  useEffect(()=>{ load(); },[]);
+  const q=(value||"").toLowerCase().trim();
+  const matches = q.length>0 ? products.filter(p=>
+      p.name.toLowerCase().includes(q) || (p.tags||"").toLowerCase().includes(q)
+    ).slice(0,8) : [];
+  const exactExists = products.some(p=>p.name.toLowerCase()===q);
+
+  const saveNew=async()=>{
+    if(!nf.name.trim()){alert("Name required.");return;}
+    setSaving(true);
+    try{
+      const [p]=await sb.post("karu_products",{name:nf.name.trim(),category:nf.category,tags:nf.tags.trim(),default_cost:Number(nf.default_cost)||0,default_price:Number(nf.default_price)||0,created_by:user.full_name});
+      await load();
+      setAdding(false); setNf({name:"",category:"living",tags:"",default_cost:"",default_price:""});
+      onPick(p); setOpen(false);
+    }catch(e){alert("Failed: "+e.message);}
+    setSaving(false);
+  };
+
+  return (
+    <div style={{position:"relative"}}>
+      <input value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),200)}
+        placeholder={placeholder||"Search product..."} style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:open&&(matches.length>0||q.length>0)?"6px 6px 0 0":"6px",padding:"9px 10px",color:"#E8E2D4",fontSize:13}}/>
+      {open&&q.length>0&&(
+        <div className="ac-drop">
+          {matches.map(p=>(
+            <div key={p.id} className="ac-item" onMouseDown={()=>{onPick(p);setOpen(false);}}>
+              <div style={{fontSize:13,fontWeight:500}}>{p.name}</div>
+              <div style={{fontSize:11,color:"#8899AA"}}>{catLabel(p.category)}{p.default_price>0?` · KSh ${Number(p.default_price).toLocaleString()}`:""}{p.tags?` · ${p.tags}`:""}</div>
+            </div>
+          ))}
+          {matches.length===0&&<div style={{padding:"9px 12px",fontSize:12,color:"#556677"}}>No match for "{value}"</div>}
+          {!exactExists&&can(user,"users")&&(
+            adding?(
+              <div style={{padding:12,borderTop:"1px solid #1A2A4A"}} onMouseDown={e=>e.preventDefault()}>
+                <div style={{fontSize:12,fontWeight:600,color:"#F5C000",marginBottom:8}}>New product</div>
+                <input value={nf.name||value} onChange={e=>setNf(x=>({...x,name:e.target.value}))} placeholder="Product name" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,marginBottom:6}}/>
+                <input value={nf.tags} onChange={e=>setNf(x=>({...x,tags:e.target.value}))} placeholder="Search tags: sofa, 3s, seater" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:12,marginBottom:6}}/>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
+                  <select value={nf.category} onChange={e=>setNf(x=>({...x,category:e.target.value}))} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+                  <input type="number" value={nf.default_cost} onChange={e=>setNf(x=>({...x,default_cost:e.target.value}))} placeholder="Cost" style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px",color:"#E8E2D4",fontSize:11}}/>
+                  <input type="number" value={nf.default_price} onChange={e=>setNf(x=>({...x,default_price:e.target.value}))} placeholder="Price" style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px",color:"#E8E2D4",fontSize:11}}/>
+                </div>
+                <div style={{display:"flex",gap:6}}><button onMouseDown={saveNew} disabled={saving} style={{flex:1,background:"#F5C000",color:"#050A1F",border:"none",borderRadius:6,padding:"7px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{saving?"...":"Add & use"}</button><button onMouseDown={()=>setAdding(false)} style={{background:"transparent",border:"1px solid #1A2A4A",color:"#8899AA",borderRadius:6,padding:"7px 12px",fontSize:12,cursor:"pointer"}}>Cancel</button></div>
+              </div>
+            ):(
+              <div className="ac-item" style={{color:"#F5C000"}} onMouseDown={e=>{e.preventDefault();setNf(x=>({...x,name:value}));setAdding(true);}}>+ New product "{value}"</div>
+            )
+          )}
+          {!exactExists&&!can(user,"users")&&matches.length===0&&<div style={{padding:"9px 12px",fontSize:11,color:"#556677"}}>Not in the list — ask an owner to add it.</div>}
+        </div>
+      )}
     </div>
   );
 }
@@ -802,7 +916,7 @@ function SaleTab({user,onMoney}){
                 {items.map(i=>(
                   <div key={i.id} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:8}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
-                      <AutocompleteInput value={i.name} onChange={v=>upItem(i.id,"name",v)} onSelect={s=>selectStock(i.id,s)} stockItems={stockItems} placeholder="Search stock..."/>
+                      <ProductSearch user={user} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>it.id===i.id?{...it,name:p.name,price:p.default_price>0?String(p.default_price):it.price}:it))} placeholder="Search product..."/>
                       <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16,paddingTop:6}}>x</button>
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
@@ -1051,7 +1165,7 @@ function StockTab({user,onMoney}){
         {tripItems.map(i=>(
           <div key={i.id} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:8}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
-              <input value={i.name} onChange={e=>upTI(i.id,"name",e.target.value)} placeholder="Item name" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:13}}/>
+              <ProductSearch user={user} value={i.name} onChange={v=>upTI(i.id,"name",v)} onPick={p=>setTripItems(x=>x.map(it=>it.id===i.id?{...it,name:p.name,category:p.category,unit_cost:p.default_cost>0?String(p.default_cost):it.unit_cost,selling_price:p.default_price>0?String(p.default_price):it.selling_price}:it))} placeholder="Search product..."/>
               <button onClick={()=>rmTI(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16}}>x</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
@@ -1129,7 +1243,7 @@ function StockTab({user,onMoney}){
                         {addExtraItems.map(i=>(
                           <div key={i.id} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:8,marginBottom:7}}>
                             <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:5,marginBottom:5}}>
-                              <input value={i.name} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,name:e.target.value}:a))} placeholder="Item name" style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 9px",color:"#E8E2D4",fontSize:12}}/>
+                              <ProductSearch user={user} value={i.name} onChange={v=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,name:v}:a))} onPick={p=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,name:p.name,category:p.category,unit_cost:p.default_cost>0?String(p.default_cost):a.unit_cost,selling_price:p.default_price>0?String(p.default_price):a.selling_price}:a))} placeholder="Search product..."/>
                               <button onClick={()=>setAddExtraItems(x=>x.filter(a=>a.id!==i.id))} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:14}}>x</button>
                             </div>
                             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5}}>
@@ -1238,7 +1352,7 @@ function OrdersTab({user,onMoney}){
         {items.map(i=>(
           <div key={i.id} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:8}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:6}}>
-              <input value={i.name} onChange={e=>upItem(i.id,"name",e.target.value)} placeholder="Item name" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:13}}/>
+              <ProductSearch user={user} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>it.id===i.id?{...it,name:p.name,category:p.category,est_cost:p.default_cost>0?String(p.default_cost):it.est_cost}:it))} placeholder="Search product..."/>
               <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16}}>x</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
