@@ -150,7 +150,7 @@ export default function App() {
       <div style={{padding:16}}>
         {activeTab==="sale"&&<SaleTab user={user} onMoney={refreshBal}/>}
         {activeTab==="stock"&&<StockTab user={user} onMoney={refreshBal}/>}
-        {activeTab==="orders"&&<OrdersTab user={user}/>}
+        {activeTab==="orders"&&<OrdersTab user={user} onMoney={refreshBal}/>}
         {activeTab==="expenses"&&<ExpensesTab user={user} onMoney={refreshBal}/>}
         {activeTab==="reports"&&<ReportsTab user={user}/>}
       </div>
@@ -737,7 +737,7 @@ function SaleTab({user,onMoney}){
               {histSales.length===0?<div style={{color:"#556677",fontSize:13}}>No sales yet.</div>:histSales.map(s=>(
                 <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1A2A4A",opacity:s.voided?0.45:1}}>
                   <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · {s.date} · {initials(s.served_by)} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div></div>
-                  <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div>{!s.voided&&can(user,"void")&&(withinWindow(s.created_at)?<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:"2px 0"}}>Void</button>:<span style={{fontSize:10,color:"#556677"}}>🔒</span>)}</div>
+                  <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:2}}>{!s.voided&&<button onClick={()=>{setReceipt(s);setShowHistory(false);}} style={{background:"none",border:"none",color:"#8899AA",fontSize:11,cursor:"pointer",padding:0}}>Receipt</button>}{!s.voided&&can(user,"void")&&(withinWindow(s.created_at)?<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:0}}>Void</button>:<span style={{fontSize:10,color:"#556677"}}>🔒</span>)}</div></div>
                 </div>
               ))}
             </div>
@@ -925,7 +925,7 @@ function StockTab({user,onMoney}){
     try{
       await sb.post("karu_adjustments",{stock_id:adjItem.id,item_name:adjItem.name,trip_no:adjItem.trip_no,qty:q,reason:adjReason,notes:adjNotes,recorded_by:adjStaff,date:todayStr()});
       await sb.patch("karu_stock",adjItem.id,{qty_adjusted:(adjItem.qty_adjusted||0)+q});
-      const lossKinds={Theft:"theft","Walked away unpaid":"unpaid",Damaged:"damage"};
+      const lossKinds={Theft:"theft",Damaged:"damage"};
       if(lossKinds[adjReason]){
         const costVal=q*Number(adjItem.unit_cost||0); const retailVal=q*Number(adjItem.selling_price||0);
         await sb.post("karu_losses",{date:todayStr(),kind:lossKinds[adjReason],item_name:adjItem.name,stock_id:adjItem.id,qty:q,cost_value:costVal,retail_value:retailVal,description:adjNotes,recorded_by:adjStaff});
@@ -998,12 +998,12 @@ function StockTab({user,onMoney}){
       <div style={{background:"#0A1128",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12,marginBottom:14,fontSize:12,color:"#8899AA"}}>
         <strong style={{color:"#E8E2D4"}}>{adjItem.name}</strong> · {adjItem.trip_no} · {adjItem.qty_in-adjItem.qty_sold-(adjItem.qty_adjusted||0)} available
       </div>
-      <div className="field"><label>Reason</label><div className="tog">{["Damaged","Display","Personal use","Theft","Walked away unpaid","Other"].map(r=><button key={r} className={`tog-btn${adjReason===r?" on":""}`} onClick={()=>setAdjReason(r)} style={{fontSize:12}}>{r}</button>)}</div></div>
+      <div className="field"><label>Reason</label><div className="tog">{["Damaged","Display","Personal use","Theft","Other"].map(r=><button key={r} className={`tog-btn${adjReason===r?" on":""}`} onClick={()=>setAdjReason(r)} style={{fontSize:12}}>{r}</button>)}</div></div>
       <div className="field"><label>Quantity</label><input type="number" value={adjQty} min={1} onChange={e=>setAdjQty(e.target.value)}/></div>
-      {["Theft","Walked away unpaid","Damaged"].includes(adjReason)&&<div style={{background:"rgba(232,91,91,0.08)",border:"1px solid rgba(232,91,91,0.3)",borderRadius:8,padding:10,marginBottom:12,fontSize:12,color:"#E85B5B"}}>Recorded as a loss · Cost: {fmtK(Number(adjQty||1)*Number(adjItem.unit_cost||0))} · Retail: {fmtK(Number(adjQty||1)*Number(adjItem.selling_price||0))}</div>}
+      {["Theft","Damaged"].includes(adjReason)&&<div style={{background:"rgba(232,91,91,0.08)",border:"1px solid rgba(232,91,91,0.3)",borderRadius:8,padding:10,marginBottom:12,fontSize:12,color:"#E85B5B"}}>Recorded as a loss · Cost: {fmtK(Number(adjQty||1)*Number(adjItem.unit_cost||0))} · Retail: {fmtK(Number(adjQty||1)*Number(adjItem.selling_price||0))}</div>}
       <div className="field"><label>Notes (optional)</label><input value={adjNotes} onChange={e=>setAdjNotes(e.target.value)} placeholder="e.g. Customer walked out, CCTV checked"/></div>
       <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${adjStaff===s?" on":""}`} onClick={()=>setAdjStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
-      <button className="btn-y" onClick={doAdjust} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":["Theft","Walked away unpaid","Damaged"].includes(adjReason)?"Record Loss":"Remove from Stock"}</button>
+      <button className="btn-y" onClick={doAdjust} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":["Theft","Damaged"].includes(adjReason)?"Record Loss":"Remove from Stock"}</button>
     </div>
   );
 
@@ -1180,7 +1180,7 @@ function StockTab({user,onMoney}){
   );
 }
 
-function OrdersTab({user}){
+function OrdersTab({user,onMoney}){
   const [orders,setOrders]=useState([]); const [loading,setLoading]=useState(true);
   const [adding,setAdding]=useState(false); const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
   const [items,setItems]=useState([{id:1,name:"",category:"living",qty:1,est_cost:""}]);
@@ -1200,7 +1200,7 @@ function OrdersTab({user}){
     setSaving(true); setErr("");
     try{
       const orderNo=`KARU-ORD-${String(orders.length+1).padStart(3,"0")}`;
-      await sb.post("karu_orders",{order_no:orderNo,date:todayStr(),items:vi.map(i=>({name:i.name,category:i.category,qty:Number(i.qty)||1,est_cost:Number(i.est_cost)||0})),status:"pending",notes,created_by:by});
+      await sb.post("karu_orders",{order_no:orderNo,date:todayStr(),items:vi.map(i=>({name:i.name,category:i.category,qty:Number(i.qty)||1,est_cost:Number(i.est_cost)||0})),est_total:estTotal,deposit_paid:0,status:"pending",notes,created_by:by});
       setAdding(false); setItems([{id:1,name:"",category:"living",qty:1,est_cost:""}]); setNotes("");
       await load();
     }catch(e){setErr("Failed: "+e.message);}
@@ -1208,6 +1208,21 @@ function OrdersTab({user}){
   };
 
   const setStatus=async(o,status)=>{ await sb.patch("karu_orders",o.id,{status,updated_at:new Date().toISOString()}); await load(); };
+  const [depOrder,setDepOrder]=useState(null); const [depAmt,setDepAmt]=useState(""); const [depFrom,setDepFrom]=useState("sacco"); const [depSaving,setDepSaving]=useState(false);
+  const payDeposit=async()=>{
+    const a=Number(depAmt); if(!a||a<=0){alert("Enter an amount.");return;}
+    setDepSaving(true);
+    try{
+      const newDep=Number(depOrder.deposit_paid||0)+a;
+      await sb.patch("karu_orders",depOrder.id,{deposit_paid:newDep,updated_at:new Date().toISOString()});
+      await recordMoney({account:depFrom,amount:-a,type:"order_deposit",ref:depOrder.order_no,description:`Deposit · ${depOrder.order_no}`,date:todayStr(),recorded_by:user.full_name});
+      await logAudit({trip_no:null,record_id:depOrder.id,action:"order_deposit",field_changed:depOrder.order_no,old_value:String(depOrder.deposit_paid||0),new_value:String(newDep),reason:`Deposit paid from ${depFrom}`,changed_by:user.full_name});
+      if(onMoney) onMoney();
+      setDepOrder(null); setDepAmt("");
+      await load();
+    }catch(e){alert("Failed: "+e.message);}
+    setDepSaving(false);
+  };
 
   const estTotal=items.reduce((s,i)=>s+(Number(i.qty||1)*Number(i.est_cost||0)),0);
   const shown=orders.filter(o=>filter==="open"?["pending","ordered"].includes(o.status):filter==="done"?["received","cancelled"].includes(o.status):true);
@@ -1258,8 +1273,18 @@ function OrdersTab({user}){
               <span className={`badge ${statusBadge(o.status)}`}>{o.status}</span>
             </div>
             <div style={{fontSize:12,color:"#8899AA",marginBottom:8}}>{(o.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")}</div>
+            {Number(o.deposit_paid||0)>0&&<div style={{fontSize:12,marginBottom:8}}><span style={{color:"#4CAF50"}}>Deposit paid: {fmtK(Number(o.deposit_paid))}</span>{est>0&&<span style={{color:"#8899AA"}}> · Balance to supplier: {fmtK(Math.max(0,est-Number(o.deposit_paid)))}</span>}</div>}
             {o.notes&&<div style={{fontSize:11,color:"#556677",marginBottom:8}}>Note: {o.notes}</div>}
+            {depOrder?.id===o.id?(
+              <div style={{background:"rgba(245,192,0,0.06)",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:10,marginBottom:8}}>
+                <div style={{fontSize:12,fontWeight:600,marginBottom:8}}>Pay deposit to supplier</div>
+                <div className="field"><label>Amount (KSh)</label><input type="number" value={depAmt} onChange={e=>setDepAmt(e.target.value)} placeholder="0" autoFocus/></div>
+                <div className="field"><label>From</label><div className="tog"><button className={`tog-btn${depFrom==="cash"?" on":""}`} onClick={()=>setDepFrom("cash")}>Cash</button><button className={`tog-btn${depFrom==="sacco"?" on":""}`} onClick={()=>setDepFrom("sacco")}>SACCO</button></div></div>
+                <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={payDeposit} disabled={depSaving} style={{flex:1,fontSize:12}}>{depSaving?"...":"Confirm Deposit"}</button><button className="btn-g" onClick={()=>{setDepOrder(null);setDepAmt("");}} style={{fontSize:12}}>Cancel</button></div>
+              </div>
+            ):null}
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {["pending","ordered"].includes(o.status)&&can(user,"money")&&depOrder?.id!==o.id&&<button className="btn-g" onClick={()=>{setDepOrder(o);setDepAmt("");}} style={{fontSize:11,padding:"5px 10px",borderColor:"rgba(245,192,0,0.3)",color:"#F5C000"}}>Pay deposit</button>}
               {o.status==="pending"&&<button className="btn-g" onClick={()=>setStatus(o,"ordered")} style={{fontSize:11,padding:"5px 10px"}}>Mark ordered</button>}
               {o.status==="ordered"&&<button className="btn-g" onClick={()=>setStatus(o,"received")} style={{fontSize:11,padding:"5px 10px",borderColor:"rgba(76,175,80,0.3)",color:"#4CAF50"}}>Mark received</button>}
               {["pending","ordered"].includes(o.status)&&<button className="btn-g" onClick={()=>{if(confirm("Cancel this order?"))setStatus(o,"cancelled");}} style={{fontSize:11,padding:"5px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Cancel</button>}
