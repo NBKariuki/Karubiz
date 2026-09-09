@@ -45,8 +45,8 @@ function pwStrength(pw){
   return "";
 }
 const ROLES = {
-  owner:   { label:"Owner",     can:["sale","stock","expenses","reports","money","void","lock","edit","adjust","close","users","edit_expense"] },
-  manager: { label:"Manager",   can:["sale","stock","expenses","reports","close","adjust","edit_expense"] },
+  owner:   { label:"Owner",     can:["sale","stock","expenses","reports","money","void","lock","edit","adjust","close","users","edit_expense","orders","loss"] },
+  manager: { label:"Manager",   can:["sale","stock","expenses","reports","close","adjust","edit_expense","orders","loss"] },
   attendant:{ label:"Attendant", can:["sale"] },
 };
 const can = (user, perm) => !!user && (ROLES[user.role]?.can.includes(perm));
@@ -138,7 +138,7 @@ export default function App() {
   useEffect(()=>{ if(user) refreshBal(); },[user,refreshBal]);
   if(!user) return <LoginScreen onLogin={setUser}/>;
   // Attendants only see the Sale tab; others see tabs they have perms for
-  const tabs=[["sale","Sale","💰","sale"],["stock","Stock","📦","stock"],["expenses","Expenses","🧾","expenses"],["reports","Reports","📊","reports"]].filter(([,,,perm])=>can(user,perm));
+  const tabs=[["sale","Sale","💰","sale"],["stock","Stock","📦","stock"],["orders","Orders","📋","orders"],["expenses","Expenses","🧾","expenses"],["reports","Reports","📊","reports"]].filter(([,,,perm])=>can(user,perm));
   const activeTab = tabs.some(t=>t[0]===tab)?tab:tabs[0][0];
   return (<><GS/>
     <div style={{maxWidth:500,margin:"0 auto",paddingBottom:72}}>
@@ -150,6 +150,7 @@ export default function App() {
       <div style={{padding:16}}>
         {activeTab==="sale"&&<SaleTab user={user} onMoney={refreshBal}/>}
         {activeTab==="stock"&&<StockTab user={user} onMoney={refreshBal}/>}
+        {activeTab==="orders"&&<OrdersTab user={user}/>}
         {activeTab==="expenses"&&<ExpensesTab user={user} onMoney={refreshBal}/>}
         {activeTab==="reports"&&<ReportsTab user={user}/>}
       </div>
@@ -519,6 +520,7 @@ function SaleTab({user,onMoney}){
   const [cName,setCName]=useState(""); const [cPhone,setCPhone]=useState("");
   const [items,setItems]=useState([{id:1,name:"",qty:1,price:""}]);
   const [pay,setPay]=useState("mpesa"); const [mpesaCode,setMpesaCode]=useState("");
+  const [cashPart,setCashPart]=useState(""); const [mpesaPart,setMpesaPart]=useState("");
   const [notes,setNotes]=useState(""); const [err,setErr]=useState("");
   const [saving,setSaving]=useState(false); const [receipt,setReceipt]=useState(null); const [saved,setSaved]=useState(null);
   const [payType,setPayType]=useState("full"); const [initPay,setInitPay]=useState("");
@@ -537,7 +539,7 @@ function SaleTab({user,onMoney}){
   const loadStock=async()=>{ try{ setStockItems(await sb.get("karu_stock","select=*&order=date_in.asc")); }catch(e){console.error(e);} };
   useEffect(()=>{ loadStock(); loadPendingSales(); loadToday(); },[]);
 
-  const resetForm=()=>{ setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);setPayType("full");setInitPay("");setErr("");setStep(1); };
+  const resetForm=()=>{ setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);setPayType("full");setInitPay("");setCashPart("");setMpesaPart("");setPay("mpesa");setErr("");setStep(1); };
   const openWiz=s=>{ setStaff(s); resetForm(); setWiz(true); };
   const closeWiz=()=>{ setWiz(false); resetForm(); };
 
@@ -576,7 +578,9 @@ function SaleTab({user,onMoney}){
 
   const genReceipt=async(withReceipt=true)=>{
     setErr("");
+    const dueNow=payType==="instalment"?Number(initPay||0):total;
     if(pay==="mpesa"&&!mpesaCode.trim()){setErr("M-Pesa code required.");return;}
+    if(pay==="split"){ const c=Number(cashPart||0),m=Number(mpesaPart||0); if(c+m!==dueNow){setErr("Split amounts must add up to "+fmtK(dueNow)+".");return;} if(m>0&&!mpesaCode.trim()){setErr("M-Pesa code required for the M-Pesa part.");return;} }
     if(payType==="instalment"&&(!initPay||Number(initPay)<=0)){setErr("Enter the initial payment.");return;}
     if(payType==="instalment"&&Number(initPay)>total){setErr("Initial payment cannot exceed total.");return;}
     setSaving(true);
@@ -587,11 +591,15 @@ function SaleTab({user,onMoney}){
       const lastNo=last.length?parseInt(last[0].receipt_no.split("-").pop()||"0"):0;
       const receipt_no=`KARU-${now.getFullYear().toString().slice(2)}${String(now.getMonth()+1).padStart(2,"0")}-${String(lastNo+1).padStart(3,"0")}`;
       const amtPaid=payType==="instalment"?Number(initPay):total; const balDue=payType==="instalment"?total-amtPaid:0;
-      const data={receipt_no,date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:validItems,payment_method:pay==="mpesa"?"M-Pesa":"Cash",mpesa_code:mpesaCode.toUpperCase(),total,amount_paid:amtPaid,balance_due:balDue,payment_type:payType,notes};
+      const cPart=pay==="split"?Number(cashPart||0):pay==="cash"?amtPaid:0;
+      const mPart=pay==="split"?Number(mpesaPart||0):pay==="mpesa"?amtPaid:0;
+      const methodLabel=pay==="split"?"Split":pay==="mpesa"?"M-Pesa":"Cash";
+      const data={receipt_no,date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:validItems,payment_method:methodLabel,mpesa_code:mpesaCode.toUpperCase(),cash_part:cPart,mpesa_part:mPart,total,amount_paid:amtPaid,balance_due:balDue,payment_type:payType,notes};
       const [newSale]=await sb.post("karu_sales",data);
-      if(payType==="instalment"&&newSale?.id) await sb.post("karu_payments",{sale_id:newSale.id,receipt_no,customer_name:cName,amount:amtPaid,payment_method:data.payment_method,mpesa_code:data.mpesa_code,date,recorded_by:staff,notes:"Initial instalment payment"});
+      if(payType==="instalment"&&newSale?.id) await sb.post("karu_payments",{sale_id:newSale.id,receipt_no,customer_name:cName,amount:amtPaid,payment_method:methodLabel,mpesa_code:data.mpesa_code,date,recorded_by:staff,notes:"Initial instalment payment"});
       await reduceStock(validItems);
-      await recordMoney({account:pay==="mpesa"?"sacco":"cash",amount:amtPaid,type:"sale",ref:receipt_no,description:`Sale ${receipt_no} · ${cName}`,date,recorded_by:staff});
+      if(cPart>0) await recordMoney({account:"cash",amount:cPart,type:"sale",ref:receipt_no,description:`Sale ${receipt_no} · ${cName}${mPart>0?" (cash part)":""}`,date,recorded_by:staff});
+      if(mPart>0) await recordMoney({account:"sacco",amount:mPart,type:"sale",ref:receipt_no,description:`Sale ${receipt_no} · ${cName}${cPart>0?" (mpesa part)":""}`,date,recorded_by:staff});
       if(onMoney) onMoney();
       await loadStock(); await loadToday(); await loadPendingSales();
       setWiz(false);
@@ -650,7 +658,7 @@ function SaleTab({user,onMoney}){
     c.width=W; c.height=H; const x=c.getContext("2d"); x.scale(S,S);
     x.fillStyle="#fff"; x.fillRect(0,0,380,H/S);
     x.fillStyle="#111"; x.textAlign="center"; x.font="bold 22px Arial"; x.fillText("KARU FURNITURE",190,34);
-    x.fillStyle="#555"; x.font="12px Arial"; x.fillText("Off Kihara-Gachie-Karura Rd, Nairobi",190,52); x.fillText("0720 772 866",190,68);
+    x.fillStyle="#555"; x.font="12px Arial"; x.fillText("Off Kihara-Gachie-Karura Rd, Nairobi",190,52); x.fillText("0720 772 866 · 0792 933 413",190,68);
     const dash=y=>{x.strokeStyle="#999";x.setLineDash([3,3]);x.beginPath();x.moveTo(18,y);x.lineTo(362,y);x.stroke();x.setLineDash([]);};
     dash(82); let y=104; x.font="14px Arial";
     const row=(l,v)=>{x.textAlign="left";x.fillStyle="#555";x.fillText(l,18,y);x.textAlign="right";x.fillStyle="#111";x.font="bold 14px Arial";x.fillText(v,362,y);x.font="14px Arial";y+=22;};
@@ -682,7 +690,7 @@ function SaleTab({user,onMoney}){
   if(receipt) return (
     <div>
       <div className="rcpt">
-        <div className="rcpt-hd"><div className="rcpt-logo">KARU FURNITURE</div><div className="rcpt-sub">Off Kihara-Gachie-Karura Rd, Nairobi</div><div className="rcpt-sub">0720 772 866</div></div>
+        <div className="rcpt-hd"><div className="rcpt-logo">KARU FURNITURE</div><div className="rcpt-sub">Off Kihara-Gachie-Karura Rd, Nairobi</div><div className="rcpt-sub">0720 772 866 · 0792 933 413</div></div>
         <div className="rcpt-row"><span className="l">Receipt</span><span className="v">{receipt.receipt_no}</span></div>
         <div className="rcpt-row"><span className="l">Date</span><span className="v">{receipt.date} {receipt.time_str}</span></div>
         <div className="rcpt-row"><span className="l">Served by</span><span className="v">{initials(receipt.served_by)}</span></div>
@@ -691,7 +699,7 @@ function SaleTab({user,onMoney}){
         <div className="rcpt-items">{receipt.items.map((i,idx)=><div key={idx} className="rcpt-it"><span className="n">{i.name} <span style={{color:"#555"}}>x{i.qty}</span></span><span style={{fontWeight:600}}>KSh {(Number(i.qty)*Number(i.price)).toLocaleString()}</span></div>)}</div>
         <div className="rcpt-tot"><span>TOTAL</span><span>KSh {receipt.total.toLocaleString()}</span></div>
         {receipt.payment_type==="instalment"&&<><div className="rcpt-row"><span className="l">Paid</span><span className="v">KSh {Number(receipt.amount_paid).toLocaleString()}</span></div><div className="rcpt-row"><span className="l">Balance</span><span className="v" style={{color:"#B45309"}}>KSh {Number(receipt.balance_due).toLocaleString()}</span></div></>}
-        <div className="rcpt-row"><span className="l">Payment</span><span className="v">{receipt.payment_method}{receipt.mpesa_code?" · "+receipt.mpesa_code:""}</span></div>
+        <div className="rcpt-row"><span className="l">Payment</span><span className="v">{receipt.payment_method}{receipt.mpesa_code?" · "+receipt.mpesa_code:""}</span></div>{receipt.payment_method==="Split"&&<div className="rcpt-row"><span className="l">Cash / M-Pesa</span><span className="v">KSh {Number(receipt.cash_part).toLocaleString()} / KSh {Number(receipt.mpesa_part).toLocaleString()}</span></div>}
         {receipt.notes&&<div className="rcpt-row"><span className="l">Note</span><span className="v">{receipt.notes}</span></div>}
         <div className="rcpt-ft">Thank you for shopping with us<br/>karufurniture.netlify.app</div>
       </div>
@@ -819,8 +827,17 @@ function SaleTab({user,onMoney}){
                 </div>
                 <div className="field"><label>Payment type</label><div className="tog"><button className={`tog-btn${payType==="full"?" on":""}`} onClick={()=>setPayType("full")}>Full</button><button className={`tog-btn${payType==="instalment"?" on":""}`} onClick={()=>setPayType("instalment")}>Instalment</button></div></div>
                 {payType==="instalment"&&<div className="field" style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12}}><label style={{color:"#E8A45B"}}>Paying now (KSh)</label><input type="number" value={initPay} onChange={e=>setInitPay(e.target.value)} placeholder="Amount"/>{initPay&&<div style={{fontSize:12,color:"#E8A45B",marginTop:6}}>Balance: {fmtK(Math.max(0,total-Number(initPay)))}</div>}</div>}
-                <div className="field"><label>Method</label><div className="tog"><button className={`tog-btn${pay==="mpesa"?" on":""}`} onClick={()=>setPay("mpesa")}>M-Pesa</button><button className={`tog-btn${pay==="cash"?" on":""}`} onClick={()=>setPay("cash")}>Cash</button></div></div>
+                <div className="field"><label>Method</label><div className="tog"><button className={`tog-btn${pay==="mpesa"?" on":""}`} onClick={()=>setPay("mpesa")}>M-Pesa</button><button className={`tog-btn${pay==="cash"?" on":""}`} onClick={()=>setPay("cash")}>Cash</button><button className={`tog-btn${pay==="split"?" on":""}`} onClick={()=>setPay("split")}>Split</button></div></div>
                 {pay==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace",letterSpacing:"0.05em"}}/></div>}
+                {pay==="split"&&(()=>{ const due=payType==="instalment"?Number(initPay||0):total; const c=Number(cashPart||0),m=Number(mpesaPart||0),sum=c+m; return (
+                  <div style={{background:"rgba(245,192,0,0.06)",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:12,marginBottom:12}}>
+                    <div style={{fontSize:12,color:"#8899AA",marginBottom:8}}>Paying {fmtK(due)} across both. Amounts must add up.</div>
+                    <div className="field"><label>Cash part (KSh)</label><input type="number" value={cashPart} onChange={e=>setCashPart(e.target.value)} placeholder="0"/></div>
+                    <div className="field"><label>M-Pesa part (KSh)</label><input type="number" value={mpesaPart} onChange={e=>setMpesaPart(e.target.value)} placeholder="0"/></div>
+                    <div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>
+                    <div style={{fontSize:12,fontWeight:600,color:sum===due?"#4CAF50":"#E85B5B"}}>{sum===due?"Balanced ✓":sum<due?`Short by ${fmtK(due-sum)}`:`Over by ${fmtK(sum-due)}`}</div>
+                  </div>
+                );})()}
                 <div className="field"><label>Notes (optional)</label><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Deliver Saturday"/></div>
               </>)}
               {err&&<div style={{color:"#E85B5B",fontSize:13,marginTop:8}}>{err}</div>}
@@ -908,6 +925,11 @@ function StockTab({user,onMoney}){
     try{
       await sb.post("karu_adjustments",{stock_id:adjItem.id,item_name:adjItem.name,trip_no:adjItem.trip_no,qty:q,reason:adjReason,notes:adjNotes,recorded_by:adjStaff,date:todayStr()});
       await sb.patch("karu_stock",adjItem.id,{qty_adjusted:(adjItem.qty_adjusted||0)+q});
+      const lossKinds={Theft:"theft","Walked away unpaid":"unpaid",Damaged:"damage"};
+      if(lossKinds[adjReason]){
+        const costVal=q*Number(adjItem.unit_cost||0); const retailVal=q*Number(adjItem.selling_price||0);
+        await sb.post("karu_losses",{date:todayStr(),kind:lossKinds[adjReason],item_name:adjItem.name,stock_id:adjItem.id,qty:q,cost_value:costVal,retail_value:retailVal,description:adjNotes,recorded_by:adjStaff});
+      }
       await logAudit({trip_no:adjItem.trip_no,record_id:adjItem.id,action:"adjust",field_changed:adjItem.name,old_value:String(avail),new_value:String(avail-q),reason:`${adjReason}${adjNotes?" · "+adjNotes:""}`,changed_by:adjStaff});
       setAdjItem(null); setAdjQty(1); setAdjNotes("");
       await loadAll();
@@ -976,11 +998,12 @@ function StockTab({user,onMoney}){
       <div style={{background:"#0A1128",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12,marginBottom:14,fontSize:12,color:"#8899AA"}}>
         <strong style={{color:"#E8E2D4"}}>{adjItem.name}</strong> · {adjItem.trip_no} · {adjItem.qty_in-adjItem.qty_sold-(adjItem.qty_adjusted||0)} available
       </div>
-      <div className="field"><label>Reason</label><div className="tog">{["Damaged","Display","Personal use","Other"].map(r=><button key={r} className={`tog-btn${adjReason===r?" on":""}`} onClick={()=>setAdjReason(r)} style={{fontSize:12}}>{r}</button>)}</div></div>
+      <div className="field"><label>Reason</label><div className="tog">{["Damaged","Display","Personal use","Theft","Walked away unpaid","Other"].map(r=><button key={r} className={`tog-btn${adjReason===r?" on":""}`} onClick={()=>setAdjReason(r)} style={{fontSize:12}}>{r}</button>)}</div></div>
       <div className="field"><label>Quantity</label><input type="number" value={adjQty} min={1} onChange={e=>setAdjQty(e.target.value)}/></div>
-      <div className="field"><label>Notes (optional)</label><input value={adjNotes} onChange={e=>setAdjNotes(e.target.value)} placeholder="e.g. Leg broke during delivery"/></div>
+      {["Theft","Walked away unpaid","Damaged"].includes(adjReason)&&<div style={{background:"rgba(232,91,91,0.08)",border:"1px solid rgba(232,91,91,0.3)",borderRadius:8,padding:10,marginBottom:12,fontSize:12,color:"#E85B5B"}}>Recorded as a loss · Cost: {fmtK(Number(adjQty||1)*Number(adjItem.unit_cost||0))} · Retail: {fmtK(Number(adjQty||1)*Number(adjItem.selling_price||0))}</div>}
+      <div className="field"><label>Notes (optional)</label><input value={adjNotes} onChange={e=>setAdjNotes(e.target.value)} placeholder="e.g. Customer walked out, CCTV checked"/></div>
       <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${adjStaff===s?" on":""}`} onClick={()=>setAdjStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
-      <button className="btn-y" onClick={doAdjust} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":"Remove from Stock"}</button>
+      <button className="btn-y" onClick={doAdjust} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":["Theft","Walked away unpaid","Damaged"].includes(adjReason)?"Record Loss":"Remove from Stock"}</button>
     </div>
   );
 
@@ -1015,7 +1038,11 @@ function StockTab({user,onMoney}){
         <div className="badge b-y">KARU-TRIP-{String(trips.length+1).padStart(3,"0")}</div>
       </div>
       <div className="field"><label>Date</label><input type="date" value={trip.date} onChange={e=>setTrip(x=>({...x,date:e.target.value}))}/></div>
-      <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${trip.created_by===s?" on":""}`} onClick={()=>setTrip(x=>({...x,created_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
+      {can(user,"users")?(
+        <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${trip.created_by===s?" on":""}`} onClick={()=>setTrip(x=>({...x,created_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
+      ):(
+        <div className="field"><label>Recorded by</label><div style={{fontSize:14,color:"#E8E2D4",padding:"9px 0"}}>{trip.created_by}</div></div>
+      )}
       <div className="field"><label>Notes</label><input value={trip.notes} onChange={e=>setTrip(x=>({...x,notes:e.target.value}))} placeholder="e.g. Gachie sourcing run"/></div>
       <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${trip.paid_from==="cash"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${trip.paid_from==="sacco"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${trip.paid_from==="personal"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
       {trip.paid_from==="personal"&&<div style={{fontSize:11,color:"#E8A45B",marginTop:5}}>Business will owe {trip.created_by.split(" ")[0]} this amount</div>}</div>
@@ -1146,6 +1173,98 @@ function StockTab({user,onMoney}){
                 )}
               </div>
             )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function OrdersTab({user}){
+  const [orders,setOrders]=useState([]); const [loading,setLoading]=useState(true);
+  const [adding,setAdding]=useState(false); const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
+  const [items,setItems]=useState([{id:1,name:"",category:"living",qty:1,est_cost:""}]);
+  const [notes,setNotes]=useState(""); const [by,setBy]=useState(user?.full_name||"Burton Kariuki");
+  const [filter,setFilter]=useState("open");
+
+  const load=async()=>{ setLoading(true); try{ setOrders(await sb.get("karu_orders","select=*&order=created_at.desc")); }catch(e){console.error(e);} setLoading(false); };
+  useEffect(()=>{load();},[]);
+
+  const addItem=()=>setItems(x=>[...x,{id:Date.now(),name:"",category:"living",qty:1,est_cost:""}]);
+  const rmItem=id=>setItems(x=>x.length>1?x.filter(i=>i.id!==id):x);
+  const upItem=(id,f,v)=>setItems(x=>x.map(i=>i.id===id?{...i,[f]:v}:i));
+
+  const save=async()=>{
+    const vi=items.filter(i=>i.name.trim());
+    if(!vi.length){setErr("Add at least one item.");return;}
+    setSaving(true); setErr("");
+    try{
+      const orderNo=`KARU-ORD-${String(orders.length+1).padStart(3,"0")}`;
+      await sb.post("karu_orders",{order_no:orderNo,date:todayStr(),items:vi.map(i=>({name:i.name,category:i.category,qty:Number(i.qty)||1,est_cost:Number(i.est_cost)||0})),status:"pending",notes,created_by:by});
+      setAdding(false); setItems([{id:1,name:"",category:"living",qty:1,est_cost:""}]); setNotes("");
+      await load();
+    }catch(e){setErr("Failed: "+e.message);}
+    setSaving(false);
+  };
+
+  const setStatus=async(o,status)=>{ await sb.patch("karu_orders",o.id,{status,updated_at:new Date().toISOString()}); await load(); };
+
+  const estTotal=items.reduce((s,i)=>s+(Number(i.qty||1)*Number(i.est_cost||0)),0);
+  const shown=orders.filter(o=>filter==="open"?["pending","ordered"].includes(o.status):filter==="done"?["received","cancelled"].includes(o.status):true);
+  const statusBadge=s=>({pending:"b-y",ordered:"b-muted",received:"b-g",cancelled:"b-r"}[s]||"b-muted");
+
+  if(adding) return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><button className="btn-g" onClick={()=>{setAdding(false);setErr("");}} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>New Order</div><div className="badge b-y">KARU-ORD-{String(orders.length+1).padStart(3,"0")}</div></div>
+      {can(user,"users")?(
+        <div className="field"><label>Requested by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${by===s?" on":""}`} onClick={()=>setBy(s)}>{s.split(" ")[0]}</button>)}</div></div>
+      ):(<div className="field"><label>Requested by</label><div style={{fontSize:14,color:"#E8E2D4",padding:"9px 0"}}>{by}</div></div>)}
+      <div className="field"><label>Items to order</label>
+        {items.map(i=>(
+          <div key={i.id} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:8}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:6}}>
+              <input value={i.name} onChange={e=>upItem(i.id,"name",e.target.value)} placeholder="Item name" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:13}}/>
+              <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16}}>x</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+              <select value={i.category} onChange={e=>upItem(i.id,"category",e.target.value)} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 8px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+              <input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} placeholder="Qty" style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 8px",color:"#E8E2D4",fontSize:12,textAlign:"center",width:"100%"}}/>
+              <input type="number" value={i.est_cost} onChange={e=>upItem(i.id,"est_cost",e.target.value)} placeholder="Est. cost" style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 8px",color:"#E8E2D4",fontSize:12,width:"100%"}}/>
+            </div>
+          </div>
+        ))}
+        <button className="btn-g" onClick={addItem} style={{width:"100%",marginTop:4,fontSize:13}}>+ Add item</button>
+        {estTotal>0&&<div style={{textAlign:"right",marginTop:8,fontSize:14,fontWeight:600,color:"#F5C000"}}>Est. total: {fmtK(estTotal)}</div>}
+      </div>
+      <div className="field"><label>Notes (optional)</label><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. From the usual Kiambu supplier"/></div>
+      {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
+      <button className="btn-y" onClick={save} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":"Create Order"}</button>
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{fontSize:12,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Plan what to restock. Create an order, mark it ordered when you buy, then received once it arrives — then log it as a sourcing trip in Stock.</div>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}><button className="btn-y" onClick={()=>setAdding(true)} style={{fontSize:13,padding:"9px 16px"}}>+ New Order</button></div>
+      <div style={{display:"flex",gap:6,marginBottom:14}}>
+        {[["open","Open"],["done","Completed"],["all","All"]].map(([id,l])=><button key={id} onClick={()=>setFilter(id)} style={{padding:"5px 12px",borderRadius:100,border:`1px solid ${filter===id?"#F5C000":"#1A2A4A"}`,background:filter===id?"rgba(245,192,0,0.1)":"transparent",color:filter===id?"#F5C000":"#8899AA",fontSize:12,cursor:"pointer"}}>{l}</button>)}
+      </div>
+      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:shown.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No orders here.</div>:shown.map(o=>{
+        const est=(o.items||[]).reduce((s,i)=>s+(Number(i.qty||1)*Number(i.est_cost||0)),0);
+        return (
+          <div key={o.id} className="card">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+              <div><span style={{fontSize:14,fontWeight:600,color:"#F5C000"}}>{o.order_no}</span><div style={{fontSize:11,color:"#8899AA",marginTop:2}}>{o.date} · {o.created_by?.split(" ")[0]} · {(o.items||[]).length} item{(o.items||[]).length!==1?"s":""}{est>0?` · est ${fmtK(est)}`:""}</div></div>
+              <span className={`badge ${statusBadge(o.status)}`}>{o.status}</span>
+            </div>
+            <div style={{fontSize:12,color:"#8899AA",marginBottom:8}}>{(o.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")}</div>
+            {o.notes&&<div style={{fontSize:11,color:"#556677",marginBottom:8}}>Note: {o.notes}</div>}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {o.status==="pending"&&<button className="btn-g" onClick={()=>setStatus(o,"ordered")} style={{fontSize:11,padding:"5px 10px"}}>Mark ordered</button>}
+              {o.status==="ordered"&&<button className="btn-g" onClick={()=>setStatus(o,"received")} style={{fontSize:11,padding:"5px 10px",borderColor:"rgba(76,175,80,0.3)",color:"#4CAF50"}}>Mark received</button>}
+              {["pending","ordered"].includes(o.status)&&<button className="btn-g" onClick={()=>{if(confirm("Cancel this order?"))setStatus(o,"cancelled");}} style={{fontSize:11,padding:"5px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Cancel</button>}
+              {o.status==="received"&&<span style={{fontSize:11,color:"#4CAF50"}}>✓ Received — now log it as a sourcing trip in Stock</span>}
+            </div>
           </div>
         );
       })}
@@ -1302,7 +1421,7 @@ function ExpensesTab({user,onMoney}){
 }
 
 function ReportsTab({user}){
-  const [data,setData]=useState({sales:[],expenses:[],stock:[]});
+  const [data,setData]=useState({sales:[],expenses:[],stock:[],losses:[]});
   const [loading,setLoading]=useState(true);
   const [period,setPeriod]=useState("month");
 
@@ -1310,12 +1429,13 @@ function ReportsTab({user}){
   const loadAll=async()=>{
     setLoading(true);
     try{
-      const [sales,expenses,stock]=await Promise.all([
+      const [sales,expenses,stock,losses]=await Promise.all([
         sb.get("karu_sales","select=*&voided=eq.false&order=date.desc"),
         sb.get("karu_expenses","select=*&order=date.desc"),
-        sb.get("karu_stock","select=*")
+        sb.get("karu_stock","select=*"),
+        sb.get("karu_losses","select=*&order=date.desc").catch(()=>[])
       ]);
-      setData({sales,expenses,stock});
+      setData({sales,expenses,stock,losses});
     }catch(e){console.error(e);}
     setLoading(false);
   };
@@ -1341,6 +1461,9 @@ function ReportsTab({user}){
       } else if(kind==="money"){
         const all=await sb.get("karu_money","select=*&order=date.desc,created_at.desc");
         dl("money",all.map(m=>({date:m.date,account:m.account,type:m.type,amount:m.amount,description:m.description,ref:m.ref,partner:m.partner,recorded_by:m.recorded_by})));
+      } else if(kind==="losses"){
+        const all=await sb.get("karu_losses","select=*&order=date.desc");
+        dl("losses",all.map(l=>({date:l.date,kind:l.kind,item:l.item_name,qty:l.qty,cost_value:l.cost_value,retail_value:l.retail_value,description:l.description,recorded_by:l.recorded_by})));
       }
     }catch(e){alert("Export failed: "+e.message);}
   };
@@ -1361,8 +1484,10 @@ function ReportsTab({user}){
   const expenses=fExp.reduce((s,x)=>s+Number(x.amount),0);
   const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
   const cogs=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
+  const fLosses=filterDate(data.losses||[]);
+  const lossCost=fLosses.reduce((s,l)=>s+Number(l.cost_value||0),0);
   const grossProfit=salesValue-cogs;
-  const netProfit=grossProfit-expenses;
+  const netProfit=grossProfit-expenses-lossCost;
 
   const dailyMap={};
   fSales.forEach(s=>{dailyMap[s.date]=(dailyMap[s.date]||0)+Number(s.total);});
@@ -1402,7 +1527,8 @@ function ReportsTab({user}){
           <div className="stat-l">Net {netProfit>=0?"profit":"loss"}</div>
         </div>
       </div>
-      <div style={{fontSize:11,color:"#556677",marginBottom:14,lineHeight:1.5,padding:"0 2px"}}>Profit is on sales value (what's invoiced). Collected is cash actually received; Owed to us is the outstanding balance on instalment sales.</div>
+      {lossCost>0&&<div style={{background:"rgba(232,91,91,0.08)",border:"1px solid rgba(232,91,91,0.3)",borderRadius:8,padding:12,marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:600,color:"#E85B5B"}}>Losses this period</div><div style={{fontSize:11,color:"#8899AA"}}>{fLosses.length} incident{fLosses.length!==1?"s":""} · theft, unpaid, damage</div></div><div style={{fontSize:16,fontWeight:600,color:"#E85B5B"}}>{fmtK(lossCost)}</div></div>}
+      <div style={{fontSize:11,color:"#556677",marginBottom:14,lineHeight:1.5,padding:"0 2px"}}>Profit is on sales value (what's invoiced), less cost of goods, expenses and losses. Collected is cash actually received; Owed to us is the outstanding balance on instalment sales.</div>
       <div className="card" style={{marginBottom:14}}>
         <div style={{fontSize:11,color:"#8899AA",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
         <div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div>
@@ -1497,6 +1623,7 @@ function ReportsTab({user}){
         <button className="btn-g" onClick={()=>exportCSV("expenses")} style={{fontSize:12}}>Export expenses</button>
         <button className="btn-g" onClick={()=>exportCSV("stock")} style={{fontSize:12}}>Export stock</button>
         <button className="btn-g" onClick={()=>exportCSV("money")} style={{fontSize:12}}>Export money</button>
+        <button className="btn-g" onClick={()=>exportCSV("losses")} style={{fontSize:12}}>Export losses</button>
       </div>
       <button className="btn-g" onClick={loadAll} style={{width:"100%",fontSize:13}}>Refresh</button>
     </div>
