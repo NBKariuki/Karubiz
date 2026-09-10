@@ -1376,7 +1376,16 @@ function OrdersTab({user,onMoney}){
   const markSupplier=async(si,status)=>{
     setBusy(true);
     try{
-      const clean=draft.map((s,i)=>({supplier:(s.supplier||"").trim(),status:i===si?status:(s.status||"pending"),deposit_paid:Number(s.deposit_paid||0),items:s.items.filter(it=>(it.name||"").trim()).map(it=>({name:it.name,category:it.category,qty:Number(it.qty)||1,est_cost:Number(it.est_cost)||0}))}));
+      const target=draft[si];
+      const dep=Number(target.deposit_paid||0);
+      // If cancelling a supplier that had a deposit, refund it to the account it came from
+      if(status==="cancelled" && dep>0){
+        const back=target.deposit_from||"sacco";
+        await recordMoney({account:back,amount:dep,type:"order_deposit_refund",ref:openOrder.order_no,description:`Deposit refunded (cancelled) · ${openOrder.order_no} · ${target.supplier}`,date:todayStr(),recorded_by:user.full_name});
+        await logAudit({trip_no:null,record_id:openOrder.id,action:"order_cancel_refund",field_changed:`${openOrder.order_no} · ${target.supplier}`,old_value:String(dep),new_value:"0",reason:`Supplier cancelled, deposit returned to ${back}`,changed_by:user.full_name});
+        if(onMoney) onMoney();
+      }
+      const clean=draft.map((s,i)=>({supplier:(s.supplier||"").trim(),status:i===si?status:(s.status||"pending"),deposit_paid:(i===si&&status==="cancelled")?0:Number(s.deposit_paid||0),deposit_from:s.deposit_from||null,items:s.items.filter(it=>(it.name||"").trim()).map(it=>({name:it.name,category:it.category,qty:Number(it.qty)||1,est_cost:Number(it.est_cost)||0}))}));
       await persist(clean);
       if(status==="ordered") await rememberSupplier(draft[si].supplier);
       await load(openOrder.id);
@@ -1390,7 +1399,7 @@ function OrdersTab({user,onMoney}){
     const a=Number(depAmt); if(!a||a<=0){alert("Enter an amount.");return;}
     setDepSaving(true);
     try{
-      const clean=draft.map((s,i)=>({supplier:(s.supplier||"").trim(),status:s.status||"pending",deposit_paid:Number(s.deposit_paid||0)+(i===depSi?a:0),items:s.items.filter(it=>(it.name||"").trim()).map(it=>({name:it.name,category:it.category,qty:Number(it.qty)||1,est_cost:Number(it.est_cost)||0}))}));
+      const clean=draft.map((s,i)=>({supplier:(s.supplier||"").trim(),status:s.status||"pending",deposit_paid:Number(s.deposit_paid||0)+(i===depSi?a:0),deposit_from:(i===depSi?depFrom:(s.deposit_from||null)),items:s.items.filter(it=>(it.name||"").trim()).map(it=>({name:it.name,category:it.category,qty:Number(it.qty)||1,est_cost:Number(it.est_cost)||0}))}));
       await persist(clean);
       await recordMoney({account:depFrom,amount:-a,type:"order_deposit",ref:openOrder.order_no,description:`Deposit · ${openOrder.order_no} · ${draft[depSi].supplier}`,date:todayStr(),recorded_by:user.full_name});
       await logAudit({trip_no:null,record_id:openOrder.id,action:"order_deposit",field_changed:`${openOrder.order_no} · ${draft[depSi].supplier}`,old_value:String(draft[depSi].deposit_paid||0),new_value:String(Number(draft[depSi].deposit_paid||0)+a),reason:`Deposit from ${depFrom}`,changed_by:user.full_name});
@@ -1435,19 +1444,19 @@ function OrdersTab({user,onMoney}){
                   )}
                 </div>
                 {sub.items.map((it,ii)=>(
-                  <div key={ii} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:8,marginBottom:6}}>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 26px",gap:5,marginBottom:5}}>
+                  <div key={ii} style={{marginBottom:10,paddingBottom:10,borderBottom:ii<sub.items.length-1?"1px solid #101B36":"none"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 24px",gap:6,marginBottom:6,alignItems:"center"}}>
                       <ProductSearch user={user} value={it.name} onChange={v=>upDraftItem(si,ii,"name",v)} onPick={p=>{upDraftItem(si,ii,"name",p.name);upDraftItem(si,ii,"category",p.category);if(p.default_cost>0)upDraftItem(si,ii,"est_cost",p.default_cost);}} placeholder="Search product..."/>
-                      <button onClick={()=>rmDraftItem(si,ii)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:15}}>x</button>
+                      {sub.items.length>1&&<button onClick={()=>rmDraftItem(si,ii)} style={{background:"none",border:"none",color:"#556677",cursor:"pointer",fontSize:16}}>×</button>}
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5}}>
-                      <select value={it.category} onChange={e=>upDraftItem(si,ii,"category",e.target.value)} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
-                      <input type="number" value={it.qty} min={1} onChange={e=>upDraftItem(si,ii,"qty",e.target.value)} placeholder="Qty" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px",color:"#E8E2D4",fontSize:11,textAlign:"center",width:"100%"}}/>
-                      <input type="number" value={it.est_cost} onChange={e=>upDraftItem(si,ii,"est_cost",e.target.value)} placeholder="Est. cost" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px",color:"#E8E2D4",fontSize:11,width:"100%"}}/>
+                    <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr 1fr",gap:6}}>
+                      <select value={it.category} onChange={e=>upDraftItem(si,ii,"category",e.target.value)} style={{background:"transparent",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#8899AA",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id} style={{background:"#0A1128"}}>{c.label}</option>)}</select>
+                      <input type="number" value={it.qty} min={1} onChange={e=>upDraftItem(si,ii,"qty",e.target.value)} placeholder="Qty" style={{background:"transparent",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:12,textAlign:"center",width:"100%"}}/>
+                      <input type="number" value={it.est_cost} onChange={e=>upDraftItem(si,ii,"est_cost",e.target.value)} placeholder="Cost" style={{background:"transparent",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:12,width:"100%"}}/>
                     </div>
                   </div>
                 ))}
-                <button className="btn-g" onClick={()=>addDraftItem(si)} style={{width:"100%",fontSize:12,marginBottom:8}}>+ Add item</button>
+                <button onClick={()=>addDraftItem(si)} style={{width:"100%",fontSize:12,marginBottom:8,background:"none",border:"1px dashed #1A2A4A",borderRadius:6,color:"#8899AA",padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Add item</button>
               </>):(
                 <div style={{marginBottom:8}}>
                   <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>{sub.supplier}</div>
