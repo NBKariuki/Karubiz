@@ -1397,6 +1397,8 @@ function OrdersTab({user,onMoney}){
   const [depSi,setDepSi]=useState(null); const [depAmt,setDepAmt]=useState(""); const [depFrom,setDepFrom]=useState("sacco"); const [depSaving,setDepSaving]=useState(false);
   const payDeposit=async()=>{
     const a=Number(depAmt); if(!a||a<=0){alert("Enter an amount.");return;}
+    const sub0=draft[depSi]; const bal0=Math.max(0,subTotal(sub0)-Number(sub0.deposit_paid||0));
+    if(a>bal0){alert(`That's more than the balance owed (${fmtK(bal0)}). Enter ${fmtK(bal0)} or less.`);return;}
     setDepSaving(true);
     try{
       const clean=draft.map((s,i)=>({supplier:(s.supplier||"").trim(),status:s.status||"pending",deposit_paid:Number(s.deposit_paid||0)+(i===depSi?a:0),deposit_from:(i===depSi?depFrom:(s.deposit_from||null)),items:s.items.filter(it=>(it.name||"").trim()).map(it=>({name:it.name,category:it.category,qty:Number(it.qty)||1,est_cost:Number(it.est_cost)||0}))}));
@@ -1465,24 +1467,30 @@ function OrdersTab({user,onMoney}){
               )}
 
               {/* Sub-summary */}
-              <div style={{borderTop:"1px solid #1A2A4A",paddingTop:8,marginTop:4}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:dep>0?4:8}}>
+              <div style={{borderTop:"1px solid #1A2A4A",paddingTop:10,marginTop:4}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:dep>0?6:8}}>
                   <span style={{color:"#8899AA"}}>Supplier total</span>
-                  <span style={{color:"#F5C000",fontWeight:600}}>{fmtK(st)}</span>
+                  <span style={{color:"#E8E2D4",fontWeight:600}}>{fmtK(st)}</span>
                 </div>
-                {dep>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:8}}><span style={{color:"#4CAF50"}}>Deposit {fmtK(dep)}</span><span style={{color:"#8899AA"}}>Balance {fmtK(bal)}</span></div>}
+                {dep>0&&(
+                  <div style={{background:"rgba(76,175,80,0.06)",border:"1px solid rgba(76,175,80,0.2)",borderRadius:6,padding:"8px 10px",marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#4CAF50"}}>Deposit paid</span><span style={{color:"#4CAF50",fontWeight:600}}>{fmtK(dep)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,paddingTop:4,borderTop:"1px solid rgba(76,175,80,0.15)"}}><span style={{color:"#E8E2D4",fontWeight:600}}>{bal>0?"Balance owed":"Fully paid"}</span><span style={{color:bal>0?"#E8A45B":"#4CAF50",fontWeight:700}}>{fmtK(bal)}</span></div>
+                  </div>
+                )}
 
                 {/* Deposit inline form */}
                 {depSi===si?(
                   <div style={{background:"rgba(245,192,0,0.06)",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:10,marginBottom:8}}>
-                    <div className="field"><label>Deposit amount (KSh)</label><input type="number" value={depAmt} onChange={e=>setDepAmt(e.target.value)} placeholder="0" autoFocus/></div>
+                    <div style={{fontSize:12,color:"#8899AA",marginBottom:8}}>{dep>0?`Already paid ${fmtK(dep)} · `:""}Balance owed: <span style={{color:"#E8A45B",fontWeight:600}}>{fmtK(bal)}</span></div>
+                    <div className="field"><label>Amount to pay now (KSh)</label><input type="number" value={depAmt} onChange={e=>setDepAmt(e.target.value)} placeholder="0" autoFocus/>{bal>0&&<button onClick={()=>setDepAmt(String(bal))} style={{marginTop:6,background:"none",border:"1px solid #1A2A4A",borderRadius:5,color:"#8899AA",fontSize:11,padding:"5px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Pay full balance ({fmtK(bal)})</button>}</div>
                     <div className="field"><label>From</label><div className="tog"><button className={`tog-btn${depFrom==="cash"?" on":""}`} onClick={()=>setDepFrom("cash")}>Cash</button><button className={`tog-btn${depFrom==="sacco"?" on":""}`} onClick={()=>setDepFrom("sacco")}>SACCO</button></div></div>
-                    <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={payDeposit} disabled={depSaving} style={{flex:1,fontSize:12}}>{depSaving?"...":"Confirm deposit"}</button><button className="btn-g" onClick={()=>{setDepSi(null);setDepAmt("");}} style={{fontSize:12}}>Cancel</button></div>
+                    <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={payDeposit} disabled={depSaving} style={{flex:1,fontSize:12}}>{depSaving?"...":"Confirm payment"}</button><button className="btn-g" onClick={()=>{setDepSi(null);setDepAmt("");}} style={{fontSize:12}}>Cancel</button></div>
                   </div>
                 ):(
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                     {!locked&&<button className="btn-y" onClick={()=>saveSupplier(si)} disabled={busy} style={{fontSize:11,padding:"6px 12px"}}>Save</button>}
-                    {["pending","ordered"].includes(sub.status)&&can(user,"money")&&<button className="btn-g" onClick={()=>{setDepSi(si);setDepAmt("");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(245,192,0,0.3)",color:"#F5C000"}}>Deposit</button>}
+                    {["pending","ordered"].includes(sub.status)&&can(user,"money")&&bal>0&&<button className="btn-g" onClick={()=>{setDepSi(si);setDepAmt("");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(245,192,0,0.3)",color:"#F5C000"}}>{dep>0?"Add deposit":"Deposit"}</button>}
                     {sub.status==="pending"&&<button className="btn-g" onClick={()=>markSupplier(si,"ordered")} disabled={busy} style={{fontSize:11,padding:"6px 10px"}}>Mark ordered</button>}
                     {sub.status==="ordered"&&<button className="btn-g" onClick={()=>markSupplier(si,"received")} disabled={busy} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(76,175,80,0.3)",color:"#4CAF50"}}>Received</button>}
                     {["pending","ordered"].includes(sub.status)&&<button className="btn-g" onClick={()=>{if(confirm(`Cancel ${sub.supplier||"this supplier"}?`))markSupplier(si,"cancelled");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Cancel</button>}
