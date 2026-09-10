@@ -1349,7 +1349,18 @@ function OrdersTab({user,onMoney}){
 
   // Local working copy of the open order's suppliers for editing text fields smoothly
   const [draft,setDraft]=useState(null);
+  const savedSig = openOrder ? JSON.stringify((openOrder.suppliers||[]).map(s=>({d:s.deposit_paid,f:s.deposit_from,st:s.status}))) : "";
+  // On order open: load fresh. On saved-data change (deposit/status): merge saved money+status into the working draft without losing in-progress typing.
   useEffect(()=>{ if(openOrder) setDraft(JSON.parse(JSON.stringify(openOrder.suppliers||[]))); else setDraft(null); },[openOrder?.id]);
+  useEffect(()=>{
+    if(!openOrder) return;
+    setDraft(cur=>{
+      if(!cur) return JSON.parse(JSON.stringify(openOrder.suppliers||[]));
+      const saved=openOrder.suppliers||[];
+      // Align by index; carry saved deposit/status/from onto current draft rows, keep current items/supplier text
+      return cur.map((row,i)=> saved[i] ? {...row, deposit_paid:saved[i].deposit_paid, deposit_from:saved[i].deposit_from, status:saved[i].status} : row);
+    });
+  },[savedSig]);
 
   const upDraft=(si,patch)=>setDraft(d=>d.map((s,i)=>i===si?{...s,...patch}:s));
   const upDraftItem=(si,ii,f,v)=>setDraft(d=>d.map((s,i)=>i===si?{...s,items:s.items.map((it,j)=>j===ii?{...it,[f]:v}:it)}:s));
