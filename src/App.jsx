@@ -1297,206 +1297,226 @@ function StockTab({user,onMoney}){
 function OrdersTab({user,onMoney}){
   const [orders,setOrders]=useState([]); const [loading,setLoading]=useState(true);
   const [suppliers,setSuppliers]=useState([]);
-  const [editingOrder,setEditingOrder]=useState(null); // full order object being built/edited
-  const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
+  const [openOrder,setOpenOrder]=useState(null); // the order currently open/expanded (live)
   const [filter,setFilter]=useState("open");
+  const [busy,setBusy]=useState(false);
 
-  const load=async()=>{ setLoading(true);
+  const load=async(keepOpenId)=>{ setLoading(true);
     try{
       const [o,s]=await Promise.all([
         sb.get("karu_orders","select=*&order=created_at.desc"),
         sb.get("karu_suppliers","select=*&order=last_used.desc.nullslast").catch(()=>[])
       ]);
       setOrders(o); setSuppliers(s);
+      if(keepOpenId){ const fresh=o.find(x=>x.id===keepOpenId); if(fresh) setOpenOrder(fresh); }
     }catch(e){console.error(e);}
     setLoading(false);
   };
   useEffect(()=>{load();},[]);
 
-  const blankSub=()=>({ _k:Date.now()+Math.random(), supplier:"", status:"pending", deposit_paid:0, items:[{id:Date.now(),name:"",category:"living",qty:1,est_cost:""}] });
-  const startNew=()=>{ setEditingOrder({ isNew:true, notes:"", created_by:user.full_name, suppliers:[blankSub()] }); setErr(""); };
-  const startEdit=(o)=>{ setEditingOrder({...o, isNew:false, suppliers:(o.suppliers||[]).map(s=>({...s,_k:Math.random(),items:(s.items||[]).map(it=>({...it,id:it.id||Date.now()+Math.random()}))})) }); setErr(""); };
-
   const subTotal=(sub)=>(sub.items||[]).reduce((t,i)=>t+(Number(i.qty||1)*Number(i.est_cost||0)),0);
   const orderTotal=(subs)=>(subs||[]).reduce((t,s)=>t+subTotal(s),0);
   const orderDeposits=(subs)=>(subs||[]).reduce((t,s)=>t+Number(s.deposit_paid||0),0);
-
-  // Mutators on the editing order
-  const setSub=(k,patch)=>setEditingOrder(o=>({...o,suppliers:o.suppliers.map(s=>s._k===k?{...s,...patch}:s)}));
-  const addSupplier=()=>setEditingOrder(o=>({...o,suppliers:[...o.suppliers,blankSub()]}));
-  const rmSupplier=(k)=>setEditingOrder(o=>({...o,suppliers:o.suppliers.length>1?o.suppliers.filter(s=>s._k!==k):o.suppliers}));
-  const addItem=(k)=>setSub(k,{items:[...editingOrder.suppliers.find(s=>s._k===k).items,{id:Date.now(),name:"",category:"living",qty:1,est_cost:""}]});
-  const rmItem=(k,id)=>{ const sub=editingOrder.suppliers.find(s=>s._k===k); setSub(k,{items:sub.items.length>1?sub.items.filter(i=>i.id!==id):sub.items}); };
-  const upItem=(k,id,f,v)=>{ const sub=editingOrder.suppliers.find(s=>s._k===k); setSub(k,{items:sub.items.map(i=>i.id===id?{...i,[f]:v}:i)}); };
-
-  const rememberSuppliers=async(subs)=>{
-    for(const s of subs){ const nm=(s.supplier||"").trim(); if(!nm) continue;
-      try{ await sb.post("karu_suppliers",{name:nm,last_used:todayStr()}); }
-      catch{ try{ const ex=await sb.get("karu_suppliers",`select=id&name=eq.${encodeURIComponent(nm)}`); if(ex[0]) await sb.patch("karu_suppliers",ex[0].id,{last_used:todayStr()}); }catch{} }
-    }
-  };
-
-  const saveOrder=async()=>{
-    const subs=editingOrder.suppliers
-      .map(s=>({supplier:(s.supplier||"").trim(),status:s.status||"pending",deposit_paid:Number(s.deposit_paid||0),items:(s.items||[]).filter(i=>i.name.trim()).map(i=>({name:i.name,category:i.category,qty:Number(i.qty)||1,est_cost:Number(i.est_cost)||0}))}))
-      .filter(s=>s.supplier && s.items.length);
-    if(!subs.length){setErr("Add at least one supplier with an item.");return;}
-    setSaving(true); setErr("");
-    try{
-      if(editingOrder.isNew){
-        const orderNo=`KARU-ORD-${String(orders.length+1).padStart(3,"0")}`;
-        await sb.post("karu_orders",{order_no:orderNo,date:todayStr(),suppliers:subs,est_total:orderTotal(subs),status:"pending",notes:editingOrder.notes,created_by:editingOrder.created_by});
-      } else {
-        const allOrdered=subs.every(s=>["ordered","received","cancelled"].includes(s.status));
-        await sb.patch("karu_orders",editingOrder.id,{suppliers:subs,est_total:orderTotal(subs),notes:editingOrder.notes,status:allOrdered?"ordered":"pending",updated_at:new Date().toISOString()});
-      }
-      await rememberSuppliers(subs);
-      setEditingOrder(null); await load();
-    }catch(e){setErr("Failed: "+e.message);}
-    setSaving(false);
-  };
-
-  // Live actions on a saved order's supplier (deposit / mark ordered / cancel)
-  const [depTarget,setDepTarget]=useState(null); const [depAmt,setDepAmt]=useState(""); const [depFrom,setDepFrom]=useState("sacco"); const [depSaving,setDepSaving]=useState(false);
-  const paySupplierDeposit=async()=>{
-    const a=Number(depAmt); if(!a||a<=0){alert("Enter an amount.");return;}
-    setDepSaving(true);
-    try{
-      const {order,idx}=depTarget;
-      const subs=(order.suppliers||[]).map((s,i)=>i===idx?{...s,deposit_paid:Number(s.deposit_paid||0)+a}:s);
-      await sb.patch("karu_orders",order.id,{suppliers:subs,updated_at:new Date().toISOString()});
-      await recordMoney({account:depFrom,amount:-a,type:"order_deposit",ref:order.order_no,description:`Deposit · ${order.order_no} · ${order.suppliers[idx].supplier}`,date:todayStr(),recorded_by:user.full_name});
-      await logAudit({trip_no:null,record_id:order.id,action:"order_deposit",field_changed:`${order.order_no} · ${order.suppliers[idx].supplier}`,old_value:String(order.suppliers[idx].deposit_paid||0),new_value:String(Number(order.suppliers[idx].deposit_paid||0)+a),reason:`Deposit from ${depFrom}`,changed_by:user.full_name});
-      if(onMoney) onMoney();
-      setDepTarget(null); setDepAmt(""); await load();
-    }catch(e){alert("Failed: "+e.message);}
-    setDepSaving(false);
-  };
-  const setSupplierStatus=async(order,idx,status)=>{
-    const subs=(order.suppliers||[]).map((s,i)=>i===idx?{...s,status}:s);
-    const allDone=subs.every(s=>["ordered","received","cancelled"].includes(s.status));
-    await sb.patch("karu_orders",order.id,{suppliers:subs,status:allDone?"ordered":"pending",updated_at:new Date().toISOString()});
-    await load();
-  };
-
-  const shown=orders.filter(o=>filter==="open"?["pending","ordered"].includes(o.status):filter==="done"?["received","cancelled"].includes(o.status):true);
   const badge=s=>({pending:"b-y",ordered:"b-muted",received:"b-g",cancelled:"b-r"}[s]||"b-muted");
   const supSuggest=(val)=>{ const q=(val||"").toLowerCase().trim(); return q?suppliers.filter(s=>s.name.toLowerCase().includes(q)).slice(0,5):[]; };
 
-  // ── BUILD / EDIT SCREEN ──
-  if(editingOrder) return (
-    <div>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-        <button className="btn-g" onClick={()=>{setEditingOrder(null);setErr("");}} style={{fontSize:13}}>Back</button>
-        <div style={{fontSize:15,fontWeight:600}}>{editingOrder.isNew?"New Order":editingOrder.order_no}</div>
-        {editingOrder.isNew&&<div className="badge b-y">KARU-ORD-{String(orders.length+1).padStart(3,"0")}</div>}
-      </div>
-      {can(user,"users")?(
-        <div className="field"><label>Trip recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${editingOrder.created_by===s?" on":""}`} onClick={()=>setEditingOrder(o=>({...o,created_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
-      ):(<div className="field"><label>Trip recorded by</label><div style={{fontSize:14,color:"#E8E2D4",padding:"9px 0"}}>{editingOrder.created_by}</div></div>)}
+  // Persist the open order's suppliers array to Supabase (debounced-ish: called on explicit actions)
+  const persist=async(subs,extra={})=>{
+    if(!openOrder) return;
+    const allDone=subs.length>0 && subs.every(s=>["ordered","received","cancelled"].includes(s.status));
+    const patch={suppliers:subs,est_total:orderTotal(subs),status:allDone?"ordered":"pending",updated_at:new Date().toISOString(),...extra};
+    await sb.patch("karu_orders",openOrder.id,patch);
+    setOpenOrder(o=>({...o,...patch}));
+  };
 
-      {editingOrder.suppliers.map((sub,si)=>{
-        const locked=["ordered","received"].includes(sub.status);
-        return (
-        <div key={sub._k} style={{background:"#0A1128",border:`1px solid ${locked?"#1A2A4A":"rgba(245,192,0,0.3)"}`,borderRadius:10,padding:12,marginBottom:12}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <div style={{fontSize:12,color:"#8899AA",fontWeight:600}}>Supplier {si+1}</div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              {locked&&<span className={`badge ${badge(sub.status)}`}>{sub.status}</span>}
-              {editingOrder.suppliers.length>1&&!locked&&<button onClick={()=>rmSupplier(sub._k)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16}}>×</button>}
-            </div>
-          </div>
-          <div style={{position:"relative",marginBottom:8}}>
-            <input value={sub.supplier} disabled={locked} onChange={e=>setSub(sub._k,{supplier:e.target.value,_showSug:true})} onFocus={()=>setSub(sub._k,{_showSug:true})} onBlur={()=>setTimeout(()=>setSub(sub._k,{_showSug:false}),200)} placeholder="Supplier name" style={{width:"100%",background:locked?"#0A1128":"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:13,opacity:locked?0.7:1}}/>
-            {sub._showSug&&supSuggest(sub.supplier).length>0&&(
-              <div className="ac-drop">{supSuggest(sub.supplier).map(sg=><div key={sg.id} className="ac-item" onMouseDown={()=>setSub(sub._k,{supplier:sg.name,_showSug:false})}>{sg.name}</div>)}</div>
-            )}
-          </div>
-          {!locked&&sub.items.map(it=>(
-            <div key={it.id} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:8,marginBottom:6}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 26px",gap:5,marginBottom:5}}>
-                <ProductSearch user={user} value={it.name} onChange={v=>upItem(sub._k,it.id,"name",v)} onPick={p=>{upItem(sub._k,it.id,"name",p.name);upItem(sub._k,it.id,"category",p.category);if(p.default_cost>0)upItem(sub._k,it.id,"est_cost",String(p.default_cost));}} placeholder="Search product..."/>
-                <button onClick={()=>rmItem(sub._k,it.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:15}}>x</button>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5}}>
-                <select value={it.category} onChange={e=>upItem(sub._k,it.id,"category",e.target.value)} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
-                <input type="number" value={it.qty} min={1} onChange={e=>upItem(sub._k,it.id,"qty",e.target.value)} placeholder="Qty" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px",color:"#E8E2D4",fontSize:11,textAlign:"center",width:"100%"}}/>
-                <input type="number" value={it.est_cost} onChange={e=>upItem(sub._k,it.id,"est_cost",e.target.value)} placeholder="Est. cost" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px",color:"#E8E2D4",fontSize:11,width:"100%"}}/>
-              </div>
-            </div>
-          ))}
-          {locked&&<div style={{fontSize:12,color:"#8899AA",marginBottom:6}}>{(sub.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")}</div>}
-          {!locked&&<button className="btn-g" onClick={()=>addItem(sub._k)} style={{width:"100%",fontSize:12,marginBottom:8}}>+ Add item</button>}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>
-            <span style={{color:"#8899AA"}}>Supplier total</span>
-            <span style={{color:"#F5C000",fontWeight:600}}>{fmtK(subTotal(sub))}</span>
-          </div>
-          {Number(sub.deposit_paid||0)>0&&<div style={{fontSize:11,color:"#4CAF50",textAlign:"right",marginTop:2}}>Deposit: {fmtK(Number(sub.deposit_paid))} · Balance {fmtK(Math.max(0,subTotal(sub)-Number(sub.deposit_paid)))}</div>}
+  const rememberSupplier=async(nm)=>{
+    nm=(nm||"").trim(); if(!nm) return;
+    try{ await sb.post("karu_suppliers",{name:nm,last_used:todayStr()}); }
+    catch{ try{ const ex=await sb.get("karu_suppliers",`select=id&name=eq.${encodeURIComponent(nm)}`); if(ex[0]) await sb.patch("karu_suppliers",ex[0].id,{last_used:todayStr()}); }catch{} }
+  };
+
+  // Create a brand-new order immediately (so everything after is live)
+  const startNew=async()=>{
+    setBusy(true);
+    try{
+      const orderNo=`KARU-ORD-${String(orders.length+1).padStart(3,"0")}`;
+      const firstSub={supplier:"",status:"pending",deposit_paid:0,items:[{name:"",category:"living",qty:1,est_cost:0}]};
+      const [created]=await sb.post("karu_orders",{order_no:orderNo,date:todayStr(),suppliers:[firstSub],est_total:0,status:"pending",notes:"",created_by:user.full_name});
+      await load(created.id);
+    }catch(e){alert("Could not start order: "+e.message);}
+    setBusy(false);
+  };
+
+  // Local working copy of the open order's suppliers for editing text fields smoothly
+  const [draft,setDraft]=useState(null);
+  useEffect(()=>{ if(openOrder) setDraft(JSON.parse(JSON.stringify(openOrder.suppliers||[]))); else setDraft(null); },[openOrder?.id]);
+
+  const upDraft=(si,patch)=>setDraft(d=>d.map((s,i)=>i===si?{...s,...patch}:s));
+  const upDraftItem=(si,ii,f,v)=>setDraft(d=>d.map((s,i)=>i===si?{...s,items:s.items.map((it,j)=>j===ii?{...it,[f]:v}:it)}:s));
+  const addDraftItem=(si)=>setDraft(d=>d.map((s,i)=>i===si?{...s,items:[...s.items,{name:"",category:"living",qty:1,est_cost:0}]}:s));
+  const rmDraftItem=(si,ii)=>setDraft(d=>d.map((s,i)=>i===si?{...s,items:s.items.length>1?s.items.filter((_,j)=>j!==ii):s.items}:s));
+  const addDraftSupplier=()=>setDraft(d=>[...d,{supplier:"",status:"pending",deposit_paid:0,items:[{name:"",category:"living",qty:1,est_cost:0}]}]);
+  const rmDraftSupplier=(si)=>setDraft(d=>d.length>1?d.filter((_,i)=>i!==si):d);
+
+  // Save a single supplier block (persists whole draft, remembers supplier name)
+  const saveSupplier=async(si)=>{
+    const sub=draft[si];
+    if(!(sub.supplier||"").trim()){alert("Supplier name required.");return;}
+    if(!sub.items.some(i=>(i.name||"").trim())){alert("Add at least one item.");return;}
+    setBusy(true);
+    try{
+      const clean=draft.map(s=>({supplier:(s.supplier||"").trim(),status:s.status||"pending",deposit_paid:Number(s.deposit_paid||0),items:s.items.filter(i=>(i.name||"").trim()).map(i=>({name:i.name,category:i.category,qty:Number(i.qty)||1,est_cost:Number(i.est_cost)||0}))}));
+      await persist(clean);
+      await rememberSupplier(sub.supplier);
+      await load(openOrder.id);
+    }catch(e){alert("Save failed: "+e.message);}
+    setBusy(false);
+  };
+
+  const markSupplier=async(si,status)=>{
+    setBusy(true);
+    try{
+      const clean=draft.map((s,i)=>({supplier:(s.supplier||"").trim(),status:i===si?status:(s.status||"pending"),deposit_paid:Number(s.deposit_paid||0),items:s.items.filter(it=>(it.name||"").trim()).map(it=>({name:it.name,category:it.category,qty:Number(it.qty)||1,est_cost:Number(it.est_cost)||0}))}));
+      await persist(clean);
+      if(status==="ordered") await rememberSupplier(draft[si].supplier);
+      await load(openOrder.id);
+    }catch(e){alert("Failed: "+e.message);}
+    setBusy(false);
+  };
+
+  // Deposit against a supplier block
+  const [depSi,setDepSi]=useState(null); const [depAmt,setDepAmt]=useState(""); const [depFrom,setDepFrom]=useState("sacco"); const [depSaving,setDepSaving]=useState(false);
+  const payDeposit=async()=>{
+    const a=Number(depAmt); if(!a||a<=0){alert("Enter an amount.");return;}
+    setDepSaving(true);
+    try{
+      const clean=draft.map((s,i)=>({supplier:(s.supplier||"").trim(),status:s.status||"pending",deposit_paid:Number(s.deposit_paid||0)+(i===depSi?a:0),items:s.items.filter(it=>(it.name||"").trim()).map(it=>({name:it.name,category:it.category,qty:Number(it.qty)||1,est_cost:Number(it.est_cost)||0}))}));
+      await persist(clean);
+      await recordMoney({account:depFrom,amount:-a,type:"order_deposit",ref:openOrder.order_no,description:`Deposit · ${openOrder.order_no} · ${draft[depSi].supplier}`,date:todayStr(),recorded_by:user.full_name});
+      await logAudit({trip_no:null,record_id:openOrder.id,action:"order_deposit",field_changed:`${openOrder.order_no} · ${draft[depSi].supplier}`,old_value:String(draft[depSi].deposit_paid||0),new_value:String(Number(draft[depSi].deposit_paid||0)+a),reason:`Deposit from ${depFrom}`,changed_by:user.full_name});
+      if(onMoney) onMoney();
+      setDepSi(null); setDepAmt(""); await load(openOrder.id);
+    }catch(e){alert("Failed: "+e.message);}
+    setDepSaving(false);
+  };
+
+  const saveNotes=async(notes)=>{ if(!openOrder) return; await sb.patch("karu_orders",openOrder.id,{notes}); setOpenOrder(o=>({...o,notes})); };
+
+  const shown=orders.filter(o=>filter==="open"?["pending","ordered"].includes(o.status):filter==="done"?["received","cancelled"].includes(o.status):true);
+
+  // ── OPEN ORDER (live editing, each supplier self-contained) ──
+  if(openOrder && draft){
+    return (
+      <div>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+          <button className="btn-g" onClick={()=>{setOpenOrder(null);load();}} style={{fontSize:13}}>Back</button>
+          <div style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>{openOrder.order_no}</div>
+          <span className={`badge ${badge(openOrder.status)}`}>{openOrder.status}</span>
         </div>
-        );
-      })}
 
-      <button className="btn-g" onClick={addSupplier} style={{width:"100%",marginBottom:14,fontSize:13}}>+ Add another supplier</button>
+        {draft.map((sub,si)=>{
+          const locked=["ordered","received","cancelled"].includes(sub.status);
+          const st=subTotal(sub); const dep=Number(sub.deposit_paid||0); const bal=Math.max(0,st-dep);
+          return (
+            <div key={si} style={{background:"#0A1128",border:`1px solid ${locked?"#1A2A4A":"rgba(245,192,0,0.35)"}`,borderRadius:10,padding:12,marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{fontSize:12,color:"#8899AA",fontWeight:600}}>Supplier {si+1}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span className={`badge ${badge(sub.status)}`}>{sub.status}</span>
+                  {draft.length>1&&!locked&&<button onClick={()=>rmDraftSupplier(si)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16}}>×</button>}
+                </div>
+              </div>
 
-      <div className="field"><label>Trip notes (optional)</label><input value={editingOrder.notes||""} onChange={e=>setEditingOrder(o=>({...o,notes:e.target.value}))} placeholder="e.g. Kiambu market run"/></div>
+              {!locked?(<>
+                <div style={{position:"relative",marginBottom:8}}>
+                  <input value={sub.supplier} onChange={e=>upDraft(si,{supplier:e.target.value,_sug:true})} onFocus={()=>upDraft(si,{_sug:true})} onBlur={()=>setTimeout(()=>upDraft(si,{_sug:false}),200)} placeholder="Supplier name" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:13}}/>
+                  {sub._sug&&supSuggest(sub.supplier).length>0&&(
+                    <div className="ac-drop">{supSuggest(sub.supplier).map(sg=><div key={sg.id} className="ac-item" onMouseDown={()=>upDraft(si,{supplier:sg.name,_sug:false})}>{sg.name}</div>)}</div>
+                  )}
+                </div>
+                {sub.items.map((it,ii)=>(
+                  <div key={ii} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:8,marginBottom:6}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 26px",gap:5,marginBottom:5}}>
+                      <ProductSearch user={user} value={it.name} onChange={v=>upDraftItem(si,ii,"name",v)} onPick={p=>{upDraftItem(si,ii,"name",p.name);upDraftItem(si,ii,"category",p.category);if(p.default_cost>0)upDraftItem(si,ii,"est_cost",p.default_cost);}} placeholder="Search product..."/>
+                      <button onClick={()=>rmDraftItem(si,ii)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:15}}>x</button>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5}}>
+                      <select value={it.category} onChange={e=>upDraftItem(si,ii,"category",e.target.value)} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+                      <input type="number" value={it.qty} min={1} onChange={e=>upDraftItem(si,ii,"qty",e.target.value)} placeholder="Qty" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px",color:"#E8E2D4",fontSize:11,textAlign:"center",width:"100%"}}/>
+                      <input type="number" value={it.est_cost} onChange={e=>upDraftItem(si,ii,"est_cost",e.target.value)} placeholder="Est. cost" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px",color:"#E8E2D4",fontSize:11,width:"100%"}}/>
+                    </div>
+                  </div>
+                ))}
+                <button className="btn-g" onClick={()=>addDraftItem(si)} style={{width:"100%",fontSize:12,marginBottom:8}}>+ Add item</button>
+              </>):(
+                <div style={{marginBottom:8}}>
+                  <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>{sub.supplier}</div>
+                  <div style={{fontSize:12,color:"#8899AA"}}>{(sub.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")}</div>
+                </div>
+              )}
 
-      <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:10,padding:12,marginBottom:14}}>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:600}}><span>Order total</span><span style={{color:"#F5C000"}}>{fmtK(orderTotal(editingOrder.suppliers))}</span></div>
-        {orderDeposits(editingOrder.suppliers)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#8899AA",marginTop:4}}><span>Deposits paid</span><span>{fmtK(orderDeposits(editingOrder.suppliers))}</span></div>}
+              {/* Sub-summary */}
+              <div style={{borderTop:"1px solid #1A2A4A",paddingTop:8,marginTop:4}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:dep>0?4:8}}>
+                  <span style={{color:"#8899AA"}}>Supplier total</span>
+                  <span style={{color:"#F5C000",fontWeight:600}}>{fmtK(st)}</span>
+                </div>
+                {dep>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:8}}><span style={{color:"#4CAF50"}}>Deposit {fmtK(dep)}</span><span style={{color:"#8899AA"}}>Balance {fmtK(bal)}</span></div>}
+
+                {/* Deposit inline form */}
+                {depSi===si?(
+                  <div style={{background:"rgba(245,192,0,0.06)",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:10,marginBottom:8}}>
+                    <div className="field"><label>Deposit amount (KSh)</label><input type="number" value={depAmt} onChange={e=>setDepAmt(e.target.value)} placeholder="0" autoFocus/></div>
+                    <div className="field"><label>From</label><div className="tog"><button className={`tog-btn${depFrom==="cash"?" on":""}`} onClick={()=>setDepFrom("cash")}>Cash</button><button className={`tog-btn${depFrom==="sacco"?" on":""}`} onClick={()=>setDepFrom("sacco")}>SACCO</button></div></div>
+                    <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={payDeposit} disabled={depSaving} style={{flex:1,fontSize:12}}>{depSaving?"...":"Confirm deposit"}</button><button className="btn-g" onClick={()=>{setDepSi(null);setDepAmt("");}} style={{fontSize:12}}>Cancel</button></div>
+                  </div>
+                ):(
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {!locked&&<button className="btn-y" onClick={()=>saveSupplier(si)} disabled={busy} style={{fontSize:11,padding:"6px 12px"}}>Save</button>}
+                    {["pending","ordered"].includes(sub.status)&&can(user,"money")&&<button className="btn-g" onClick={()=>{setDepSi(si);setDepAmt("");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(245,192,0,0.3)",color:"#F5C000"}}>Deposit</button>}
+                    {sub.status==="pending"&&<button className="btn-g" onClick={()=>markSupplier(si,"ordered")} disabled={busy} style={{fontSize:11,padding:"6px 10px"}}>Mark ordered</button>}
+                    {sub.status==="ordered"&&<button className="btn-g" onClick={()=>markSupplier(si,"received")} disabled={busy} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(76,175,80,0.3)",color:"#4CAF50"}}>Received</button>}
+                    {["pending","ordered"].includes(sub.status)&&<button className="btn-g" onClick={()=>{if(confirm(`Cancel ${sub.supplier||"this supplier"}?`))markSupplier(si,"cancelled");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Cancel</button>}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        <button className="btn-g" onClick={addDraftSupplier} style={{width:"100%",marginBottom:14,fontSize:13}}>+ Add another supplier</button>
+
+        <div className="field"><label>Trip notes</label><input defaultValue={openOrder.notes||""} onBlur={e=>saveNotes(e.target.value)} placeholder="e.g. Kiambu market run"/></div>
+
+        <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:10,padding:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:600}}><span>Order total</span><span style={{color:"#F5C000"}}>{fmtK(orderTotal(draft))}</span></div>
+          {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#8899AA",marginTop:4}}><span>Deposits paid</span><span>{fmtK(orderDeposits(draft))}</span></div>}
+          {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#E8A45B",marginTop:2}}><span>Balance to suppliers</span><span>{fmtK(Math.max(0,orderTotal(draft)-orderDeposits(draft)))}</span></div>}
+        </div>
+        {draft.some(s=>s.status==="received")&&<div style={{fontSize:11,color:"#4CAF50",marginTop:10}}>✓ Received items — log them as a sourcing trip in Stock</div>}
       </div>
+    );
+  }
 
-      {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
-      <button className="btn-y" onClick={saveOrder} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":editingOrder.isNew?"Create Order":"Save Changes"}</button>
-    </div>
-  );
-
-  // ── LIST SCREEN ──
+  // ── LIST ──
   return (
     <div>
-      <div style={{fontSize:12,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Plan a buying trip. Add each supplier as a sub-order with its own items, deposit and status. Edit freely until you mark a supplier ordered.</div>
-      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}><button className="btn-y" onClick={startNew} style={{fontSize:13,padding:"9px 16px"}}>+ New Order</button></div>
+      <div style={{fontSize:12,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Plan a buying trip. Open an order and add each supplier as its own block — items, deposit, and status handled right there. Each supplier acts on its own.</div>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}><button className="btn-y" onClick={startNew} disabled={busy} style={{fontSize:13,padding:"9px 16px"}}>{busy?"...":"+ New Order"}</button></div>
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {[["open","Open"],["done","Completed"],["all","All"]].map(([id,l])=><button key={id} onClick={()=>setFilter(id)} style={{padding:"5px 12px",borderRadius:100,border:`1px solid ${filter===id?"#F5C000":"#1A2A4A"}`,background:filter===id?"rgba(245,192,0,0.1)":"transparent",color:filter===id?"#F5C000":"#8899AA",fontSize:12,cursor:"pointer"}}>{l}</button>)}
       </div>
       {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:shown.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No orders here.</div>:shown.map(o=>{
-        const subs=o.suppliers||[]; const anyEditable=subs.some(s=>s.status==="pending");
+        const subs=o.suppliers||[];
         return (
-          <div key={o.id} className="card">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+          <div key={o.id} className="card" onClick={()=>setOpenOrder(o)} style={{cursor:"pointer"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
               <div><span style={{fontSize:14,fontWeight:600,color:"#F5C000"}}>{o.order_no}</span><div style={{fontSize:11,color:"#8899AA",marginTop:2}}>{o.date} · {o.created_by?.split(" ")[0]} · {subs.length} supplier{subs.length!==1?"s":""} · est {fmtK(orderTotal(subs))}</div></div>
               <span className={`badge ${badge(o.status)}`}>{o.status}</span>
             </div>
-            {o.notes&&<div style={{fontSize:11,color:"#556677",marginBottom:8}}>Note: {o.notes}</div>}
-            {subs.map((sub,idx)=>{
-              const st=subTotal(sub); const dep=Number(sub.deposit_paid||0); const bal=Math.max(0,st-dep);
-              return (
-                <div key={idx} style={{borderTop:"1px solid #1A2A4A",paddingTop:8,marginTop:8}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <span style={{fontSize:13,fontWeight:600}}>{sub.supplier}</span>
-                    <span className={`badge ${badge(sub.status)}`}>{sub.status}</span>
-                  </div>
-                  <div style={{fontSize:11,color:"#8899AA",margin:"3px 0"}}>{(sub.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")}</div>
-                  <div style={{fontSize:11,color:"#8899AA"}}>Total {fmtK(st)}{dep>0?` · Deposit ${fmtK(dep)} · Balance ${fmtK(bal)}`:""}</div>
-                  {depTarget&&depTarget.order.id===o.id&&depTarget.idx===idx?(
-                    <div style={{background:"rgba(245,192,0,0.06)",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:10,margin:"8px 0"}}>
-                      <div style={{fontSize:12,fontWeight:600,marginBottom:8}}>Deposit to {sub.supplier}</div>
-                      <div className="field"><label>Amount (KSh)</label><input type="number" value={depAmt} onChange={e=>setDepAmt(e.target.value)} placeholder="0" autoFocus/></div>
-                      <div className="field"><label>From</label><div className="tog"><button className={`tog-btn${depFrom==="cash"?" on":""}`} onClick={()=>setDepFrom("cash")}>Cash</button><button className={`tog-btn${depFrom==="sacco"?" on":""}`} onClick={()=>setDepFrom("sacco")}>SACCO</button></div></div>
-                      <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={paySupplierDeposit} disabled={depSaving} style={{flex:1,fontSize:12}}>{depSaving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setDepTarget(null);setDepAmt("");}} style={{fontSize:12}}>Cancel</button></div>
-                    </div>
-                  ):(
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
-                      {["pending","ordered"].includes(sub.status)&&can(user,"money")&&<button className="btn-g" onClick={()=>{setDepTarget({order:o,idx});setDepAmt("");}} style={{fontSize:11,padding:"4px 10px",borderColor:"rgba(245,192,0,0.3)",color:"#F5C000"}}>Pay deposit</button>}
-                      {sub.status==="pending"&&<button className="btn-g" onClick={()=>setSupplierStatus(o,idx,"ordered")} style={{fontSize:11,padding:"4px 10px"}}>Mark ordered</button>}
-                      {sub.status==="ordered"&&<button className="btn-g" onClick={()=>setSupplierStatus(o,idx,"received")} style={{fontSize:11,padding:"4px 10px",borderColor:"rgba(76,175,80,0.3)",color:"#4CAF50"}}>Mark received</button>}
-                      {["pending","ordered"].includes(sub.status)&&<button className="btn-g" onClick={()=>{if(confirm(`Cancel ${sub.supplier}?`))setSupplierStatus(o,idx,"cancelled");}} style={{fontSize:11,padding:"4px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Cancel</button>}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {anyEditable&&<button className="btn-g" onClick={()=>startEdit(o)} style={{width:"100%",fontSize:12,marginTop:10}}>Edit order</button>}
-            {subs.some(s=>s.status==="received")&&<div style={{fontSize:11,color:"#4CAF50",marginTop:8}}>✓ Received items — log them as a sourcing trip in Stock</div>}
+            <div style={{fontSize:11,color:"#8899AA"}}>{subs.map(s=>s.supplier).filter(Boolean).join(" · ")||"No suppliers yet"}</div>
+            {orderDeposits(subs)>0&&<div style={{fontSize:11,color:"#4CAF50",marginTop:4}}>Deposits {fmtK(orderDeposits(subs))} · Balance {fmtK(Math.max(0,orderTotal(subs)-orderDeposits(subs)))}</div>}
+            <div style={{fontSize:11,color:"#556677",marginTop:6}}>Tap to open</div>
           </div>
         );
       })}
