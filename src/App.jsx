@@ -1944,6 +1944,7 @@ function ReportsTab({user}){
   const [data,setData]=useState({sales:[],expenses:[],stock:[],losses:[]});
   const [loading,setLoading]=useState(true);
   const [period,setPeriod]=useState("month");
+  const [drill,setDrill]=useState(null); // {title, rows:[{label,sub,amount}], total, color}
 
   useEffect(()=>{loadAll();},[]);
   const loadAll=async()=>{
@@ -2003,6 +2004,8 @@ function ReportsTab({user}){
   const receivables=fSales.reduce((s,x)=>s+Number(x.balance_due||0),0);
   const expenses=fExp.reduce((s,x)=>s+Number(x.amount),0);
   const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
+  const stockRetail=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*(i.selling_price||0)),0);
+  const stockPotentialProfit=stockRetail-stockValue;
   const cogs=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
   const fLosses=filterDate(data.losses||[]);
   const lossCost=fLosses.reduce((s,l)=>s+Number(l.cost_value||0),0);
@@ -2012,6 +2015,12 @@ function ReportsTab({user}){
   const dailyMap={};
   fSales.forEach(s=>{dailyMap[s.date]=(dailyMap[s.date]||0)+Number(s.total);});
   const chartData=Object.entries(dailyMap).sort(([a],[b])=>a.localeCompare(b)).slice(-14).map(([date,total])=>({date:date.slice(5),total}));
+  // Profit vs Expenses per day: profit approximated as collected margin. Use per-day collected * blended margin, minus that day's expenses.
+  const blendedMargin = salesValue>0 ? grossProfit/salesValue : 0;
+  const pvMap={};
+  fSales.forEach(s=>{ const d=s.date; if(!pvMap[d])pvMap[d]={profit:0,expenses:0}; pvMap[d].profit += Number(s.total)*blendedMargin; });
+  fExp.forEach(e=>{ const d=e.date; if(!pvMap[d])pvMap[d]={profit:0,expenses:0}; pvMap[d].expenses += Number(e.amount); });
+  const pvData=Object.entries(pvMap).sort(([a],[b])=>a.localeCompare(b)).slice(-14).map(([date,v])=>({date:date.slice(5),Profit:Math.round(v.profit),Expenses:Math.round(v.expenses)}));
 
   const itemMap={};
   fSales.forEach(s=>{ if(s.items) s.items.forEach(i=>{ if(!itemMap[i.name]) itemMap[i.name]={qty:0,revenue:0}; itemMap[i.name].qty+=Number(i.qty||1); itemMap[i.name].revenue+=Number(i.qty||1)*Number(i.price||0); }); });
@@ -2023,6 +2032,20 @@ function ReportsTab({user}){
   const mpesa=fSales.filter(s=>s.payment_method==="M-Pesa").reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
   const cash=fSales.filter(s=>s.payment_method==="Cash").reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
 
+  // Drill-down builders: each returns {title,color,total,rows:[{label,sub,amount}]}
+  const drillCollected=()=>({ title:"Collected", color:"#4CAF50", total:collected,
+    rows:fSales.filter(s=>Number(s.amount_paid!=null?s.amount_paid:s.total)>0).map(s=>({label:s.customer_name,sub:`${s.receipt_no} · ${s.date.slice(5)} · ${s.payment_method}`,amount:Number(s.amount_paid!=null?s.amount_paid:s.total)})) });
+  const drillExpenses=()=>({ title:"Expenses", color:"#E85B5B", total:expenses,
+    rows:fExp.map(e=>({label:e.description||e.category,sub:`${e.category} · ${e.date.slice(5)} · ${e.recorded_by?.split(" ")[0]||""}`,amount:Number(e.amount)})) });
+  const drillSalesValue=()=>({ title:"Sales value (invoiced)", color:"#8899AA", total:salesValue,
+    rows:fSales.map(s=>({label:s.customer_name,sub:`${s.receipt_no} · ${s.date.slice(5)}`,amount:Number(s.total)})) });
+  const drillOwed=()=>({ title:"Owed to us", color:"#E8A45B", total:receivables,
+    rows:fSales.filter(s=>Number(s.balance_due||0)>0).map(s=>({label:s.customer_name,sub:`${s.receipt_no} · paid ${fmtK(Number(s.amount_paid||0))} of ${fmtK(Number(s.total))}`,amount:Number(s.balance_due)})) });
+  const drillGross=()=>({ title:"Gross profit breakdown", color:"#F5C000", total:grossProfit,
+    rows:[{label:"Sales value (invoiced)",sub:"what was billed",amount:salesValue},{label:"Less: cost of goods sold",sub:"COGS on items sold",amount:-cogs}] });
+  const drillNet=()=>({ title:"Net profit breakdown", color:netProfit>=0?"#4CAF50":"#E85B5B", total:netProfit,
+    rows:[{label:"Gross profit",sub:"sales value less COGS",amount:grossProfit},{label:"Less: expenses",sub:`${fExp.length} entries`,amount:-expenses},...(lossCost>0?[{label:"Less: losses",sub:`${fLosses.length} incidents`,amount:-lossCost}]:[])] });
+
   if(loading) return <div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading reports...</div>;
 
   return (
@@ -2033,38 +2056,46 @@ function ReportsTab({user}){
         ))}</div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-        <div className="stat"><div className="stat-n" style={{color:"#4CAF50"}}>KSh {collected.toLocaleString()}</div><div className="stat-l">Collected</div></div>
-        <div className="stat"><div className="stat-n" style={{color:"#E85B5B"}}>KSh {expenses.toLocaleString()}</div><div className="stat-l">Expenses</div></div>
+        <div className="stat" onClick={()=>setDrill(drillCollected())} style={{cursor:"pointer"}}><div className="stat-n" style={{color:"#4CAF50"}}>KSh {collected.toLocaleString()}</div><div className="stat-l">Collected ›</div></div>
+        <div className="stat" onClick={()=>setDrill(drillExpenses())} style={{cursor:"pointer"}}><div className="stat-n" style={{color:"#E85B5B"}}>KSh {expenses.toLocaleString()}</div><div className="stat-l">Expenses ›</div></div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-        <div className="stat"><div className="stat-n" style={{fontSize:18,color:"#8899AA"}}>KSh {salesValue.toLocaleString()}</div><div className="stat-l">Sales value (invoiced)</div></div>
-        <div className="stat" style={receivables>0?{border:"1px solid rgba(232,164,91,0.4)"}:{}}><div className="stat-n" style={{fontSize:18,color:receivables>0?"#E8A45B":"#8899AA"}}>KSh {receivables.toLocaleString()}</div><div className="stat-l">Owed to us</div></div>
+        <div className="stat" onClick={()=>setDrill(drillSalesValue())} style={{cursor:"pointer"}}><div className="stat-n" style={{fontSize:18,color:"#8899AA"}}>KSh {salesValue.toLocaleString()}</div><div className="stat-l">Sales value ›</div></div>
+        <div className="stat" onClick={()=>setDrill(drillOwed())} style={{cursor:"pointer",...(receivables>0?{border:"1px solid rgba(232,164,91,0.4)"}:{})}}><div className="stat-n" style={{fontSize:18,color:receivables>0?"#E8A45B":"#8899AA"}}>KSh {receivables.toLocaleString()}</div><div className="stat-l">Owed to us ›</div></div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-        <div className="stat"><div className="stat-n" style={{color:"#F5C000"}}>KSh {grossProfit.toLocaleString()}</div><div className="stat-l">Gross profit</div></div>
-        <div className="stat" style={{border:`1px solid ${netProfit>=0?"rgba(76,175,80,0.4)":"rgba(232,91,91,0.4)"}`}}>
+        <div className="stat" onClick={()=>setDrill(drillGross())} style={{cursor:"pointer"}}><div className="stat-n" style={{color:"#F5C000"}}>KSh {grossProfit.toLocaleString()}</div><div className="stat-l">Gross profit ›</div></div>
+        <div className="stat" onClick={()=>setDrill(drillNet())} style={{cursor:"pointer",border:`1px solid ${netProfit>=0?"rgba(76,175,80,0.4)":"rgba(232,91,91,0.4)"}`}}>
           <div className="stat-n" style={{color:netProfit>=0?"#4CAF50":"#E85B5B"}}>KSh {Math.abs(netProfit).toLocaleString()}</div>
-          <div className="stat-l">Net {netProfit>=0?"profit":"loss"}</div>
+          <div className="stat-l">Net {netProfit>=0?"profit":"loss"} ›</div>
         </div>
       </div>
       {lossCost>0&&<div style={{background:"rgba(232,91,91,0.08)",border:"1px solid rgba(232,91,91,0.3)",borderRadius:8,padding:12,marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:600,color:"#E85B5B"}}>Losses this period</div><div style={{fontSize:11,color:"#8899AA"}}>{fLosses.length} incident{fLosses.length!==1?"s":""} · theft, unpaid, damage</div></div><div style={{fontSize:16,fontWeight:600,color:"#E85B5B"}}>{fmtK(lossCost)}</div></div>}
       <div style={{fontSize:11,color:"#556677",marginBottom:14,lineHeight:1.5,padding:"0 2px"}}>Profit is on sales value (what's invoiced), less cost of goods, expenses and losses. Collected is cash actually received; Owed to us is the outstanding balance on instalment sales.</div>
       <div className="card" style={{marginBottom:14}}>
-        <div style={{fontSize:11,color:"#8899AA",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
-        <div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div>
-        <div style={{fontSize:11,color:"#556677",marginTop:2}}>COGS this period: KSh {cogs.toLocaleString()}</div>
+        <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div><div style={{fontSize:10,color:"#556677"}}>AT COST</div></div>
+          <div><div style={{fontSize:20,fontWeight:600,color:"#4CAF50"}}>KSh {stockPotentialProfit.toLocaleString()}</div><div style={{fontSize:10,color:"#556677"}}>EST. PROFIT IF ALL SELLS</div></div>
+        </div>
+        <div style={{fontSize:11,color:"#556677",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()} · COGS this period KSh {cogs.toLocaleString()}</div>
       </div>
-      {chartData.length>0&&(
+      {pvData.length>0&&(
         <div className="card" style={{marginBottom:14}}>
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Daily sales</div>
-          <ResponsiveContainer width="100%" height={130}>
-            <BarChart data={chartData} margin={{left:-20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em"}}>Profit vs Expenses</div>
+            <div style={{display:"flex",gap:12,fontSize:10}}><span style={{color:"#4CAF50"}}>● Profit</span><span style={{color:"#E85B5B"}}>● Expenses</span></div>
+          </div>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={pvData} margin={{left:-20}}>
               <XAxis dataKey="date" tick={{fill:"#556677",fontSize:9}}/>
               <YAxis tick={{fill:"#556677",fontSize:9}}/>
               <Tooltip contentStyle={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,fontSize:12}}/>
-              <Bar dataKey="total" fill="#F5C000" radius={[3,3,0,0]} name="Revenue"/>
+              <Bar dataKey="Profit" fill="#4CAF50" radius={[3,3,0,0]}/>
+              <Bar dataKey="Expenses" fill="#E85B5B" radius={[3,3,0,0]}/>
             </BarChart>
           </ResponsiveContainer>
+          <div style={{fontSize:10,color:"#556677",marginTop:8,lineHeight:1.4}}>Profit is estimated per day using this period's blended margin ({Math.round(blendedMargin*100)}%). Actual item-level margins vary.</div>
         </div>
       )}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
@@ -2146,6 +2177,25 @@ function ReportsTab({user}){
         <button className="btn-g" onClick={()=>exportCSV("losses")} style={{fontSize:12}}>Export losses</button>
       </div>
       <button className="btn-g" onClick={loadAll} style={{width:"100%",fontSize:13}}>Refresh</button>
+
+      {drill&&(
+        <div onClick={()=>setDrill(null)} style={{position:"fixed",inset:0,background:"rgba(5,10,31,0.8)",zIndex:150,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0A1128",borderTop:`3px solid ${drill.color}`,borderRadius:"16px 16px 0 0",width:"100%",maxWidth:500,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
+            <div style={{padding:"16px 18px",borderBottom:"1px solid #1A2A4A",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div><div style={{fontSize:15,fontWeight:600}}>{drill.title}</div><div style={{fontSize:18,fontWeight:700,color:drill.color,marginTop:2}}>{drill.total<0?"-":""}KSh {Math.abs(drill.total).toLocaleString()}</div></div>
+              <button onClick={()=>setDrill(null)} style={{background:"none",border:"none",color:"#8899AA",fontSize:22,cursor:"pointer"}}>×</button>
+            </div>
+            <div style={{overflowY:"auto",padding:"8px 18px 24px"}}>
+              {drill.rows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"24px 0",fontSize:13}}>Nothing in this period.</div>:drill.rows.map((r,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 0",borderBottom:i<drill.rows.length-1?"1px solid #101B36":"none"}}>
+                  <div style={{flex:1,minWidth:0,paddingRight:10}}><div style={{fontSize:13,fontWeight:500}}>{r.label}</div>{r.sub&&<div style={{fontSize:11,color:"#556677"}}>{r.sub}</div>}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:r.amount<0?"#E85B5B":"#E8E2D4",whiteSpace:"nowrap"}}>{r.amount<0?"-":""}KSh {Math.abs(r.amount).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
