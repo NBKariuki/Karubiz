@@ -796,8 +796,28 @@ function SaleTab({user,onMoney}){
         const matches=stockItems.filter(x=>x.name.toLowerCase()===String(it.name).toLowerCase()&&x.qty_sold>0).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
         let q=Number(it.qty||1); for(const m of matches){ if(q<=0)break; const r=Math.min(q,m.qty_sold); await sb.patch("karu_stock",m.id,{qty_sold:m.qty_sold-r}); q-=r; }
       }}
-      const paid=Number(s.amount_paid||s.total);
-      await recordMoney({account:s.payment_method==="M-Pesa"?"sacco":"cash",amount:-paid,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name}`,date:todayStr(),recorded_by:voidStaff});
+      // Reverse the money actually collected, to the correct account(s).
+      const paid=Number(s.amount_paid!=null?s.amount_paid:s.total);
+      const cashPaid=Number(s.cash_part||0), mpesaPaid=Number(s.mpesa_part||0);
+      if(s.payment_method==="Split" && (cashPaid+mpesaPaid)>0){
+        // Reverse each leg proportionally to what was collected vs invoiced
+        const invoiced=Number(s.total)||1; const ratio=paid/invoiced;
+        const cashBack=Math.round(cashPaid*ratio), mpesaBack=Math.round(mpesaPaid*ratio);
+        if(cashBack>0) await recordMoney({account:"cash",amount:-cashBack,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name} (cash)`,date:todayStr(),recorded_by:voidStaff});
+        if(mpesaBack>0) await recordMoney({account:"sacco",amount:-mpesaBack,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name} (mpesa)`,date:todayStr(),recorded_by:voidStaff});
+      } else if(paid>0){
+        await recordMoney({account:s.payment_method==="M-Pesa"?"sacco":"cash",amount:-paid,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name}`,date:todayStr(),recorded_by:voidStaff});
+      }
+      // Return any store credit that was applied to this sale (re-credit the customer)
+      const creditUsed=Number(s.credit_applied||0);
+      if(creditUsed>0 && (s.customer_phone||"").trim()){
+        await sb.post("karu_credit",{customer_name:s.customer_name,customer_phone:s.customer_phone,amount:creditUsed,reason:`Reinstated — voided ${s.receipt_no}`,ref_receipt:s.receipt_no,recorded_by:voidStaff,date:todayStr()});
+      }
+      // Reverse any store credit this sale CREATED (e.g. via prior exchange) so it isn't double-held
+      const creditMade=Number(s.store_credit_note||0);
+      if(creditMade>0 && (s.customer_phone||"").trim()){
+        await sb.post("karu_credit",{customer_name:s.customer_name,customer_phone:s.customer_phone,amount:-creditMade,reason:`Cancelled — voided ${s.receipt_no}`,ref_receipt:s.receipt_no,recorded_by:voidStaff,date:todayStr()});
+      }
       await logAudit({trip_no:null,record_id:s.id,action:"void_sale",field_changed:s.receipt_no,old_value:String(s.total),new_value:"0",reason:voidReason,changed_by:voidStaff});
       if(onMoney) onMoney();
       setVoidSale(null); setVoidReason("");
@@ -1156,17 +1176,22 @@ function StockTab({user,onMoney}){
   const [addExtraItems,setAddExtraItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
   const [trip,setTrip]=useState({date:new Date().toISOString().split("T")[0],notes:"",created_by:user?.full_name||"Burton Kariuki",paid_from:"sacco"});
   const [tripItems,setTripItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
+  const [pendingReceived,setPendingReceived]=useState([]); // orders with received items not yet imported
 
   useEffect(()=>{loadAll();},[]);
   const loadAll=async()=>{
     setLoading(true);
     try{
-      const [t,s,a]=await Promise.all([
+      const [t,s,a,ord]=await Promise.all([
         sb.get("karu_trips","select=*&order=created_at.desc"),
         sb.get("karu_stock","select=*&order=created_at.desc"),
-        sb.get("karu_audit","select=*&order=changed_at.desc&limit=300")
+        sb.get("karu_audit","select=*&order=changed_at.desc&limit=300"),
+        sb.get("karu_orders","select=*&order=created_at.desc").catch(()=>[])
       ]);
       setTrips(t); setStock(s); setAudit(a);
+      // Orders that have at least one received supplier and haven't been imported to a trip yet
+      const awaiting=(ord||[]).filter(o=>!o.received_trip_no && (o.suppliers||[]).some(su=>su.status==="received"));
+      setPendingReceived(awaiting);
     }catch(e){console.error(e);}
     setLoading(false);
   };
@@ -1247,6 +1272,20 @@ function StockTab({user,onMoney}){
     setSaving(false);
   };
 
+  const [importingOrder,setImportingOrder]=useState(null);
+  const receiveOrderIntoTrip=(o)=>{
+    // Collect items only from RECEIVED suppliers; drop supplier names, keep items
+    const items=[];
+    (o.suppliers||[]).filter(su=>su.status==="received").forEach(su=>{
+      (su.items||[]).forEach(it=>items.push({id:Date.now()+Math.random(),name:it.name,category:it.category||"living",qty_in:Number(it.qty)||1,unit_cost:it.est_cost?String(it.est_cost):"",selling_price:""}));
+    });
+    if(!items.length){alert("No received items to import.");return;}
+    setTripItems(items);
+    setTrip(t=>({...t,notes:`From order ${o.order_no}`}));
+    setImportingOrder(o);
+    setView("new");
+  };
+
   const addTI=()=>setTripItems(x=>[...x,{id:Date.now(),name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
   const rmTI=id=>setTripItems(x=>x.filter(i=>i.id!==id));
   const upTI=(id,f,v)=>setTripItems(x=>x.map(i=>i.id===id?{...i,[f]:v}:i));
@@ -1268,10 +1307,11 @@ function StockTab({user,onMoney}){
       if(onMoney) onMoney();
       await sb.post("karu_stock",vi.map(i=>({trip_id:newTrip.id,trip_no:tripNo,name:i.name,category:i.category,qty_in:Number(i.qty_in),qty_sold:0,unit_cost:Number(i.unit_cost),selling_price:Number(i.selling_price||0),date_in:trip.date})));
       await logAudit({trip_no:tripNo,record_id:newTrip.id,action:"create",reason:"New sourcing trip",changed_by:trip.created_by});
+      if(importingOrder){ await sb.patch("karu_orders",importingOrder.id,{received_trip_no:tripNo,status:"received",updated_at:new Date().toISOString()}); setImportingOrder(null); }
       await loadAll();
       setView("list");
       setTripItems([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
-      setTrip({date:new Date().toISOString().split("T")[0],notes:"",created_by:"Burton Kariuki",paid_from:"sacco"});
+      setTrip({date:new Date().toISOString().split("T")[0],notes:"",created_by:user?.full_name||"Burton Kariuki",paid_from:"sacco"});
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
   };
@@ -1323,10 +1363,11 @@ function StockTab({user,onMoney}){
   if(view==="new") return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-        <button className="btn-g" onClick={()=>setView("list")}>Back</button>
+        <button className="btn-g" onClick={()=>{setView("list");setImportingOrder(null);}}>Back</button>
         <div style={{fontSize:15,fontWeight:600}}>New Sourcing Trip</div>
         <div className="badge b-y">KARU-TRIP-{String(trips.length+1).padStart(3,"0")}</div>
       </div>
+      {importingOrder&&<div style={{background:"rgba(245,192,0,0.08)",border:"1px solid rgba(245,192,0,0.3)",borderRadius:8,padding:10,marginBottom:14,fontSize:12,color:"#8899AA"}}>Imported from <strong style={{color:"#E8E2D4"}}>{importingOrder.order_no}</strong>. Confirm each item's actual cost and set selling prices before saving. Remember any deposit already paid.</div>}
       <div className="field"><label>Date</label><input type="date" value={trip.date} onChange={e=>setTrip(x=>({...x,date:e.target.value}))}/></div>
       {can(user,"users")?(
         <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${trip.created_by===s?" on":""}`} onClick={()=>setTrip(x=>({...x,created_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
@@ -1365,6 +1406,24 @@ function StockTab({user,onMoney}){
 
   return (
     <div>
+      {pendingReceived.length>0&&(
+        <div style={{marginBottom:14}}>
+          {pendingReceived.map(o=>{
+            const recvSuppliers=(o.suppliers||[]).filter(su=>su.status==="received");
+            const itemCount=recvSuppliers.reduce((n,su)=>n+(su.items||[]).length,0);
+            return (
+              <div key={o.id} style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.35)",borderRadius:10,padding:12,marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#4CAF50"}}>{o.order_no} received</div>
+                  <span className="badge b-g">{itemCount} item{itemCount!==1?"s":""}</span>
+                </div>
+                <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>{recvSuppliers.flatMap(su=>(su.items||[]).map(i=>`${i.name} x${i.qty}`)).join(", ")}</div>
+                <button className="btn-y" onClick={()=>receiveOrderIntoTrip(o)} style={{width:"100%",fontSize:13}}>Receive into New Trip</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
         <div className="stat"><div className="stat-n" style={{color:"#F5C000"}}>KSh {totalSV.toLocaleString()}</div><div className="stat-l">Stock value</div></div>
         <div className="stat"><div className="stat-n" style={{color:"#4CAF50"}}>{totalU}</div><div className="stat-l">Units available</div></div>
@@ -1697,7 +1756,12 @@ function OrdersTab({user,onMoney}){
           {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#8899AA",marginTop:4}}><span>Deposits paid</span><span>{fmtK(orderDeposits(draft))}</span></div>}
           {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#E8A45B",marginTop:2}}><span>Balance to suppliers</span><span>{fmtK(Math.max(0,orderTotal(draft)-orderDeposits(draft)))}</span></div>}
         </div>
-        {draft.some(s=>s.status==="received")&&<div style={{fontSize:11,color:"#4CAF50",marginTop:10}}>✓ Received items — log them as a sourcing trip in Stock</div>}
+        {draft.some(s=>s.status==="received")&&(()=>{ const depOnReceived=draft.filter(s=>s.status==="received").reduce((t,s)=>t+Number(s.deposit_paid||0),0); return (
+          <div style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:10,marginTop:10,fontSize:12,color:"#8899AA"}}>
+            <div style={{color:"#4CAF50",fontWeight:600,marginBottom:4}}>✓ Received items — log them as a sourcing trip in Stock</div>
+            {depOnReceived>0&&<div>Deposits of {fmtK(depOnReceived)} were already paid and recorded as money out. When you create the sourcing trip, record it as paid from the same account for the <strong>balance only</strong> ({fmtK(depOnReceived)} is already accounted), so you don't double-count.</div>}
+          </div>
+        );})()}
       </div>
     );
   }
