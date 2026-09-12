@@ -107,12 +107,12 @@ const GS = () => (
     .mv{font-size:11px;padding:6px 0;border-bottom:1px solid #0F1A3A;display:flex;justify-content:space-between}
     .mv:last-child{border-bottom:none}
     .wiz-overlay{position:fixed;inset:0;background:rgba(5,10,31,0.94);z-index:120;overflow-y:auto;padding:12px}
-    .wiz{max-width:480px;margin:0 auto;background:#0A1128;border:1px solid #1A2A4A;border-radius:12px;min-height:calc(100vh - 24px);display:flex;flex-direction:column}
+    .wiz{max-width:480px;margin:0 auto;background:#0A1128;border:1px solid #1A2A4A;border-radius:12px;display:flex;flex-direction:column}
     .wiz-hd{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #1A2A4A}
     .wiz-steps{display:flex;gap:6px;padding:12px 16px 4px}
     .wiz-dot{flex:1;height:4px;border-radius:2px;background:#1A2A4A} .wiz-dot.on{background:#F5C000}
-    .wiz-body{padding:16px;flex:1}
-    .wiz-ft{padding:12px 16px 16px;border-top:1px solid #1A2A4A;display:flex;gap:8px}
+    .wiz-body{padding:16px}
+    .wiz-ft{padding:4px 16px 20px;display:flex;gap:8px}
     .staff-btn{background:#0A1128;border:2px solid #1A2A4A;border-radius:12px;padding:22px 12px;color:#FFFFFF;font-size:17px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s}
     .staff-btn:hover{border-color:#F5C000;color:#F5C000}
     .rcpt{background:#fff;color:#111;border-radius:8px;padding:18px 16px;max-width:340px;margin:0 auto 14px;font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5}
@@ -2015,12 +2015,29 @@ function ReportsTab({user}){
   const dailyMap={};
   fSales.forEach(s=>{dailyMap[s.date]=(dailyMap[s.date]||0)+Number(s.total);});
   const chartData=Object.entries(dailyMap).sort(([a],[b])=>a.localeCompare(b)).slice(-14).map(([date,total])=>({date:date.slice(5),total}));
-  // Profit vs Expenses per day: profit approximated as collected margin. Use per-day collected * blended margin, minus that day's expenses.
+  // Profit vs Expenses, bucketed by period: day for week/month, month for year/all.
   const blendedMargin = salesValue>0 ? grossProfit/salesValue : 0;
+  const byMonth = (period==="year"||period==="all");
+  const monthSummary = (period==="month");
+  const bucketKey = dateStr => byMonth ? dateStr.slice(0,7) : dateStr; // YYYY-MM or full date
+  const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const bucketLabel = key => byMonth ? MONTHS[parseInt(key.slice(5,7))-1]+(period==="all"?" "+key.slice(2,4):"") : key.slice(5);
   const pvMap={};
-  fSales.forEach(s=>{ const d=s.date; if(!pvMap[d])pvMap[d]={profit:0,expenses:0}; pvMap[d].profit += Number(s.total)*blendedMargin; });
-  fExp.forEach(e=>{ const d=e.date; if(!pvMap[d])pvMap[d]={profit:0,expenses:0}; pvMap[d].expenses += Number(e.amount); });
-  const pvData=Object.entries(pvMap).sort(([a],[b])=>a.localeCompare(b)).slice(-14).map(([date,v])=>({date:date.slice(5),Profit:Math.round(v.profit),Expenses:Math.round(v.expenses)}));
+  fSales.forEach(s=>{ const k=bucketKey(s.date); if(!pvMap[k])pvMap[k]={profit:0,expenses:0}; pvMap[k].profit += Number(s.total)*blendedMargin; });
+  fExp.forEach(e=>{ const k=bucketKey(e.date); if(!pvMap[k])pvMap[k]={profit:0,expenses:0}; pvMap[k].expenses += Number(e.amount); });
+  const pvCap = byMonth ? 12 : 31;
+  let pvData;
+  if(monthSummary){
+    const tp=Object.values(pvMap).reduce((s,v)=>s+v.profit,0);
+    const te=Object.values(pvMap).reduce((s,v)=>s+v.expenses,0);
+    pvData=[{date:MONTHS[now.getMonth()],Profit:Math.round(tp),Expenses:Math.round(te)}];
+  } else {
+    pvData=Object.entries(pvMap).sort(([a],[b])=>a.localeCompare(b)).slice(-pvCap).map(([key,v])=>({date:bucketLabel(key),Profit:Math.round(v.profit),Expenses:Math.round(v.expenses)}));
+  }
+  // Period totals for the card
+  const periodProfit = Math.round(salesValue*blendedMargin - 0); // gross margin portion earned on invoiced
+  const pvTotalProfit = Object.values(pvMap).reduce((s,v)=>s+v.profit,0);
+  const pvTotalExpenses = Object.values(pvMap).reduce((s,v)=>s+v.expenses,0);
 
   const itemMap={};
   fSales.forEach(s=>{ if(s.items) s.items.forEach(i=>{ if(!itemMap[i.name]) itemMap[i.name]={qty:0,revenue:0}; itemMap[i.name].qty+=Number(i.qty||1); itemMap[i.name].revenue+=Number(i.qty||1)*Number(i.price||0); }); });
@@ -2082,9 +2099,13 @@ function ReportsTab({user}){
       </div>
       {pvData.length>0&&(
         <div className="card" style={{marginBottom:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em"}}>Profit vs Expenses</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em"}}>Profit vs Expenses · {monthSummary?"this month":byMonth?"by month":"by day"}</div>
             <div style={{display:"flex",gap:12,fontSize:10}}><span style={{color:"#4CAF50"}}>● Profit</span><span style={{color:"#E85B5B"}}>● Expenses</span></div>
+          </div>
+          <div style={{display:"flex",gap:16,marginBottom:12,fontSize:12}}>
+            <span style={{color:"#8899AA"}}>Period profit <b style={{color:"#4CAF50"}}>{fmtK(pvTotalProfit)}</b></span>
+            <span style={{color:"#8899AA"}}>Period expenses <b style={{color:"#E85B5B"}}>{fmtK(pvTotalExpenses)}</b></span>
           </div>
           <ResponsiveContainer width="100%" height={140}>
             <BarChart data={pvData} margin={{left:-20}}>
@@ -2095,7 +2116,7 @@ function ReportsTab({user}){
               <Bar dataKey="Expenses" fill="#E85B5B" radius={[3,3,0,0]}/>
             </BarChart>
           </ResponsiveContainer>
-          <div style={{fontSize:10,color:"#556677",marginTop:8,lineHeight:1.4}}>Profit is estimated per day using this period's blended margin ({Math.round(blendedMargin*100)}%). Actual item-level margins vary.</div>
+          <div style={{fontSize:10,color:"#556677",marginTop:8,lineHeight:1.4}}>{monthSummary?"This month totalled. ":byMonth?"Each bar is one month. ":"Each bar is one day. "}Profit is estimated using this period's blended margin ({Math.round(blendedMargin*100)}%). Actual item-level margins vary.</div>
         </div>
       )}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
