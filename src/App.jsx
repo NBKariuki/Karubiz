@@ -81,19 +81,19 @@ const GS = () => (
     *{box-sizing:border-box;margin:0;padding:0} body{font-family:'DM Sans',sans-serif;background:#050A1F;color:#E8E2D4} input,select,textarea{outline:none;font-family:'DM Sans',sans-serif}
     .field{margin-bottom:13px} .field label{display:block;font-size:12px;color:#FFFFFF;font-weight:600;margin-bottom:5px;letter-spacing:0.04em;text-transform:uppercase}
     .field input,.field select,.field textarea{width:100%;background:#0A1128;border:1px solid #1A2A4A;border-radius:6px;padding:10px 12px;color:#E8E2D4;font-size:14px} .field textarea{resize:vertical;min-height:56px}
-    .tog{display:flex;gap:6px} .tog-btn{flex:1;padding:8px 4px;font-size:13px;border:1px solid #1A2A4A;border-radius:6px;background:#0A1128;color:#8899AA;cursor:pointer;text-align:center;transition:all 0.15s}
-    .tog-btn.on{background:rgba(245,192,0,0.12);border-color:#F5C000;color:#F5C000;font-weight:600}
+    .tog{display:flex;gap:6px} .tog-btn{flex:1;padding:9px 6px;font-size:14px;font-weight:600;border:1px solid #24365C;border-radius:8px;background:#111C34;color:#AEB9C7;cursor:pointer;text-align:center;transition:all 0.15s}
+    .tog-btn.on{background:rgba(245,192,0,0.18);border-color:#F5C000;color:#F5C000;font-weight:700}
     .card{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:14px;margin-bottom:10px}
     .btn-y{background:#F5C000;color:#050A1F;border:none;padding:11px 18px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif} .btn-y:disabled{background:#444;color:#888;cursor:not-allowed}
-    .btn-g{background:transparent;color:#8899AA;border:1px solid #1A2A4A;padding:9px 14px;border-radius:6px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif}
+    .btn-g{background:transparent;color:#C2CBD6;border:1px solid #24365C;padding:10px 15px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
     .btn-r{background:rgba(232,91,91,0.12);color:#E85B5B;border:1px solid rgba(232,91,91,0.3);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
-    .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:100px} .b-y{background:rgba(245,192,0,0.12);color:#F5C000} .b-g{background:rgba(76,175,80,0.12);color:#4CAF50} .b-r{background:rgba(232,91,91,0.12);color:#E85B5B}
-    .stat{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:14px;text-align:center} .stat-n{font-size:22px;font-weight:600;margin-bottom:2px} .stat-l{font-size:10px;color:#8899AA;text-transform:uppercase;letter-spacing:0.08em}
+    .badge{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:100px} .b-y{background:rgba(245,192,0,0.12);color:#F5C000} .b-g{background:rgba(76,175,80,0.12);color:#4CAF50} .b-r{background:rgba(232,91,91,0.12);color:#E85B5B}
+    .stat{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:14px;text-align:center} .stat-n{font-size:22px;font-weight:600;margin-bottom:2px} .stat-l{font-size:12px;color:#AEB9C7;text-transform:uppercase;letter-spacing:0.06em}
     .nav{display:flex;background:#0A1128;border-top:1px solid #1A2A4A;position:fixed;bottom:0;left:0;right:0;z-index:50}
-    .nav-btn{flex:1;padding:10px 4px 8px;background:none;border:none;color:#556677;cursor:pointer;font-size:10px;letter-spacing:0.05em;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'DM Sans',sans-serif} .nav-btn .ni{font-size:20px} .nav-btn.on{color:#F5C000}
+    .nav-btn{flex:1;padding:10px 4px 8px;background:none;border:none;color:#8A97A8;cursor:pointer;font-size:12px;font-weight:500;letter-spacing:0.03em;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'DM Sans',sans-serif} .nav-btn .ni{font-size:20px} .nav-btn.on{color:#F5C000}
     .ac-drop{position:absolute;top:100%;left:0;right:0;background:#0A1128;border:1px solid #F5C000;border-top:none;border-radius:0 0 6px 6px;z-index:200;max-height:200px;overflow-y:auto}
     .ac-item{padding:9px 12px;cursor:pointer;border-bottom:1px solid #1A2A4A} .ac-item:hover{background:#0F1A3A} .ac-item:last-child{border-bottom:none}
-    .audit-entry{font-size:11px;color:#556677;padding:5px 0;border-bottom:1px solid #0F1A3A;line-height:1.5} .audit-entry:last-child{border-bottom:none}
+    .audit-entry{font-size:12px;color:#8A97A8;padding:6px 0;border-bottom:1px solid #0F1A3A;line-height:1.55} .audit-entry:last-child{border-bottom:none}
     .trip-hdr{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:2px 0}
     .strip{display:flex;justify-content:center;gap:16px;padding:6px 16px;background:#0A1128;border-bottom:1px solid #1A2A4A;font-size:12px}
     .strip span{color:#8899AA} .strip b{color:#F5C000;font-weight:600}
@@ -1356,11 +1356,11 @@ function StockTab({user,onMoney}){
   );
 
   if(view==="new") return (
-    <div>
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+    <div className="subscreen">
+      <div className="subscreen-hd">
         <button className="btn-g" onClick={()=>{setView("list");setImportingOrder(null);}}>Back</button>
-        <div style={{fontSize:15,fontWeight:600}}>New Sourcing Trip</div>
-        <div className="badge b-y">KARU-TRIP-{String(trips.length+1).padStart(3,"0")}</div>
+        <div className="title">New Sourcing Trip</div>
+        <div className="badge b-y" style={{marginLeft:"auto"}}>KARU-TRIP-{String(trips.length+1).padStart(3,"0")}</div>
       </div>
       {importingOrder&&<div style={{background:"rgba(245,192,0,0.08)",border:"1px solid rgba(245,192,0,0.3)",borderRadius:8,padding:10,marginBottom:14,fontSize:12,color:"#8899AA"}}>Imported from <strong style={{color:"#E8E2D4"}}>{importingOrder.order_no}</strong>. Confirm each item's actual cost and set selling prices before saving. Remember any deposit already paid.</div>}
       <div className="field"><label>Date</label><input type="date" value={trip.date} onChange={e=>setTrip(x=>({...x,date:e.target.value}))}/></div>
@@ -1668,10 +1668,10 @@ function OrdersTab({user,onMoney}){
   if(openOrder && draft){
     return (
       <div>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+        <div className="subscreen-hd" style={{margin:"0 0 14px",borderRadius:12,border:"1px solid #24365C"}}>
           <button className="btn-g" onClick={()=>{setOpenOrder(null);load();}} style={{fontSize:13}}>Back</button>
-          <div style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>{openOrder.order_no}</div>
-          <span className={`badge ${badge(openOrder.status)}`}>{openOrder.status}</span>
+          <div className="title" style={{color:"#F5C000"}}>{openOrder.order_no}</div>
+          <span className={`badge ${badge(openOrder.status)}`} style={{marginLeft:"auto"}}>{openOrder.status}</span>
         </div>
 
         {draft.map((sub,si)=>{
