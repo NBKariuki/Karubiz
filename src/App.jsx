@@ -1159,7 +1159,8 @@ function SaleTab({user,onMoney}){
 }
 
 function StockTab({user,onMoney}){
-  const [section,setSection]=useState("stock"); // stock | orders
+  const [section,setSection]=useState("stock"); // stock | orders | count
+  const [takeCounts,setTakeCounts]=useState({}); const [takeReasons,setTakeReasons]=useState({}); const [takeNotes,setTakeNotes]=useState(""); const [takeSaving,setTakeSaving]=useState(false); const [takeStaff,setTakeStaff]=useState(user?.full_name||"Burton Kariuki");
   const [trips,setTrips]=useState([]); const [stock,setStock]=useState([]); const [audit,setAudit]=useState([]);
   const [loading,setLoading]=useState(true); const [view,setView]=useState("list");
   const [expanded,setExpanded]=useState({}); const [editItem,setEditItem]=useState(null);
@@ -1279,6 +1280,42 @@ function StockTab({user,onMoney}){
     setTrip(t=>({...t,notes:`From order ${o.order_no}`}));
     setImportingOrder(o);
     setView("new");
+  };
+
+  // Live stock rows with computed available qty for counting
+  const liveStock=stock.filter(s=>(s.qty_in-s.qty_sold-(s.qty_adjusted||0))>0 || Number(s.qty_in)>0).map(s=>({...s,available:s.qty_in-s.qty_sold-(s.qty_adjusted||0)})).filter(s=>s.available>0);
+  const saveStockTake=async()=>{
+    // Build lines; a discrepancy needs a reason
+    const lines=[]; let sysVal=0, cntVal=0, varCount=0;
+    for(const s of liveStock){
+      const sys=s.available; const cntRaw=takeCounts[s.id]; const cnt=cntRaw===undefined||cntRaw===""?sys:Number(cntRaw);
+      sysVal+=sys*s.unit_cost; cntVal+=cnt*s.unit_cost;
+      if(cnt!==sys){ varCount++; if(!(takeReasons[s.id]||"").trim()){ alert(`Enter a reason for ${s.name} (system ${sys}, counted ${cnt}).`); return; } }
+      lines.push({stock_id:s.id,name:s.name,system_qty:sys,counted_qty:cnt,unit_cost:s.unit_cost,reason:cnt!==sys?takeReasons[s.id]:""});
+    }
+    setTakeSaving(true);
+    try{
+      // Apply each discrepancy as a qty_adjusted change so available matches the count
+      for(const ln of lines){
+        if(ln.counted_qty!==ln.system_qty){
+          const diff=ln.system_qty-ln.counted_qty; // positive = shrinkage (remove), negative = found more
+          const s=stock.find(x=>x.id===ln.stock_id);
+          const newAdj=(s.qty_adjusted||0)+diff;
+          await sb.patch("karu_stock",ln.stock_id,{qty_adjusted:newAdj});
+          await sb.post("karu_adjustments",{stock_id:ln.stock_id,item_name:ln.name,trip_no:s.trip_no,qty:Math.abs(diff),reason:`Stock take: ${ln.reason}`,notes:`Count ${ln.counted_qty} vs system ${ln.system_qty}`,recorded_by:takeStaff,date:todayStr()});
+          // If it's a loss reason and shrinkage, record the loss value too
+          if(diff>0 && /theft|damage|lost|broke/i.test(ln.reason)){
+            await sb.post("karu_losses",{date:todayStr(),kind:"stocktake",item_name:ln.name,stock_id:ln.stock_id,qty:diff,cost_value:diff*ln.unit_cost,retail_value:diff*(s.selling_price||0),description:`Stock take: ${ln.reason}`,recorded_by:takeStaff});
+          }
+        }
+      }
+      await sb.post("karu_stocktakes",{date:todayStr(),system_value:Math.round(sysVal),counted_value:Math.round(cntVal),variance:Math.round(cntVal-sysVal),items_counted:lines.length,items_with_variance:varCount,lines,notes:takeNotes,done_by:takeStaff});
+      await logAudit({trip_no:null,record_id:null,action:"stock_take",field_changed:"inventory",old_value:`system ${Math.round(sysVal)}`,new_value:`counted ${Math.round(cntVal)}`,reason:`${varCount} discrepancies · ${takeNotes||"routine count"}`,changed_by:takeStaff});
+      setTakeCounts({}); setTakeReasons({}); setTakeNotes(""); setSection("stock");
+      await loadAll();
+      alert(`Stock take saved. ${varCount} discrepanc${varCount===1?"y":"ies"} reconciled. Stock now matches your count.`);
+    }catch(e){alert("Failed: "+e.message);}
+    setTakeSaving(false);
   };
 
   const addTI=()=>setTripItems(x=>[...x,{id:Date.now(),name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
@@ -1405,9 +1442,41 @@ function StockTab({user,onMoney}){
         <div style={{display:"flex",gap:6,marginBottom:14}}>
           <button onClick={()=>setSection("stock")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${section==="stock"?"#F5C000":"#1A2A4A"}`,background:section==="stock"?"rgba(245,192,0,0.1)":"transparent",color:section==="stock"?"#F5C000":"#8899AA",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Stock</button>
           <button onClick={()=>setSection("orders")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${section==="orders"?"#F5C000":"#1A2A4A"}`,background:section==="orders"?"rgba(245,192,0,0.1)":"transparent",color:section==="orders"?"#F5C000":"#8899AA",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Orders</button>
+          {can(user,"users")&&<button onClick={()=>setSection("count")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${section==="count"?"#F5C000":"#1A2A4A"}`,background:section==="count"?"rgba(245,192,0,0.1)":"transparent",color:section==="count"?"#F5C000":"#8899AA",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Count</button>}
         </div>
       )}
-      {section==="orders"?<OrdersTab user={user} onMoney={onMoney}/>:(<>
+      {section==="count"?(()=>{
+        let sysVal=0,cntVal=0,varCount=0;
+        liveStock.forEach(s=>{ const c=takeCounts[s.id]===undefined||takeCounts[s.id]===""?s.available:Number(takeCounts[s.id]); sysVal+=s.available*s.unit_cost; cntVal+=c*s.unit_cost; if(c!==s.available)varCount++; });
+        return (
+        <div className="subscreen">
+          <div className="subscreen-hd"><div className="title">Stock Take</div></div>
+          <div style={{fontSize:12,color:"#AEB9C7",marginBottom:14,lineHeight:1.5}}>Count what's physically on the shelf. Leave a row blank if it matches. Where your count differs, give a reason — the app adjusts stock to match reality and logs it.</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+            <div className="stat"><div className="stat-n" style={{fontSize:16,color:"#8899AA"}}>{fmtK(sysVal)}</div><div className="stat-l">System</div></div>
+            <div className="stat"><div className="stat-n" style={{fontSize:16,color:"#F5C000"}}>{fmtK(cntVal)}</div><div className="stat-l">Counted</div></div>
+            <div className="stat" style={cntVal!==sysVal?{border:"1px solid rgba(232,91,91,0.4)"}:{}}><div className="stat-n" style={{fontSize:16,color:cntVal===sysVal?"#4CAF50":"#E85B5B"}}>{cntVal-sysVal<0?"-":""}{fmtK(Math.abs(cntVal-sysVal))}</div><div className="stat-l">Variance</div></div>
+          </div>
+          {liveStock.length===0?<div style={{textAlign:"center",color:"#8899AA",padding:"20px 0"}}>No stock to count.</div>:liveStock.map(s=>{
+            const c=takeCounts[s.id]===undefined||takeCounts[s.id]===""?s.available:Number(takeCounts[s.id]);
+            const diff=c-s.available;
+            return (
+              <div key={s.id} className="card" style={{padding:"10px 12px",borderLeft:diff!==0?`3px solid ${diff<0?"#E85B5B":"#4CAF50"}`:"3px solid transparent"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600}}>{s.name}</div><div style={{fontSize:11,color:"#8A97A8"}}>{catLabel(s.category)} · {s.trip_no} · KSh {Number(s.unit_cost).toLocaleString()} each</div></div>
+                  <div style={{textAlign:"center",minWidth:52}}><div style={{fontSize:11,color:"#8A97A8"}}>SYSTEM</div><div style={{fontSize:16,fontWeight:700}}>{s.available}</div></div>
+                  <div style={{minWidth:70,marginLeft:8}}><div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"#0A1128",border:`1px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#1A2A4A"}`,borderRadius:6,padding:"7px 8px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/></div>
+                </div>
+                {diff!==0&&<div><div style={{fontSize:11,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"#0A1128",border:"1px solid #24365C",borderRadius:6,padding:"7px 9px",color:"#E8E2D4",fontSize:12}}/></div>}
+              </div>
+            );
+          })}
+          <div className="field" style={{marginTop:12}}><label>Notes (optional)</label><input value={takeNotes} onChange={e=>setTakeNotes(e.target.value)} placeholder="e.g. Month-end count"/></div>
+          {can(user,"users")&&<div className="field"><label>Counted by</label><div className="tog">{STAFF.map(st=><button key={st} className={`tog-btn${takeStaff===st?" on":""}`} onClick={()=>setTakeStaff(st)}>{st.split(" ")[0]}</button>)}</div></div>}
+          <button className="btn-y" onClick={saveStockTake} disabled={takeSaving} style={{width:"100%",padding:14,marginTop:8}}>{takeSaving?"Saving...":varCount>0?`Reconcile ${varCount} difference${varCount!==1?"s":""} & Save`:"Confirm Count (all match)"}</button>
+        </div>
+        );
+      })():section==="orders"?<OrdersTab user={user} onMoney={onMoney}/>:(<>
       {pendingReceived.length>0&&(
         <div style={{marginBottom:14}}>
           {pendingReceived.map(o=>{
