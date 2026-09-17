@@ -2224,31 +2224,29 @@ function ReportsTab({user,bal}){
   const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
   const stockRetail=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*(i.selling_price||0)),0);
   const stockPotentialProfit=stockRetail-stockValue;
-  // ── Capital health ──
-  const liquid=(bal?.cash||0)+(bal?.sacco||0)+(bal?.petty||0);
-  const totalCapital=liquid+stockValue;
-  const liquidPct=totalCapital>0?Math.round(liquid/totalCapital*100):0;
-  const SAFETY_FLOOR=(()=>{ try{ const v=localStorage.getItem("karu_safety_floor"); return v?Number(v):15000; }catch{ return 15000; } })();
-  // Inflow vs outflow this period (money actually in vs money actually out)
-  const inflow=collected;
-  const outflow=expenses+lossCost;
-  const netFlow=inflow-outflow;
-  // Health state: red if below floor OR draining hard; amber if thinning; green otherwise
-  let capState="green", capMsg="Healthy — liquid money is strong and inflow covers costs.";
-  if(liquid<SAFETY_FLOOR){ capState="red"; capMsg=`Below your safety floor of ${fmtK(SAFETY_FLOOR)}. Liquid cash is critically low — hold off on non-essential spend and prioritise collecting balances.`; }
-  else if(netFlow<0){ capState="amber"; capMsg=`Draining — this period you spent ${fmtK(Math.abs(netFlow))} more than you collected. If this continues, capital erodes.`; }
-  else if(liquid<SAFETY_FLOOR*1.5){ capState="amber"; capMsg="Thinning — liquid money is getting close to your safety floor. Watch spending."; }
-  const capColor=capState==="green"?"#4CAF50":capState==="amber"?"#E8A45B":"#E85B5B";
-  // ── Growth projection (straight-line from average monthly net profit) ──
-  const monthsOfData=(()=>{ const ms=new Set(); data.sales.forEach(s=>ms.add(s.date.slice(0,7))); data.expenses.forEach(e=>ms.add(e.date.slice(0,7))); return Math.max(1,ms.size); })();
-  const allNet=(()=>{ const sv=data.sales.reduce((s,x)=>s+Number(x.total),0); const cg=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0); const ex=data.expenses.reduce((s,x)=>s+Number(x.amount),0); const lo=(data.losses||[]).reduce((s,l)=>s+Number(l.cost_value||0),0); return sv-cg-ex-lo; })();
-  const avgMonthlyNet=allNet/monthsOfData;
-  const proj=[3,6,12].map(m=>({months:m,value:Math.round(totalCapital+avgMonthlyNet*m)}));
   const cogs=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
   const fLosses=filterDate(data.losses||[]);
   const lossCost=fLosses.reduce((s,l)=>s+Number(l.cost_value||0),0);
   const grossProfit=salesValue-cogs;
   const netProfit=grossProfit-expenses-lossCost;
+  // ── Capital health ──
+  const liquid=(bal?.cash||0)+(bal?.sacco||0)+(bal?.petty||0);
+  const totalCapital=liquid+stockValue;
+  const liquidPct=totalCapital>0?Math.round(liquid/totalCapital*100):0;
+  const SAFETY_FLOOR=(()=>{ try{ const v=localStorage.getItem("karu_safety_floor"); return v?Number(v):15000; }catch{ return 15000; } })();
+  const inflow=collected;
+  const outflow=expenses+lossCost;
+  const netFlow=inflow-outflow;
+  let capState="green", capMsg="Healthy — liquid money is strong and inflow covers costs.";
+  if(liquid<SAFETY_FLOOR){ capState="red"; capMsg=`Below your safety floor of ${fmtK(SAFETY_FLOOR)}. Liquid cash is critically low — hold off on non-essential spend and prioritise collecting balances.`; }
+  else if(netFlow<0){ capState="amber"; capMsg=`Draining — this period you spent ${fmtK(Math.abs(netFlow))} more than you collected. If this continues, capital erodes.`; }
+  else if(liquid<SAFETY_FLOOR*1.5){ capState="amber"; capMsg="Thinning — liquid money is getting close to your safety floor. Watch spending."; }
+  const capColor=capState==="green"?"#4CAF50":capState==="amber"?"#E8A45B":"#E85B5B";
+  // ── Growth projection ──
+  const monthsOfData=(()=>{ const ms=new Set(); data.sales.forEach(s=>ms.add(s.date.slice(0,7))); data.expenses.forEach(e=>ms.add(e.date.slice(0,7))); return Math.max(1,ms.size); })();
+  const allNet=(()=>{ const sv=data.sales.reduce((s,x)=>s+Number(x.total),0); const cg=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0); const ex=data.expenses.reduce((s,x)=>s+Number(x.amount),0); const lo=(data.losses||[]).reduce((s,l)=>s+Number(l.cost_value||0),0); return sv-cg-ex-lo; })();
+  const avgMonthlyNet=allNet/monthsOfData;
+  const proj=[3,6,12].map(m=>({months:m,value:Math.round(totalCapital+avgMonthlyNet*m)}));
 
   const dailyMap={};
   fSales.forEach(s=>{dailyMap[s.date]=(dailyMap[s.date]||0)+Number(s.total);});
