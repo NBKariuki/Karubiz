@@ -153,7 +153,7 @@ export default function App() {
         {activeTab==="stock"&&<StockTab user={user} onMoney={refreshBal}/>}
         {activeTab==="ledger"&&<LedgerTab user={user} onMoney={refreshBal} bal={bal} onChange={refreshBal}/>}
         {activeTab==="expenses"&&<ExpensesTab user={user} onMoney={refreshBal}/>}
-        {activeTab==="reports"&&<ReportsTab user={user}/>}
+        {activeTab==="reports"&&<ReportsTab user={user} bal={bal}/>}
       </div>
     </div>
     {panel&&<SidePanel user={user} bal={bal} onClose={()=>setPanel(false)} onChange={refreshBal} onLogout={()=>{setUser(null);setPanel(false);}}/>}
@@ -2158,7 +2158,7 @@ function ExpensesTab({user,onMoney}){
   );
 }
 
-function ReportsTab({user}){
+function ReportsTab({user,bal}){
   const [data,setData]=useState({sales:[],expenses:[],stock:[],losses:[]});
   const [loading,setLoading]=useState(true);
   const [period,setPeriod]=useState("month");
@@ -2224,6 +2224,26 @@ function ReportsTab({user}){
   const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
   const stockRetail=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*(i.selling_price||0)),0);
   const stockPotentialProfit=stockRetail-stockValue;
+  // ── Capital health ──
+  const liquid=(bal?.cash||0)+(bal?.sacco||0)+(bal?.petty||0);
+  const totalCapital=liquid+stockValue;
+  const liquidPct=totalCapital>0?Math.round(liquid/totalCapital*100):0;
+  const SAFETY_FLOOR=(()=>{ try{ const v=localStorage.getItem("karu_safety_floor"); return v?Number(v):15000; }catch{ return 15000; } })();
+  // Inflow vs outflow this period (money actually in vs money actually out)
+  const inflow=collected;
+  const outflow=expenses+lossCost;
+  const netFlow=inflow-outflow;
+  // Health state: red if below floor OR draining hard; amber if thinning; green otherwise
+  let capState="green", capMsg="Healthy — liquid money is strong and inflow covers costs.";
+  if(liquid<SAFETY_FLOOR){ capState="red"; capMsg=`Below your safety floor of ${fmtK(SAFETY_FLOOR)}. Liquid cash is critically low — hold off on non-essential spend and prioritise collecting balances.`; }
+  else if(netFlow<0){ capState="amber"; capMsg=`Draining — this period you spent ${fmtK(Math.abs(netFlow))} more than you collected. If this continues, capital erodes.`; }
+  else if(liquid<SAFETY_FLOOR*1.5){ capState="amber"; capMsg="Thinning — liquid money is getting close to your safety floor. Watch spending."; }
+  const capColor=capState==="green"?"#4CAF50":capState==="amber"?"#E8A45B":"#E85B5B";
+  // ── Growth projection (straight-line from average monthly net profit) ──
+  const monthsOfData=(()=>{ const ms=new Set(); data.sales.forEach(s=>ms.add(s.date.slice(0,7))); data.expenses.forEach(e=>ms.add(e.date.slice(0,7))); return Math.max(1,ms.size); })();
+  const allNet=(()=>{ const sv=data.sales.reduce((s,x)=>s+Number(x.total),0); const cg=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0); const ex=data.expenses.reduce((s,x)=>s+Number(x.amount),0); const lo=(data.losses||[]).reduce((s,l)=>s+Number(l.cost_value||0),0); return sv-cg-ex-lo; })();
+  const avgMonthlyNet=allNet/monthsOfData;
+  const proj=[3,6,12].map(m=>({months:m,value:Math.round(totalCapital+avgMonthlyNet*m)}));
   const cogs=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
   const fLosses=filterDate(data.losses||[]);
   const lossCost=fLosses.reduce((s,l)=>s+Number(l.cost_value||0),0);
@@ -2315,6 +2335,63 @@ function ReportsTab({user}){
         </div>
         <div style={{fontSize:11,color:"#556677",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()} · COGS this period KSh {cogs.toLocaleString()}</div>
       </div>
+
+      {/* CAPITAL BATTERY */}
+      <div className="card" style={{marginBottom:14,border:`1px solid ${capColor}44`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:12,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600}}>Capital health</div>
+          <div style={{fontSize:13,fontWeight:700,color:capColor}}>{capState==="green"?"Charging":capState==="amber"?"Watch":"Draining"}</div>
+        </div>
+        {/* Battery bar: liquid (bright) vs stock (dim), inside a battery-style frame */}
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+          <div style={{flex:1,height:30,border:`2px solid ${capColor}`,borderRadius:6,overflow:"hidden",display:"flex",background:"#0A1128"}}>
+            <div style={{width:`${liquidPct}%`,background:capColor,display:"flex",alignItems:"center",justifyContent:"center",minWidth:liquidPct>0?24:0,transition:"width 0.3s"}}>
+              {liquidPct>=18&&<span style={{fontSize:11,fontWeight:700,color:"#050A1F"}}>{liquidPct}%</span>}
+            </div>
+            <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontSize:11,fontWeight:600,color:"#8A97A8"}}>stock {100-liquidPct}%</span>
+            </div>
+          </div>
+          <div style={{width:5,height:14,background:capColor,borderRadius:"0 2px 2px 0"}}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+          <span style={{color:"#AEB9C7"}}>Liquid money</span><span style={{fontWeight:600,color:capColor}}>{fmtK(liquid)}</span>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
+          <span style={{color:"#AEB9C7"}}>Locked in stock</span><span style={{fontWeight:600}}>{fmtK(stockValue)}</span>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:13,paddingTop:6,marginTop:2,borderTop:"1px solid #1A2A4A"}}>
+          <span style={{color:"#FFFFFF",fontWeight:600}}>Total capital</span><span style={{fontWeight:700,color:"#F5C000"}}>{fmtK(totalCapital)}</span>
+        </div>
+        <div style={{fontSize:12,color:capColor,marginTop:10,lineHeight:1.5,background:`${capColor}12`,border:`1px solid ${capColor}33`,borderRadius:8,padding:"8px 10px"}}>{capMsg}</div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#8A97A8",marginTop:8}}>
+          <span>Period in: <b style={{color:"#4CAF50"}}>{fmtK(inflow)}</b></span>
+          <span>Period out: <b style={{color:"#E85B5B"}}>{fmtK(outflow)}</b></span>
+          <span>Net: <b style={{color:netFlow>=0?"#4CAF50":"#E85B5B"}}>{netFlow<0?"-":""}{fmtK(Math.abs(netFlow))}</b></span>
+        </div>
+        {can(user,"users")&&<div style={{fontSize:11,color:"#8A97A8",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A",display:"flex",alignItems:"center",gap:6}}>
+          <span>Safety floor:</span>
+          <input type="number" defaultValue={SAFETY_FLOOR} onBlur={e=>{try{localStorage.setItem("karu_safety_floor",String(Number(e.target.value)||0));loadAll();}catch{}}} style={{width:90,background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"4px 8px",color:"#E8E2D4",fontSize:12}}/>
+          <span style={{color:"#556677"}}>minimum liquid cash to keep</span>
+        </div>}
+      </div>
+
+      {/* GROWTH PROJECTION */}
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{fontSize:12,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:4}}>Growth projection</div>
+        <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>If the current trend holds ({avgMonthlyNet>=0?"+":""}{fmtK(avgMonthlyNet)}/month average over {monthsOfData} month{monthsOfData!==1?"s":""} of data)</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          {proj.map(p=>(
+            <div key={p.months} style={{textAlign:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 6px"}}>
+              <div style={{fontSize:15,fontWeight:700,color:p.value>=totalCapital?"#4CAF50":"#E85B5B"}}>{fmtK(p.value)}</div>
+              <div style={{fontSize:11,color:"#8A97A8",marginTop:2}}>in {p.months} mo</div>
+            </div>
+          ))}
+        </div>
+        {monthsOfData<2&&<div style={{fontSize:11,color:"#E8A45B",marginTop:10,lineHeight:1.4}}>Only {monthsOfData} month of data — this projection will get meaningful after 2-3 months of trading.</div>}
+        <div style={{fontSize:10,color:"#556677",marginTop:8,lineHeight:1.4}}>A straight-line estimate, not a forecast. It assumes trading continues as it has. Real results depend on sales, sourcing and seasonality.</div>
+      </div>
+
       {pvData.length>0&&(
         <div className="card" style={{marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
