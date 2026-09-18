@@ -1457,20 +1457,41 @@ function StockTab({user,onMoney}){
             <div className="stat"><div className="stat-n" style={{fontSize:16,color:"#F5C000"}}>{fmtK(cntVal)}</div><div className="stat-l">Counted</div></div>
             <div className="stat" style={cntVal!==sysVal?{border:"1px solid rgba(232,91,91,0.4)"}:{}}><div className="stat-n" style={{fontSize:16,color:cntVal===sysVal?"#4CAF50":"#E85B5B"}}>{cntVal-sysVal<0?"-":""}{fmtK(Math.abs(cntVal-sysVal))}</div><div className="stat-l">Variance</div></div>
           </div>
-          {liveStock.length===0?<div style={{textAlign:"center",color:"#8899AA",padding:"20px 0"}}>No stock to count.</div>:liveStock.map(s=>{
-            const c=takeCounts[s.id]===undefined||takeCounts[s.id]===""?s.available:Number(takeCounts[s.id]);
-            const diff=c-s.available;
-            return (
-              <div key={s.id} className="card" style={{padding:"10px 12px",borderLeft:diff!==0?`3px solid ${diff<0?"#E85B5B":"#4CAF50"}`:"3px solid transparent"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600}}>{s.name}</div><div style={{fontSize:11,color:"#8A97A8"}}>{catLabel(s.category)} · {s.trip_no} · KSh {Number(s.unit_cost).toLocaleString()} each</div></div>
-                  <div style={{textAlign:"center",minWidth:52}}><div style={{fontSize:11,color:"#8A97A8"}}>SYSTEM</div><div style={{fontSize:16,fontWeight:700}}>{s.available}</div></div>
-                  <div style={{minWidth:70,marginLeft:8}}><div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"#0A1128",border:`1px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#1A2A4A"}`,borderRadius:6,padding:"7px 8px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/></div>
+          {liveStock.length===0?<div style={{textAlign:"center",color:"#8899AA",padding:"20px 0"}}>No stock to count.</div>:(()=>{
+            // Group batches by item name, sort names alphabetically
+            const groups={};
+            liveStock.forEach(s=>{ const k=s.name.toLowerCase(); if(!groups[k])groups[k]={name:s.name,batches:[]}; groups[k].batches.push(s); });
+            const names=Object.values(groups).sort((a,b)=>a.name.localeCompare(b.name));
+            return names.map(g=>{
+              const sysTotal=g.batches.reduce((n,b)=>n+b.available,0);
+              const cntTotal=g.batches.reduce((n,b)=>{ const c=takeCounts[b.id]===undefined||takeCounts[b.id]===""?b.available:Number(takeCounts[b.id]); return n+c; },0);
+              const valTotal=g.batches.reduce((n,b)=>n+b.available*b.unit_cost,0);
+              const gDiff=cntTotal-sysTotal;
+              return (
+                <div key={g.name} className="card" style={{padding:"12px",marginBottom:10,borderLeft:gDiff!==0?`3px solid ${gDiff<0?"#E85B5B":"#4CAF50"}`:"3px solid #24365C"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+                    <div style={{fontSize:15,fontWeight:700}}>{g.name}</div>
+                    <div style={{fontSize:12,color:"#8A97A8"}}>{catLabel(g.batches[0].category)} · {fmtK(valTotal)}</div>
+                  </div>
+                  {g.batches.length>1&&<div style={{fontSize:11,color:"#8A97A8",marginBottom:8}}>{g.batches.length} batches · system total {sysTotal}{gDiff!==0?` · counted ${cntTotal}`:""}</div>}
+                  {g.batches.slice().sort((a,b)=>(a.trip_no||"").localeCompare(b.trip_no||"")).map(s=>{
+                    const c=takeCounts[s.id]===undefined||takeCounts[s.id]===""?s.available:Number(takeCounts[s.id]);
+                    const diff=c-s.available;
+                    return (
+                      <div key={s.id} style={{padding:"8px 0",borderTop:"1px solid #101B36"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,color:"#AEB9C7"}}>{s.trip_no}</div><div style={{fontSize:11,color:"#8A97A8"}}>KSh {Number(s.unit_cost).toLocaleString()} each · in {s.date_in?.slice(5)||""}</div></div>
+                          <div style={{textAlign:"center",minWidth:48}}><div style={{fontSize:10,color:"#8A97A8"}}>SYSTEM</div><div style={{fontSize:15,fontWeight:700}}>{s.available}</div></div>
+                          <div style={{minWidth:66,marginLeft:8}}><div style={{fontSize:10,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"#0A1128",border:`1px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#1A2A4A"}`,borderRadius:6,padding:"6px 8px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/></div>
+                        </div>
+                        {diff!==0&&<div style={{marginTop:6}}><div style={{fontSize:11,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"#0A1128",border:"1px solid #24365C",borderRadius:6,padding:"7px 9px",color:"#E8E2D4",fontSize:12}}/></div>}
+                      </div>
+                    );
+                  })}
                 </div>
-                {diff!==0&&<div><div style={{fontSize:11,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"#0A1128",border:"1px solid #24365C",borderRadius:6,padding:"7px 9px",color:"#E8E2D4",fontSize:12}}/></div>}
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
           <div className="field" style={{marginTop:12}}><label>Notes (optional)</label><input value={takeNotes} onChange={e=>setTakeNotes(e.target.value)} placeholder="e.g. Month-end count"/></div>
           {can(user,"users")&&<div className="field"><label>Counted by</label><div className="tog">{STAFF.map(st=><button key={st} className={`tog-btn${takeStaff===st?" on":""}`} onClick={()=>setTakeStaff(st)}>{st.split(" ")[0]}</button>)}</div></div>}
           <button className="btn-y" onClick={saveStockTake} disabled={takeSaving} style={{width:"100%",padding:14,marginTop:8}}>{takeSaving?"Saving...":varCount>0?`Reconcile ${varCount} difference${varCount!==1?"s":""} & Save`:"Confirm Count (all match)"}</button>
