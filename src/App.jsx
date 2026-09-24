@@ -1899,13 +1899,36 @@ function LedgerTab({user,onMoney,bal,onChange}){
   const [pcNote,setPcNote]=useState(""); const [pcCat,setPcCat]=useState("Transport"); const [pcFrom,setPcFrom]=useState("cash");
   const [recAcct,setRecAcct]=useState("sacco"); const [recActual,setRecActual]=useState(""); const [recReason,setRecReason]=useState("");
 
-  const load=async()=>{ setLoading(true); try{ setRows(await sb.get("karu_money","select=*&order=created_at.desc")); }catch(e){console.error(e);} setLoading(false); };
+  const [pl,setPl]=useState({sales:[],stock:[],expenses:[],losses:[]});
+  const load=async()=>{ setLoading(true); try{
+    const [m,sales,stock,expenses,losses]=await Promise.all([
+      sb.get("karu_money","select=*&order=created_at.desc"),
+      sb.get("karu_sales","select=*&voided=eq.false"),
+      sb.get("karu_stock","select=*"),
+      sb.get("karu_expenses","select=*"),
+      sb.get("karu_losses","select=*").catch(()=>[])
+    ]);
+    setRows(m); setPl({sales,stock,expenses,losses});
+  }catch(e){console.error(e);} setLoading(false); };
   useEffect(()=>{load();},[]);
   const refreshAll=async()=>{ await load(); if(onChange) onChange(); };
 
   const ACCTS=[["cash","Cash"],["sacco","SACCO"],["petty","Petty Cash"]];
   const acctLabel=a=>({cash:"Cash",sacco:"SACCO",petty:"Petty Cash",owed_burton:"Owed Burton",owed_martin:"Owed Martin"}[a]||a);
   const total=(bal.cash||0)+(bal.sacco||0)+(bal.petty||0);
+
+  // ── Capital vs Profit (live) ──
+  const stockAtCost=pl.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
+  const cogsAll=pl.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
+  const salesAll=pl.sales.reduce((s,x)=>s+Number(x.total),0);
+  const expAll=pl.expenses.reduce((s,x)=>s+Number(x.amount),0);
+  const lossAll=(pl.losses||[]).reduce((s,l)=>s+Number(l.cost_value||0),0);
+  const grossProfitAll=salesAll-cogsAll;
+  const netProfitAll=grossProfitAll-expAll-lossAll;
+  const liquidAll=(bal.cash||0)+(bal.sacco||0)+(bal.petty||0);
+  // Capital float = total liquid + stock, minus profit already earned = the working capital still circulating
+  const totalWorth=liquidAll+stockAtCost;
+  const capitalFloat=totalWorth-netProfitAll;
 
   // Balance check: sum of all money rows for real accounts should equal displayed balances
   const sumFor=a=>rows.filter(r=>r.account===a).reduce((s,r)=>s+Number(r.amount),0);
@@ -1928,12 +1951,13 @@ function LedgerTab({user,onMoney,bal,onChange}){
     else await recordMoney([{account:acc,amount:-a,type:"partner_repay",partner:who,description:`Repaid ${who.split(" ")[0]}`,date:todayStr(),recorded_by:who},{account:"owed_"+short,amount:-a,type:"partner_repay",partner:who,description:`Repaid ${who.split(" ")[0]}`,date:todayStr(),recorded_by:who}]);
     setSaving(false); rb(); refreshAll(); };
   const doAllocatePetty=async()=>{ const a=Number(amt); if(!a)return; setSaving(true);
-    // Move into petty from cash/sacco, AND record as an expense (this is when it "leaves" for reports)
+    // Just move money into the petty pocket. It is NOT an expense yet — the actual spends are the expenses.
     await recordMoney([{account:pcFrom,amount:-a,type:"petty_allocate",description:"Petty cash top-up",date:todayStr(),recorded_by:who},{account:"petty",amount:a,type:"petty_allocate",description:"Petty cash top-up",date:todayStr(),recorded_by:who}]);
-    await sb.post("karu_expenses",{date:todayStr(),category:"Petty cash",description:"Petty cash replenishment",amount:a,recorded_by:who,paid_from:pcFrom});
     setSaving(false); rb(); refreshAll(); };
   const doPettySpend=async()=>{ const a=Number(amt); if(!a)return; if(!pcNote.trim()){alert("Add a note.");return;} setSaving(true);
     await recordMoney({account:"petty",amount:-a,type:"petty_spend",description:`${pcCat}: ${pcNote}`,date:todayStr(),recorded_by:who});
+    // The spend is the real expense — record it so it appears in the Expenses tab, tagged as petty.
+    await sb.post("karu_expenses",{date:todayStr(),category:"Petty cash",description:`${pcCat}: ${pcNote}`,amount:a,recorded_by:who,paid_from:"petty"});
     setSaving(false); rb(); refreshAll(); };
   const doReconcile=async()=>{ const cur=recAcct==="cash"?bal.cash:recAcct==="petty"?bal.petty:bal.sacco; const diff=Number(recActual)-cur;
     if(recActual===""){alert("Enter actual balance.");return;} if(diff===0){alert("No difference.");return;} if(!recReason.trim()){alert("Reason required.");return;}
@@ -1941,6 +1965,12 @@ function LedgerTab({user,onMoney,bal,onChange}){
     await recordMoney({account:recAcct,amount:diff,type:"reconciliation",description:`Reconciliation: ${recReason}`,date:todayStr(),recorded_by:user.full_name});
     await logAudit({trip_no:null,record_id:null,action:"reconcile",field_changed:recAcct.toUpperCase(),old_value:String(Math.round(cur)),new_value:String(Math.round(Number(recActual))),reason:recReason,changed_by:user.full_name});
     setSaving(false); rb(); refreshAll(); };
+
+  // ── Per-sale cost lookup (for splitting sale rows into capital + profit) ──
+  const stockCostByName={};
+  pl.stock.forEach(s=>{ const k=s.name.toLowerCase(); if(!stockCostByName[k])stockCostByName[k]=[]; stockCostByName[k].push({cost:Number(s.unit_cost),date:s.date_in}); });
+  const avgCost=name=>{ const arr=stockCostByName[(name||"").toLowerCase()]; if(!arr||!arr.length)return 0; return arr.reduce((s,x)=>s+x.cost,0)/arr.length; };
+  const saleSplit=ref=>{ const sale=pl.sales.find(x=>x.receipt_no===ref); if(!sale||!sale.items)return null; let cost=0; sale.items.forEach(it=>{ cost+=avgCost(it.name)*Number(it.qty||1); }); return {cost:Math.round(cost),total:Number(sale.total)}; };
 
   // ── Filtered register with running balance ──
   const inRange=r=>r.date>=from&&r.date<=to;
@@ -1983,8 +2013,29 @@ function LedgerTab({user,onMoney,bal,onChange}){
         </div>
       )}
       {/* Balance check */}
-      <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,marginBottom:14,color:checkOK?"#4CAF50":"#E85B5B"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,marginBottom:12,color:checkOK?"#4CAF50":"#E85B5B"}}>
         <span>{checkOK?"✓ Books balanced — every movement reconciles":"⚠ Balance mismatch — review the register"}</span>
+      </div>
+
+      {/* Capital vs Profit */}
+      <div className="card" style={{marginBottom:14,border:"1px solid #2E4472"}}>
+        <div style={{fontSize:12,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:10}}>Capital vs Profit</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div style={{background:"#0A1128",border:"1px solid #24365C",borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>CAPITAL FLOAT</div>
+            <div style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(capitalFloat)}</div>
+            <div style={{fontSize:10,color:"#556677",marginTop:2}}>working money going round</div>
+          </div>
+          <div style={{background:"#0A1128",border:`1px solid ${netProfitAll>=0?"rgba(76,175,80,0.35)":"rgba(232,91,91,0.35)"}`,borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>NET PROFIT EARNED</div>
+            <div style={{fontSize:18,fontWeight:700,color:netProfitAll>=0?"#4CAF50":"#E85B5B"}}>{netProfitAll<0?"-":""}{fmtK(Math.abs(netProfitAll))}</div>
+            <div style={{fontSize:10,color:"#556677",marginTop:2}}>after cost, expenses, losses</div>
+          </div>
+        </div>
+        <div style={{fontSize:12,color:"#8A97A8",display:"flex",justifyContent:"space-between",padding:"8px 2px 0",borderTop:"1px solid #1A2A4A"}}>
+          <span>Gross profit (sales less cost): <b style={{color:"#4CAF50"}}>{fmtK(grossProfitAll)}</b></span>
+        </div>
+        <div style={{fontSize:11,color:"#556677",marginTop:8,lineHeight:1.5}}>Of your total worth ({fmtK(totalWorth)} = {fmtK(liquidAll)} liquid + {fmtK(stockAtCost)} stock), {fmtK(capitalFloat)} is capital still circulating and {fmtK(netProfitAll)} is what the business has actually earned on top.</div>
       </div>
 
       {/* Sub-tabs */}
@@ -2041,14 +2092,16 @@ function LedgerTab({user,onMoney,bal,onChange}){
             {ACCTS.map(([id,l])=><button key={id} onClick={()=>setAcctFilter(id)} style={pill(acctFilter===id)}>{l}</button>)}
           </div>
           <div style={{fontSize:11,color:"#556677",marginBottom:8}}>{registerRows.length} movements · <button onClick={exportLedger} style={{background:"none",border:"none",color:"#8899AA",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Export CSV</button></div>
-          {registerRows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0",fontSize:13}}>No movements in range.</div>:registerRows.map(r=>(
+          {registerRows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0",fontSize:13}}>No movements in range.</div>:registerRows.map(r=>{ const isSale=r.type==="sale"&&r.ref; const sp=isSale?saleSplit(r.ref):null; return (
             <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #101B36"}}>
               <div style={{flex:1,minWidth:0,paddingRight:8}}>
                 <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.description||r.type}</div>
                 <div style={{fontSize:10,color:"#556677"}}>{r.date.slice(5)} · {acctLabel(r.account)} · {r.recorded_by?.split(" ")[0]||""}</div>
+                {sp&&sp.cost>0&&<div style={{fontSize:10,color:"#8A97A8",marginTop:1}}>capital {fmtK(sp.cost)} · profit <span style={{color:"#4CAF50"}}>{fmtK(Math.max(0,Number(r.amount)-sp.cost))}</span></div>}
               </div>
               <div style={{fontSize:13,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B",whiteSpace:"nowrap"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
             </div>
+            );})}
           ))}
         </div>
       )}
