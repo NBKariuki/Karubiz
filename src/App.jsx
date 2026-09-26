@@ -668,13 +668,14 @@ function SaleTab({user,onMoney}){
   const [showPending,setShowPending]=useState(false);
   const [todaySales,setTodaySales]=useState([]); const [showHistory,setShowHistory]=useState(false);
   const [histSales,setHistSales]=useState([]); const [voidSale,setVoidSale]=useState(null);
+  const [histOpen,setHistOpen]=useState({}); // keys: day/month/year expansion
   const [voidReason,setVoidReason]=useState(""); const [voidStaff,setVoidStaff]=useState("Burton Kariuki"); const [voiding,setVoiding]=useState(false);
   const [custCredit,setCustCredit]=useState(0); const [useCredit,setUseCredit]=useState(false);
   const [exchSale,setExchSale]=useState(null); const [exchItems,setExchItems]=useState([]); const [exchStaff,setExchStaff]=useState("Burton Kariuki"); const [exchReason,setExchReason]=useState(""); const [exchSaving,setExchSaving]=useState(false); const [exchErr,setExchErr]=useState("");
 
   const loadPendingSales=async()=>{ try{ setPendingSales(await sb.get("karu_sales","select=*&balance_due=gt.0&voided=eq.false&order=created_at.desc")); }catch(e){console.error(e);} };
   const loadToday=async()=>{ try{ setTodaySales(await sb.get("karu_sales",`select=*&date=eq.${todayStr()}&order=created_at.desc`)); }catch(e){console.error(e);} };
-  const loadHistory=async()=>{ try{ setHistSales(await sb.get("karu_sales","select=*&order=created_at.desc&limit=60")); }catch(e){console.error(e);} };
+  const loadHistory=async()=>{ try{ setHistSales(await sb.get("karu_sales","select=*&order=created_at.desc&limit=500")); }catch(e){console.error(e);} };
   const loadStock=async()=>{ try{ setStockItems(await sb.get("karu_stock","select=*&order=date_in.asc")); }catch(e){console.error(e);} };
   useEffect(()=>{ loadStock(); loadPendingSales(); loadToday(); },[]);
 
@@ -1028,12 +1029,87 @@ function SaleTab({user,onMoney}){
           ):(
             <div>
               <div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Recent sales</div>
-              {histSales.length===0?<div style={{color:"#556677",fontSize:13}}>No sales yet.</div>:histSales.map(s=>(
-                <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1A2A4A",opacity:s.voided?0.45:1}}>
-                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · {s.date} · {initials(s.served_by)} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div></div>
-                  <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:2}}>{!s.voided&&<button onClick={()=>{setReceipt(s);setShowHistory(false);}} style={{background:"none",border:"none",color:"#8899AA",fontSize:11,cursor:"pointer",padding:0}}>Receipt</button>}{!s.voided&&can(user,"users")&&canModify(s)&&<button onClick={()=>startExchange(s)} style={{background:"none",border:"none",color:"#E8A45B",fontSize:11,cursor:"pointer",padding:0}}>{Number(s.balance_due||0)>0?"Edit":"Exchange"}</button>}{!s.voided&&can(user,"void")&&(withinWindow(s.created_at)?<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:0}}>Void</button>:<span style={{fontSize:10,color:"#556677"}}>🔒</span>)}</div></div>
-                </div>
-              ))}
+              {histSales.length===0?<div style={{color:"#556677",fontSize:13}}>No sales yet.</div>:(()=>{
+                // Row renderer for one sale (keeps all actions)
+                const saleRow=(s)=>(
+                  <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #101B36",opacity:s.voided?0.45:1}}>
+                    <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8A97A8"}}>{s.receipt_no} · {initials(s.served_by)} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div></div>
+                    <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:2}}>{!s.voided&&<button onClick={()=>{setReceipt(s);setShowHistory(false);}} style={{background:"none",border:"none",color:"#AEB9C7",fontSize:11,cursor:"pointer",padding:0}}>Receipt</button>}{!s.voided&&can(user,"users")&&canModify(s)&&<button onClick={()=>startExchange(s)} style={{background:"none",border:"none",color:"#E8A45B",fontSize:11,cursor:"pointer",padding:0}}>{Number(s.balance_due||0)>0?"Edit":"Exchange"}</button>}{!s.voided&&can(user,"void")&&(withinWindow(s.created_at)?<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:0}}>Void</button>:<span style={{fontSize:10,color:"#556677"}}>🔒</span>)}</div></div>
+                  </div>
+                );
+                const dayTotal=arr=>arr.filter(s=>!s.voided).reduce((n,s)=>n+Number(s.total),0);
+                const toggle=k=>setHistOpen(x=>({...x,[k]:!x[k]}));
+                const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+                const now=new Date(); const curMonth=now.toISOString().slice(0,7); const curYear=String(now.getFullYear());
+                // Group sales by day
+                const days={};
+                histSales.forEach(s=>{ if(!days[s.date])days[s.date]=[]; days[s.date].push(s); });
+                // Classify each day into: current month (show as days), past month this year (fold into month), past year (fold into year)
+                const currentMonthDays=[]; const monthGroups={}; const yearGroups={};
+                Object.keys(days).sort((a,b)=>b.localeCompare(a)).forEach(date=>{
+                  const ym=date.slice(0,7); const y=date.slice(0,4);
+                  if(ym===curMonth){ currentMonthDays.push(date); }
+                  else if(y===curYear){ if(!monthGroups[ym])monthGroups[ym]=[]; monthGroups[ym].push(date); }
+                  else { if(!yearGroups[y])yearGroups[y]=[]; yearGroups[y].push(date); }
+                });
+                const fmtDay=d=>{ const dt=new Date(d+"T00:00:00"); return dt.toLocaleDateString("en-KE",{weekday:"short",day:"2-digit",month:"short"}); };
+                return (
+                  <div>
+                    {/* Current month: expand by day */}
+                    {currentMonthDays.map(date=>(
+                      <div key={date} style={{marginBottom:8}}>
+                        <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8}}>
+                          <span style={{fontSize:13,fontWeight:600,color:"#E8E2D4"}}>{histOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                          <span style={{fontSize:13,fontWeight:600,color:"#F5C000"}}>{fmtK(dayTotal(days[date]))}</span>
+                        </div>
+                        {histOpen[date]&&<div style={{padding:"0 10px"}}>{days[date].map(saleRow)}</div>}
+                      </div>
+                    ))}
+                    {/* Past months this year: fold into month */}
+                    {Object.keys(monthGroups).sort((a,b)=>b.localeCompare(a)).map(ym=>{
+                      const dates=monthGroups[ym]; const mTotal=dates.reduce((n,d)=>n+dayTotal(days[d]),0);
+                      return (
+                        <div key={ym} style={{marginBottom:8}}>
+                          <div onClick={()=>toggle(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
+                            <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{histOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
+                            <span style={{fontSize:13,fontWeight:600,color:"#F5C000"}}>{fmtK(mTotal)}</span>
+                          </div>
+                          {histOpen[ym]&&<div style={{padding:"4px 10px 0"}}>{dates.map(date=>(
+                            <div key={date} style={{marginBottom:6}}>
+                              <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid #101B36"}}>
+                                <span style={{fontSize:12,color:"#AEB9C7"}}>{histOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                                <span style={{fontSize:12,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
+                              </div>
+                              {histOpen[date]&&<div>{days[date].map(saleRow)}</div>}
+                            </div>
+                          ))}</div>}
+                        </div>
+                      );
+                    })}
+                    {/* Past years: fold into year */}
+                    {Object.keys(yearGroups).sort((a,b)=>b.localeCompare(a)).map(y=>{
+                      const dates=yearGroups[y]; const yTotal=dates.reduce((n,d)=>n+dayTotal(days[d]),0);
+                      return (
+                        <div key={y} style={{marginBottom:8}}>
+                          <div onClick={()=>toggle(y)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
+                            <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{histOpen[y]?"▾":"▸"} {y}</span>
+                            <span style={{fontSize:13,fontWeight:700,color:"#F5C000"}}>{fmtK(yTotal)}</span>
+                          </div>
+                          {histOpen[y]&&<div style={{padding:"4px 10px 0"}}>{dates.map(date=>(
+                            <div key={date} style={{marginBottom:6}}>
+                              <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid #101B36"}}>
+                                <span style={{fontSize:12,color:"#AEB9C7"}}>{histOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                                <span style={{fontSize:12,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
+                              </div>
+                              {histOpen[date]&&<div>{days[date].map(saleRow)}</div>}
+                            </div>
+                          ))}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
