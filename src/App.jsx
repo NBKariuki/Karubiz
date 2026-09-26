@@ -1925,7 +1925,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
   const lossAll=(pl.losses||[]).reduce((s,l)=>s+Number(l.cost_value||0),0);
   const grossProfitAll=salesAll-cogsAll;
   const netProfitAll=grossProfitAll-expAll-lossAll;
-  const liquidAll=(bal.cash||0)+(bal.sacco||0)+(bal.petty||0);
+  const liquidAll=(bal?.cash||0)+(bal?.sacco||0)+(bal?.petty||0);
   // Capital float = total liquid + stock, minus profit already earned = the working capital still circulating
   const totalWorth=liquidAll+stockAtCost;
   const capitalFloat=totalWorth-netProfitAll;
