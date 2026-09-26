@@ -2102,7 +2102,6 @@ function LedgerTab({user,onMoney,bal,onChange}){
               <div style={{fontSize:13,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B",whiteSpace:"nowrap"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
             </div>
             );})}
-          ))}
         </div>
       )}
 
