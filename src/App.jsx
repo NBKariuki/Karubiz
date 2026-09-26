@@ -2041,6 +2041,11 @@ function LedgerTab({user,onMoney,bal,onChange}){
   // Capital float = total liquid + stock, minus profit already earned = the working capital still circulating
   const totalWorth=liquidAll+stockAtCost;
   const capitalFloat=totalWorth-netProfitAll;
+  // Split the LIQUID total into capital vs realised profit sitting in cash.
+  // netProfitAll is realised earnings (sales less COGS, expenses, losses). The profit you can actually
+  // take now is that realised profit, capped at how much liquid cash exists; the rest of liquid is capital.
+  const liquidProfitPortion=Math.max(0,Math.min(netProfitAll,liquidAll));
+  const liquidCapitalPortion=liquidAll-liquidProfitPortion;
 
   // Balance check: sum of all money rows for real accounts should equal displayed balances
   const sumFor=a=>rows.filter(r=>r.account===a).reduce((s,r)=>s+Number(r.amount),0);
@@ -2114,9 +2119,22 @@ function LedgerTab({user,onMoney,bal,onChange}){
         <div className="stat" style={{padding:"10px 8px"}}><div style={{fontSize:15,fontWeight:700,color:"#FFFFFF"}}>{fmtK(bal.sacco||0)}</div><div className="stat-l">SACCO</div></div>
         <div className="stat" style={{padding:"10px 8px"}}><div style={{fontSize:15,fontWeight:700,color:"#FFFFFF"}}>{fmtK(bal.petty||0)}</div><div className="stat-l">Petty</div></div>
       </div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 14px",marginBottom:12}}>
-        <span style={{fontSize:13,color:"#8899AA"}}>Total on hand</span>
-        <span style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(total)}</span>
+      <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"12px 14px",marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <span style={{fontSize:13,color:"#AEB9C7"}}>Total on hand</span>
+          <span style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(total)}</span>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <div style={{flex:1,background:"#12203C",border:"1px solid #24365C",borderRadius:7,padding:"8px 10px"}}>
+            <div style={{fontSize:11,color:"#8A97A8"}}>CAPITAL (keep)</div>
+            <div style={{fontSize:15,fontWeight:700,color:"#E8E2D4"}}>{fmtK(liquidCapitalPortion)}</div>
+          </div>
+          <div style={{flex:1,background:liquidProfitPortion>0?"rgba(76,175,80,0.08)":"#12203C",border:`1px solid ${liquidProfitPortion>0?"rgba(76,175,80,0.35)":"#24365C"}`,borderRadius:7,padding:"8px 10px"}}>
+            <div style={{fontSize:11,color:"#8A97A8"}}>PROFIT (spendable)</div>
+            <div style={{fontSize:15,fontWeight:700,color:liquidProfitPortion>0?"#4CAF50":"#8A97A8"}}>{fmtK(liquidProfitPortion)}</div>
+          </div>
+        </div>
+        <div style={{fontSize:11,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>{liquidProfitPortion>0?`You can take up to ${fmtK(liquidProfitPortion)} without touching capital.`:"All liquid money is capital right now — spending eats into the float."}</div>
       </div>
       {(bal.owed_burton>0||bal.owed_martin>0)&&(
         <div style={{display:"flex",gap:8,marginBottom:12}}>
