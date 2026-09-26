@@ -1703,6 +1703,7 @@ function OrdersTab({user,onMoney}){
   const [suppliers,setSuppliers]=useState([]);
   const [openOrder,setOpenOrder]=useState(null); // the order currently open/expanded (live)
   const [filter,setFilter]=useState("open");
+  const [ordOpen,setOrdOpen]=useState({});
   const [busy,setBusy]=useState(false);
 
   const load=async(keepOpenId)=>{ setLoading(true);
@@ -1943,20 +1944,55 @@ function OrdersTab({user,onMoney}){
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {[["open","Open"],["done","Completed"],["all","All"]].map(([id,l])=><button key={id} onClick={()=>setFilter(id)} style={{padding:"5px 12px",borderRadius:100,border:`1px solid ${filter===id?"#F5C000":"#1A2A4A"}`,background:filter===id?"rgba(245,192,0,0.1)":"transparent",color:filter===id?"#F5C000":"#8899AA",fontSize:12,cursor:"pointer"}}>{l}</button>)}
       </div>
-      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:shown.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No orders here.</div>:shown.map(o=>{
-        const subs=o.suppliers||[];
-        return (
+      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:shown.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No orders here.</div>:(()=>{
+        const orderCard=(o)=>{
+          const subs=o.suppliers||[];
+          return (
           <div key={o.id} className="card" onClick={()=>setOpenOrder(o)} style={{cursor:"pointer"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-              <div><span style={{fontSize:14,fontWeight:600,color:"#F5C000"}}>{o.order_no}</span><div style={{fontSize:11,color:"#8899AA",marginTop:2}}>{o.date} · {o.created_by?.split(" ")[0]} · {subs.length} supplier{subs.length!==1?"s":""} · est {fmtK(orderTotal(subs))}</div></div>
+              <div><span style={{fontSize:14,fontWeight:600,color:"#F5C000"}}>{o.order_no}</span><div style={{fontSize:11,color:"#8A97A8",marginTop:2}}>{o.date} · {o.created_by?.split(" ")[0]} · {subs.length} supplier{subs.length!==1?"s":""} · est {fmtK(orderTotal(subs))}</div></div>
               <span className={`badge ${badge(o.status)}`}>{o.status}</span>
             </div>
-            <div style={{fontSize:11,color:"#8899AA"}}>{subs.map(s=>s.supplier).filter(Boolean).join(" · ")||"No suppliers yet"}</div>
+            <div style={{fontSize:11,color:"#8A97A8"}}>{subs.map(s=>s.supplier).filter(Boolean).join(" · ")||"No suppliers yet"}</div>
             {orderDeposits(subs)>0&&<div style={{fontSize:11,color:"#4CAF50",marginTop:4}}>Deposits {fmtK(orderDeposits(subs))} · Balance {fmtK(Math.max(0,orderTotal(subs)-orderDeposits(subs)))}</div>}
             <div style={{fontSize:11,color:"#556677",marginTop:6}}>Tap to open</div>
           </div>
+          );
+        };
+        const toggle=k=>setOrdOpen(x=>({...x,[k]:!x[k]}));
+        const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+        const now=new Date(); const curMonth=now.toISOString().slice(0,7); const curYear=String(now.getFullYear());
+        const gTotal=arr=>arr.reduce((n,o)=>n+orderTotal(o.suppliers||[]),0);
+        const current=[]; const monthGroups={}; const yearGroups={};
+        shown.forEach(o=>{ const ym=(o.date||"").slice(0,7); const y=(o.date||"").slice(0,4);
+          if(ym===curMonth) current.push(o);
+          else if(y===curYear){ if(!monthGroups[ym])monthGroups[ym]=[]; monthGroups[ym].push(o); }
+          else { if(!yearGroups[y])yearGroups[y]=[]; yearGroups[y].push(o); }
+        });
+        return (
+          <div>
+            {current.map(orderCard)}
+            {Object.keys(monthGroups).sort((a,b)=>b.localeCompare(a)).map(ym=>(
+              <div key={ym} style={{marginBottom:8}}>
+                <div onClick={()=>toggle(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{ordOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]} · {monthGroups[ym].length} order{monthGroups[ym].length!==1?"s":""}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:"#F5C000"}}>{fmtK(gTotal(monthGroups[ym]))}</span>
+                </div>
+                {ordOpen[ym]&&<div style={{padding:"8px 0 0"}}>{monthGroups[ym].map(orderCard)}</div>}
+              </div>
+            ))}
+            {Object.keys(yearGroups).sort((a,b)=>b.localeCompare(a)).map(y=>(
+              <div key={y} style={{marginBottom:8}}>
+                <div onClick={()=>toggle(y)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
+                  <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{ordOpen[y]?"▾":"▸"} {y} · {yearGroups[y].length} order{yearGroups[y].length!==1?"s":""}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:"#F5C000"}}>{fmtK(gTotal(yearGroups[y]))}</span>
+                </div>
+                {ordOpen[y]&&<div style={{padding:"8px 0 0"}}>{yearGroups[y].map(orderCard)}</div>}
+              </div>
+            ))}
+          </div>
         );
-      })}
+      })()}
     </div>
   );
 }
@@ -2235,10 +2271,25 @@ function ExpensesTab({user,onMoney}){
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
   const [showForm,setShowForm]=useState(false);
+  const [showPetty,setShowPetty]=useState(false); const [pcCat,setPcCat]=useState("Refreshments"); const [pcNote,setPcNote]=useState(""); const [pcAmt,setPcAmt]=useState(""); const [pcSaving,setPcSaving]=useState(false);
+  const PETTY_CATS=["Refreshments","Transport","Airtime","Cleaning","Office","Other"];
+  const doPettySpend=async()=>{
+    const a=Number(pcAmt); if(!a||a<=0){alert("Enter an amount.");return;} if(!pcNote.trim()){alert("Add a note.");return;}
+    setPcSaving(true);
+    try{
+      await recordMoney({account:"petty",amount:-a,type:"petty_spend",description:`${pcCat}: ${pcNote}`,date:todayStr(),recorded_by:user.full_name});
+      await sb.post("karu_expenses",{date:todayStr(),category:"Petty cash",description:`${pcCat}: ${pcNote}`,amount:a,recorded_by:user.full_name,paid_from:"petty"});
+      if(onMoney) onMoney();
+      setShowPetty(false); setPcAmt(""); setPcNote("");
+      await loadExp();
+    }catch(e){alert("Failed: "+e.message);}
+    setPcSaving(false);
+  };
   const monthStart=new Date().toISOString().slice(0,7)+"-01";
   const [from,setFrom]=useState(monthStart); const [to,setTo]=useState(todayStr());
   const [showRange,setShowRange]=useState(false);
   const [editing,setEditing]=useState(null); const [editReason,setEditReason]=useState("");
+  const [expOpen,setExpOpen]=useState({});
 
   const loadExp=async()=>{
     setLoading(true);
@@ -2323,7 +2374,20 @@ function ExpensesTab({user,onMoney}){
         </div>
       )}
 
-      {!showForm&&<button className="btn-y" onClick={()=>setShowForm(true)} style={{width:"100%",marginBottom:14}}>+ Log Expense</button>}
+      {!showForm&&!showPetty&&<div style={{display:"flex",gap:8,marginBottom:14}}>
+        <button className="btn-y" onClick={()=>setShowForm(true)} style={{flex:1}}>+ Log Expense</button>
+        {can(user,"users")&&<button className="btn-g" onClick={()=>setShowPetty(true)} style={{flex:1}}>+ Petty spend</button>}
+      </div>}
+      {showPetty&&(
+        <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
+          <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Record Petty Cash Spend</div>
+          <div style={{fontSize:11,color:"#8A97A8",marginBottom:12}}>Comes out of the petty cash pocket and logs here as an expense.</div>
+          <div className="field"><label>Category</label><div className="tog" style={{flexWrap:"wrap"}}>{PETTY_CATS.map(c=><button key={c} className={`tog-btn${pcCat===c?" on":""}`} onClick={()=>setPcCat(c)} style={{flex:"1 0 30%",fontSize:12}}>{c}</button>)}</div></div>
+          <div className="field"><label>Note (what for)</label><input value={pcNote} onChange={e=>setPcNote(e.target.value)} placeholder="e.g. Tea for the shop"/></div>
+          <div className="field"><label>Amount (KSh)</label><input type="number" value={pcAmt} onChange={e=>setPcAmt(e.target.value)} placeholder="0"/></div>
+          <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={doPettySpend} disabled={pcSaving} style={{flex:1}}>{pcSaving?"Saving...":"Record Spend"}</button><button className="btn-g" onClick={()=>{setShowPetty(false);setPcAmt("");setPcNote("");}}>Cancel</button></div>
+        </div>
+      )}
       {showForm&&(
         <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
           <div style={{fontSize:14,fontWeight:600,marginBottom:14}}>Log Expense</div>
@@ -2353,25 +2417,89 @@ function ExpensesTab({user,onMoney}){
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={saveEdit} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save Changes"}</button><button className="btn-g" onClick={()=>{setEditing(null);setErr("");}}>Cancel</button></div>
         </div>
       )}
-      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:exp.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No expenses in this period.</div>:(
-        <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,overflow:"hidden"}}>
-          {exp.map((e,i)=>(
-            <div key={e.id} style={{padding:"10px 12px",borderBottom:i<exp.length-1?"1px solid #0F1A3A":"none"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.description||e.category}</div>
-                  <div style={{fontSize:11,color:"#556677"}}>{e.category} · {e.date.slice(5)} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+e.paid_from:""}</div>
-                </div>
-                <span style={{fontSize:14,fontWeight:600,color:"#E85B5B",marginLeft:10,whiteSpace:"nowrap"}}>{fmtK(Number(e.amount))}</span>
+      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:exp.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No expenses in this period.</div>:(()=>{
+        const expRow=(e,last)=>(
+          <div key={e.id} style={{padding:"9px 0",borderBottom:last?"none":"1px solid #101B36"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.description||e.category}</div>
+                <div style={{fontSize:11,color:"#8A97A8"}}>{e.category} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+e.paid_from:""}</div>
               </div>
-              {can(user,"edit_expense")&&(withinWindow(e.created_at)?<div style={{display:"flex",gap:6,marginTop:6}}>
-                <button className="btn-g" onClick={()=>startEdit(e)} style={{fontSize:11,padding:"4px 10px"}}>Edit</button>
-                {can(user,"void")&&<button className="btn-g" onClick={()=>delExpense(e)} style={{fontSize:11,padding:"4px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Delete</button>}
-              </div>:<div style={{fontSize:10,color:"#556677",marginTop:6}}>🔒 Locked (over 24h)</div>)}
+              <span style={{fontSize:14,fontWeight:600,color:"#E85B5B",marginLeft:10,whiteSpace:"nowrap"}}>{fmtK(Number(e.amount))}</span>
             </div>
-          ))}
-        </div>
-      )}
+            {can(user,"edit_expense")&&(withinWindow(e.created_at)?<div style={{display:"flex",gap:6,marginTop:6}}>
+              <button className="btn-g" onClick={()=>startEdit(e)} style={{fontSize:11,padding:"4px 10px"}}>Edit</button>
+              {can(user,"void")&&<button className="btn-g" onClick={()=>delExpense(e)} style={{fontSize:11,padding:"4px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Delete</button>}
+            </div>:<div style={{fontSize:10,color:"#556677",marginTop:6}}>🔒 Locked (over 24h)</div>)}
+          </div>
+        );
+        const dayTotal=arr=>arr.reduce((n,e)=>n+Number(e.amount),0);
+        const toggle=k=>setExpOpen(x=>({...x,[k]:!x[k]}));
+        const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+        const now=new Date(); const curMonth=now.toISOString().slice(0,7); const curYear=String(now.getFullYear());
+        const days={}; exp.forEach(e=>{ if(!days[e.date])days[e.date]=[]; days[e.date].push(e); });
+        const currentMonthDays=[]; const monthGroups={}; const yearGroups={};
+        Object.keys(days).sort((a,b)=>b.localeCompare(a)).forEach(date=>{
+          const ym=date.slice(0,7); const y=date.slice(0,4);
+          if(ym===curMonth) currentMonthDays.push(date);
+          else if(y===curYear){ if(!monthGroups[ym])monthGroups[ym]=[]; monthGroups[ym].push(date); }
+          else { if(!yearGroups[y])yearGroups[y]=[]; yearGroups[y].push(date); }
+        });
+        const fmtDay=d=>{ const dt=new Date(d+"T00:00:00"); return dt.toLocaleDateString("en-KE",{weekday:"short",day:"2-digit",month:"short"}); };
+        return (
+          <div>
+            {currentMonthDays.map(date=>(
+              <div key={date} style={{marginBottom:8}}>
+                <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"#E8E2D4"}}>{expOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:"#E85B5B"}}>{fmtK(dayTotal(days[date]))}</span>
+                </div>
+                {expOpen[date]&&<div style={{padding:"0 10px"}}>{days[date].map((e,i)=>expRow(e,i===days[date].length-1))}</div>}
+              </div>
+            ))}
+            {Object.keys(monthGroups).sort((a,b)=>b.localeCompare(a)).map(ym=>{
+              const dates=monthGroups[ym]; const mTotal=dates.reduce((n,d)=>n+dayTotal(days[d]),0);
+              return (
+                <div key={ym} style={{marginBottom:8}}>
+                  <div onClick={()=>toggle(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{expOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:"#E85B5B"}}>{fmtK(mTotal)}</span>
+                  </div>
+                  {expOpen[ym]&&<div style={{padding:"4px 10px 0"}}>{dates.map(date=>(
+                    <div key={date} style={{marginBottom:6}}>
+                      <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid #101B36"}}>
+                        <span style={{fontSize:12,color:"#AEB9C7"}}>{expOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                        <span style={{fontSize:12,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
+                      </div>
+                      {expOpen[date]&&<div>{days[date].map((e,i)=>expRow(e,i===days[date].length-1))}</div>}
+                    </div>
+                  ))}</div>}
+                </div>
+              );
+            })}
+            {Object.keys(yearGroups).sort((a,b)=>b.localeCompare(a)).map(y=>{
+              const dates=yearGroups[y]; const yTotal=dates.reduce((n,d)=>n+dayTotal(days[d]),0);
+              return (
+                <div key={y} style={{marginBottom:8}}>
+                  <div onClick={()=>toggle(y)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
+                    <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{expOpen[y]?"▾":"▸"} {y}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:"#E85B5B"}}>{fmtK(yTotal)}</span>
+                  </div>
+                  {expOpen[y]&&<div style={{padding:"4px 10px 0"}}>{dates.map(date=>(
+                    <div key={date} style={{marginBottom:6}}>
+                      <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid #101B36"}}>
+                        <span style={{fontSize:12,color:"#AEB9C7"}}>{expOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                        <span style={{fontSize:12,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
+                      </div>
+                      {expOpen[date]&&<div>{days[date].map((e,i)=>expRow(e,i===days[date].length-1))}</div>}
+                    </div>
+                  ))}</div>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
