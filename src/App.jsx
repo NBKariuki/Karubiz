@@ -2036,6 +2036,9 @@ function LedgerTab({user,onMoney,bal,onChange}){
   const monthStart=new Date().toISOString().slice(0,7)+"-01";
   const [from,setFrom]=useState(monthStart); const [to,setTo]=useState(todayStr());
   const [stmtAcct,setStmtAcct]=useState("sacco");
+  const lastMonthStart=(()=>{ const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,7)+"-01"; })();
+  const lastMonthEnd=(()=>{ const d=new Date(); d.setDate(0); return d.toISOString().split("T")[0]; })();
+  const [cmpOn,setCmpOn]=useState(false); const [fromB,setFromB]=useState(lastMonthStart); const [toB,setToB]=useState(lastMonthEnd);
   const [act,setAct]=useState(null); const [saving,setSaving]=useState(false);
   // action fields
   const [amt,setAmt]=useState(""); const [who,setWho]=useState(user.full_name); const [dir,setDir]=useState("in"); const [acc,setAcc]=useState("sacco");
@@ -2267,71 +2270,104 @@ function LedgerTab({user,onMoney,bal,onChange}){
       )}
 
       {tab==="statement"&&(()=>{
-        // Period P&L from pl data, filtered by from/to
-        const inR=d=>d>=from&&d<=to;
-        const pSales=pl.sales.filter(s=>inR(s.date));
-        const pExp=pl.expenses.filter(e=>inR(e.date));
-        const pLoss=(pl.losses||[]).filter(l=>inR(l.date));
-        const revenue=pSales.reduce((s,x)=>s+Number(x.total),0);
-        // COGS for the period: cost of items sold in period sales
+        const EXP_CATS_LIST=["Rent","Transport","Utilities","Marketing","Staff","Petty cash","Other"];
         const costLookup={}; pl.stock.forEach(st=>{ const k=st.name.toLowerCase(); if(!costLookup[k])costLookup[k]=[]; costLookup[k].push(Number(st.unit_cost)); });
         const avgC=n=>{ const a=costLookup[(n||"").toLowerCase()]; return a&&a.length?a.reduce((x,y)=>x+y,0)/a.length:0; };
-        const pCogs=pSales.reduce((s,x)=>s+(x.items||[]).reduce((t,it)=>t+avgC(it.name)*Number(it.qty||1),0),0);
-        const pExpTotal=pExp.reduce((s,x)=>s+Number(x.amount),0);
-        const pLossTotal=pLoss.reduce((s,l)=>s+Number(l.cost_value||0),0);
-        const grossP=revenue-pCogs;
-        const netP=grossP-pExpTotal-pLossTotal;
-        // Assets (as of now)
-        const cashA=bal.cash||0, saccoA=bal.sacco||0, pettyA=bal.petty||0;
-        const stockA=stockAtCost;
+        // Compute P&L for a date range
+        const computePL=(f,t)=>{
+          const inR=d=>d>=f&&d<=t;
+          const s=pl.sales.filter(x=>inR(x.date)); const e=pl.expenses.filter(x=>inR(x.date)); const lo=(pl.losses||[]).filter(x=>inR(x.date));
+          const revenue=s.reduce((a,x)=>a+Number(x.total),0);
+          const cogs=s.reduce((a,x)=>a+(x.items||[]).reduce((tt,it)=>tt+avgC(it.name)*Number(it.qty||1),0),0);
+          const byCat={}; EXP_CATS_LIST.forEach(c=>byCat[c]=0);
+          e.forEach(x=>{ const c=EXP_CATS_LIST.includes(x.category)?x.category:"Other"; byCat[c]+=Number(x.amount); });
+          const expTotal=e.reduce((a,x)=>a+Number(x.amount),0);
+          const lossTotal=lo.reduce((a,x)=>a+Number(x.cost_value||0),0);
+          const gross=revenue-cogs; const net=gross-expTotal-lossTotal;
+          return {revenue,cogs,byCat,expTotal,lossTotal,gross,net};
+        };
+        const A=computePL(from,to); const B=cmpOn?computePL(fromB,toB):null;
+        const cashA=bal.cash||0, saccoA=bal.sacco||0, pettyA=bal.petty||0, stockA=stockAtCost;
         const totalAssets=cashA+saccoA+pettyA+stockA;
-        // Liabilities
-        const owesB=bal.owed_burton||0, owesM=bal.owed_martin||0;
-        const totalLiab=owesB+owesM;
+        const owesB=bal.owed_burton||0, owesM=bal.owed_martin||0; const totalLiab=owesB+owesM;
         const netWorth=totalAssets-totalLiab;
         const genDate=new Date().toLocaleDateString("en-KE",{day:"2-digit",month:"long",year:"numeric"});
-        const fmtP=n=>"KSh "+Math.round(n).toLocaleString();
+        const fmtP=n=>Math.round(n).toLocaleString();
+        const perLabel=(f,t)=>`${f.slice(5)} to ${t.slice(5)}`;
+        // A row with one or two value columns
+        const Row=({label,a,b,bold,neg,band,indent,total})=>(
+          <tr style={band?{background:"#e8edf5"}:{}}>
+            <td style={{padding:total||bold?"7px 8px":"3px 8px",fontSize:bold?12.5:12,fontWeight:bold?700:400,color:"#111",paddingLeft:indent?20:8,borderTop:total?"1.5px solid #050A1F":"none"}}>{label}</td>
+            <td style={{padding:total||bold?"7px 8px":"3px 8px",fontSize:bold?12.5:12,fontWeight:bold?700:500,textAlign:"right",color:neg?"#b00":"#111",borderTop:total?"1.5px solid #050A1F":"none",whiteSpace:"nowrap"}}>{a==null?"":(neg?`(${fmtP(a)})`:fmtP(a))}</td>
+            {cmpOn&&<td style={{padding:total||bold?"7px 8px":"3px 8px",fontSize:bold?12.5:12,fontWeight:bold?700:500,textAlign:"right",color:neg?"#b00":"#111",borderTop:total?"1.5px solid #050A1F":"none",whiteSpace:"nowrap"}}>{b==null?"":(neg?`(${fmtP(b)})`:fmtP(b))}</td>}
+          </tr>
+        );
+        const Band=({label})=>(
+          <tr><td colSpan={cmpOn?3:2} style={{background:"#2E4472",color:"#fff",fontSize:12,fontWeight:700,padding:"6px 8px",letterSpacing:"0.04em"}}>{label}</td></tr>
+        );
         return (
         <div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>PERIOD FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="lg-in" style={{margin:0}}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>PERIOD A · FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="lg-in" style={{margin:0}}/></div>
             <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} className="lg-in" style={{margin:0}}/></div>
           </div>
-          {/* The formal statement document */}
-          <div id="karu-statement" style={{background:"#fff",color:"#111",borderRadius:10,padding:"20px 18px"}}>
-            <div style={{textAlign:"center",borderBottom:"2px solid #050A1F",paddingBottom:12,marginBottom:14}}>
-              <div style={{fontSize:20,fontWeight:800,letterSpacing:"0.06em",color:"#050A1F"}}>KARU FURNITURE</div>
-              <div style={{fontSize:13,color:"#555",marginTop:2}}>Financial Statement</div>
-              <div style={{fontSize:11,color:"#888",marginTop:2}}>Snapshot as of {genDate} · Performance {from} to {to}</div>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#AEB9C7",marginBottom:8,cursor:"pointer"}}>
+            <input type="checkbox" checked={cmpOn} onChange={e=>setCmpOn(e.target.checked)}/> Compare against a second period
+          </label>
+          {cmpOn&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>PERIOD B · FROM</div><input type="date" value={fromB} onChange={e=>setFromB(e.target.value)} className="lg-in" style={{margin:0}}/></div>
+            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>TO</div><input type="date" value={toB} onChange={e=>setToB(e.target.value)} className="lg-in" style={{margin:0}}/></div>
+          </div>}
+          <div id="karu-statement" style={{background:"#fff",color:"#111",borderRadius:10,padding:"18px 14px"}}>
+            <div style={{textAlign:"center",borderBottom:"2px solid #050A1F",paddingBottom:10,marginBottom:12}}>
+              <div style={{fontSize:19,fontWeight:800,letterSpacing:"0.06em",color:"#050A1F"}}>KARU FURNITURE</div>
+              <div style={{fontSize:13,color:"#555",marginTop:2}}>Income Statement &amp; Financial Position</div>
+              <div style={{fontSize:10.5,color:"#888",marginTop:2}}>Snapshot as of {genDate}</div>
             </div>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr>
+                <th style={{textAlign:"left",fontSize:10,color:"#888",padding:"2px 8px",fontWeight:600}}></th>
+                <th style={{textAlign:"right",fontSize:10.5,color:"#050A1F",padding:"2px 8px",fontWeight:700}}>{perLabel(from,to)}</th>
+                {cmpOn&&<th style={{textAlign:"right",fontSize:10.5,color:"#050A1F",padding:"2px 8px",fontWeight:700}}>{perLabel(fromB,toB)}</th>}
+              </tr></thead>
+              <tbody>
+                <Band label="REVENUE"/>
+                <Row label="Sales revenue" a={A.revenue} b={B?.revenue} indent/>
+                <Row label="Total Revenue" a={A.revenue} b={B?.revenue} bold total/>
+                <Band label="COST OF GOODS SOLD"/>
+                <Row label="Cost of goods sold" a={A.cogs} b={B?.cogs} neg indent/>
+                <Row label="Gross Profit" a={A.gross} b={B?.gross} bold total/>
+                <Band label="EXPENSES"/>
+                {EXP_CATS_LIST.map(c=>((A.byCat[c]>0||(B&&B.byCat[c]>0))?<Row key={c} label={c} a={A.byCat[c]} b={B?B.byCat[c]:null} neg indent/>:null))}
+                {(A.lossTotal>0||(B&&B.lossTotal>0))&&<Row label="Losses (theft/damage)" a={A.lossTotal} b={B?.lossTotal} neg indent/>}
+                <Row label="Total Expenses" a={A.expTotal+A.lossTotal} b={B?(B.expTotal+B.lossTotal):null} bold total/>
+                <tr><td colSpan={cmpOn?3:2} style={{padding:"4px 0"}}></td></tr>
+                <Row label="NET PROFIT" a={A.net} b={B?.net} bold total/>
+              </tbody>
+            </table>
 
-            <div style={{fontSize:12,fontWeight:700,color:"#050A1F",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Assets</div>
-            {[["Cash at hand",cashA],["SACCO",saccoA],["Petty cash",pettyA],["Stock (at cost)",stockA]].map(([l,v])=>(
-              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>{l}</span><span style={{fontWeight:500}}>{fmtP(v)}</span></div>
-            ))}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:"1px solid #ccc",marginTop:2}}><span style={{fontWeight:700}}>Total Assets</span><span style={{fontWeight:700}}>{fmtP(totalAssets)}</span></div>
-
-            <div style={{fontSize:12,fontWeight:700,color:"#050A1F",textTransform:"uppercase",letterSpacing:"0.05em",margin:"14px 0 4px"}}>Liabilities</div>
-            {totalLiab===0?<div style={{fontSize:12,color:"#888",padding:"4px 0"}}>None</div>:<>
-              {owesB>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Owed to Burton</span><span style={{fontWeight:500}}>{fmtP(owesB)}</span></div>}
-              {owesM>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Owed to Martin</span><span style={{fontWeight:500}}>{fmtP(owesM)}</span></div>}
-            </>}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:"1px solid #ccc",marginTop:2}}><span style={{fontWeight:700}}>Total Liabilities</span><span style={{fontWeight:700}}>{fmtP(totalLiab)}</span></div>
-
-            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderTop:"2px solid #050A1F",borderBottom:"2px solid #050A1F",margin:"8px 0",background:"#f7f7f7"}}><span style={{fontWeight:800,fontSize:14}}>NET WORTH</span><span style={{fontWeight:800,fontSize:14}}>{fmtP(netWorth)}</span></div>
-
-            <div style={{fontSize:12,fontWeight:700,color:"#050A1F",textTransform:"uppercase",letterSpacing:"0.05em",margin:"14px 0 4px"}}>Performance ({from} to {to})</div>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Revenue (sales invoiced)</span><span style={{fontWeight:500}}>{fmtP(revenue)}</span></div>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Less: Cost of goods sold</span><span style={{fontWeight:500,color:"#b00"}}>({fmtP(pCogs)})</span></div>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderTop:"1px solid #ddd",fontSize:12}}><span style={{fontWeight:600}}>Gross Profit</span><span style={{fontWeight:600}}>{fmtP(grossP)}</span></div>
-            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Less: Expenses</span><span style={{fontWeight:500,color:"#b00"}}>({fmtP(pExpTotal)})</span></div>
-            {pLossTotal>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Less: Losses</span><span style={{fontWeight:500,color:"#b00"}}>({fmtP(pLossTotal)})</span></div>}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderTop:"2px solid #050A1F",fontSize:14}}><span style={{fontWeight:800}}>NET PROFIT</span><span style={{fontWeight:800,color:netP>=0?"#0a0":"#b00"}}>{fmtP(netP)}</span></div>
-
-            <div style={{textAlign:"center",fontSize:10,color:"#999",marginTop:16,paddingTop:10,borderTop:"1px solid #ddd"}}>KARU Furniture · Off Kihara-Gachie-Karura Rd, Nairobi · 0720 772 866 · 0792 933 413<br/>Generated {genDate} from KARU Accounts</div>
+            <div style={{marginTop:16}}>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <tbody>
+                  <Band label="FINANCIAL POSITION (AS OF TODAY)"/>
+                  <Row label="Cash at hand" a={cashA} indent/>
+                  <Row label="SACCO" a={saccoA} indent/>
+                  <Row label="Petty cash" a={pettyA} indent/>
+                  <Row label="Stock (at cost)" a={stockA} indent/>
+                  <Row label="Total Assets" a={totalAssets} bold total/>
+                  {totalLiab>0&&<>
+                    {owesB>0&&<Row label="Owed to Burton" a={owesB} neg indent/>}
+                    {owesM>0&&<Row label="Owed to Martin" a={owesM} neg indent/>}
+                    <Row label="Total Liabilities" a={totalLiab} bold total/>
+                  </>}
+                  <Row label="NET WORTH" a={netWorth} bold total band/>
+                </tbody>
+              </table>
+            </div>
+            <div style={{textAlign:"center",fontSize:9.5,color:"#999",marginTop:16,paddingTop:10,borderTop:"1px solid #ddd"}}>KARU Furniture · Off Kihara-Gachie-Karura Rd, Nairobi · 0720 772 866 · 0792 933 413<br/>Generated {genDate} from KARU Accounts. Figures management-prepared, unaudited.</div>
           </div>
           <button className="btn-y" onClick={()=>{document.body.classList.add("printing-statement");window.print();setTimeout(()=>document.body.classList.remove("printing-statement"),500);}} style={{width:"100%",marginTop:12}}>Print / Save as PDF</button>
-          <div style={{fontSize:11,color:"#8A97A8",marginTop:8,textAlign:"center"}}>Screenshot this, or Print to save as PDF for a bank or partner.</div>
+          <div style={{fontSize:11,color:"#8A97A8",marginTop:8,textAlign:"center"}}>Screenshot, or Print to save as PDF for a bank or partner.</div>
         </div>
         );
       })()}
