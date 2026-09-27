@@ -660,11 +660,18 @@ function SaleTab({user,onMoney}){
   const [cashPart,setCashPart]=useState(""); const [mpesaPart,setMpesaPart]=useState("");
   const [notes,setNotes]=useState(""); const [err,setErr]=useState("");
   const [saving,setSaving]=useState(false); const [receipt,setReceipt]=useState(null); const [saved,setSaved]=useState(null);
+  const [payTrail,setPayTrail]=useState([]);
+  useEffect(()=>{ (async()=>{
+    if(receipt&&receipt.payment_type==="instalment"&&receipt.receipt_no){
+      try{ const p=await sb.get("karu_payments",`select=*&receipt_no=eq.${encodeURIComponent(receipt.receipt_no)}&order=created_at.asc`); setPayTrail(p); }catch{ setPayTrail([]); }
+    } else setPayTrail([]);
+  })(); },[receipt?.receipt_no]);
   const [payType,setPayType]=useState("full"); const [initPay,setInitPay]=useState("");
   const [pendingSales,setPendingSales]=useState([]); const [addPaySale,setAddPaySale]=useState(null);
   const [addPayAmt,setAddPayAmt]=useState(""); const [addPayMethod,setAddPayMethod]=useState("mpesa");
   const [addPayCode,setAddPayCode]=useState(""); const [addPayNotes,setAddPayNotes]=useState("");
   const [addPayStaff,setAddPayStaff]=useState("Burton Kariuki"); const [addPaySaving,setAddPaySaving]=useState(false);
+  const [addPayAdj,setAddPayAdj]=useState(""); const [showAdj,setShowAdj]=useState(false);
   const [showPending,setShowPending]=useState(false);
   const [todaySales,setTodaySales]=useState([]); const [showHistory,setShowHistory]=useState(false);
   const [histSales,setHistSales]=useState([]); const [voidSale,setVoidSale]=useState(null);
@@ -764,19 +771,24 @@ function SaleTab({user,onMoney}){
 
   const addPaymentToSale=async()=>{
     if(!addPayAmt||Number(addPayAmt)<=0){alert("Enter a valid amount.");return;}
-    const balNow=Number(addPaySale.balance_due||0);
-    if(Number(addPayAmt)>balNow){alert(`That's more than the balance owed (${fmtK(balNow)}).`);return;}
+    const adj=Number(addPayAdj||0); // price adjustment: negative reduces total (discount), positive raises it
+    const newTotal=Number(addPaySale.total)+adj; // adjust the sale total
+    const balNow=Math.max(0,newTotal-Number(addPaySale.amount_paid||0));
+    if(Number(addPayAmt)>balNow+0.5){alert(`That's more than the balance owed (${fmtK(balNow)}).`);return;}
     if(addPayMethod==="mpesa"&&!addPayCode.trim()){alert("M-Pesa code required.");return;}
     setAddPaySaving(true);
     try{
-      const date=todayStr(); const newPaid=Number(addPaySale.amount_paid||0)+Number(addPayAmt); const newBal=Math.max(0,Number(addPaySale.total)-newPaid);
+      const date=todayStr(); const newPaid=Number(addPaySale.amount_paid||0)+Number(addPayAmt); const newBal=Math.max(0,newTotal-newPaid);
       await sb.post("karu_payments",{sale_id:addPaySale.id,receipt_no:addPaySale.receipt_no,customer_name:addPaySale.customer_name,amount:Number(addPayAmt),payment_method:addPayMethod==="mpesa"?"M-Pesa":"Cash",mpesa_code:addPayCode.toUpperCase(),date,recorded_by:addPayStaff,notes:addPayNotes||"Instalment payment"});
-      await sb.patch("karu_sales",addPaySale.id,{amount_paid:newPaid,balance_due:newBal,payment_type:newBal<=0?"full":"instalment"});
+      const patch={amount_paid:newPaid,balance_due:newBal,payment_type:newBal<=0.5?"full":"instalment"};
+      if(adj!==0){ patch.total=newTotal; patch.price_adjustment=(Number(addPaySale.price_adjustment||0)+adj); }
+      await sb.patch("karu_sales",addPaySale.id,patch);
       await recordMoney({account:addPayMethod==="mpesa"?"sacco":"cash",amount:Number(addPayAmt),type:"sale",ref:addPaySale.receipt_no,description:`Instalment ${addPaySale.receipt_no} · ${addPaySale.customer_name}`,date,recorded_by:addPayStaff});
+      if(adj!==0) await logAudit({trip_no:null,record_id:addPaySale.id,action:"price_adjustment",field_changed:addPaySale.receipt_no,old_value:String(addPaySale.total),new_value:String(newTotal),reason:`Price adjustment ${adj>0?"+":""}${adj} on settlement`,changed_by:addPayStaff});
       if(onMoney) onMoney();
-      setAddPaySale(null);setAddPayAmt("");setAddPayCode("");setAddPayNotes("");
+      setAddPaySale(null);setAddPayAmt("");setAddPayCode("");setAddPayNotes("");setAddPayAdj("");setShowAdj(false);
       await loadPendingSales();
-      alert(newBal<=0?"Fully paid. Account cleared.":"Payment recorded. Balance: "+fmtK(newBal));
+      alert(newBal<=0.5?"Fully paid. Account cleared.":"Payment recorded. Balance: "+fmtK(newBal));
     }catch(e){alert("Failed: "+e.message);}
     setAddPaySaving(false);
   };
@@ -993,6 +1005,16 @@ function SaleTab({user,onMoney}){
         <div className="rcpt-items">{receipt.items.map((i,idx)=><div key={idx} className="rcpt-it"><span className="n">{i.name} <span style={{color:"#555"}}>x{i.qty}</span></span><span style={{fontWeight:600}}>KSh {(Number(i.qty)*Number(i.price)).toLocaleString()}</span></div>)}</div>
         <div className="rcpt-tot"><span>TOTAL</span><span>KSh {receipt.total.toLocaleString()}</span></div>{Number(receipt.credit_applied)>0&&<div className="rcpt-row"><span className="l">Store credit used</span><span className="v">- KSh {Number(receipt.credit_applied).toLocaleString()}</span></div>}
         {receipt.payment_type==="instalment"&&<><div className="rcpt-row"><span className="l">Paid</span><span className="v">KSh {Number(receipt.amount_paid).toLocaleString()}</span></div><div className="rcpt-row"><span className="l">Balance</span><span className="v" style={{color:"#B45309"}}>KSh {Number(receipt.balance_due).toLocaleString()}</span></div></>}
+        {receipt.payment_type==="instalment"&&payTrail.length>0&&(
+          <div style={{margin:"8px 0",padding:"8px 0",borderTop:"1px dashed #999",borderBottom:"1px dashed #999"}}>
+            <div style={{fontSize:11,color:"#555",marginBottom:4,fontWeight:600}}>PAYMENT HISTORY</div>
+            {payTrail.map((p,i)=>(
+              <div key={i} className="rcpt-row"><span className="l">{p.date?.slice(5)} · {p.payment_method}</span><span className="v">KSh {Number(p.amount).toLocaleString()}</span></div>
+            ))}
+            {Number(receipt.price_adjustment)!==0&&receipt.price_adjustment!=null&&<div className="rcpt-row"><span className="l">Price adjustment</span><span className="v">{Number(receipt.price_adjustment)>0?"+":""}KSh {Number(receipt.price_adjustment).toLocaleString()}</span></div>}
+            <div className="rcpt-row" style={{fontWeight:700}}><span className="l">Total paid</span><span className="v">KSh {payTrail.reduce((s,p)=>s+Number(p.amount),0).toLocaleString()}</span></div>
+          </div>
+        )}
         <div className="rcpt-row"><span className="l">Payment</span><span className="v">{receipt.payment_method}{receipt.mpesa_code?" · "+receipt.mpesa_code:""}</span></div>{receipt.payment_method==="Split"&&<div className="rcpt-row"><span className="l">Cash / M-Pesa</span><span className="v">KSh {Number(receipt.cash_part).toLocaleString()} / KSh {Number(receipt.mpesa_part).toLocaleString()}</span></div>}
         {receipt.notes&&<div className="rcpt-row"><span className="l">Note</span><span className="v">{receipt.notes}</span></div>}
         {Number(receipt.store_credit_note)>0&&<div style={{background:"rgba(76,175,80,0.1)",border:"1px dashed rgba(76,175,80,0.4)",borderRadius:6,padding:"8px 10px",margin:"10px 0",fontSize:12,color:"#1a7a2e",textAlign:"center"}}>Store credit: KSh {Number(receipt.store_credit_note).toLocaleString()} — redeemable on a future purchase. Payments made are not refundable.</div>}
@@ -1125,8 +1147,17 @@ function SaleTab({user,onMoney}){
               {addPaySale?(
                 <div>
                   <div style={{fontSize:13,fontWeight:600,marginBottom:2}}>{addPaySale.customer_name}</div>
-                  <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>Total {fmtK(Number(addPaySale.total))} · Paid {fmtK(Number(addPaySale.amount_paid||0))} · <span style={{color:"#E8A45B",fontWeight:600}}>Balance {fmtK(Number(addPaySale.balance_due))}</span></div>
-                  <div className="field"><label>Amount received now (KSh)</label><input type="number" value={addPayAmt} onChange={e=>setAddPayAmt(e.target.value)} placeholder="0"/><button onClick={()=>setAddPayAmt(String(Number(addPaySale.balance_due)))} style={{marginTop:6,background:"none",border:"1px solid #1A2A4A",borderRadius:5,color:"#8899AA",fontSize:11,padding:"5px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Pay full balance ({fmtK(Number(addPaySale.balance_due))})</button></div>
+                  {(()=>{ const adj=Number(addPayAdj||0); const effTotal=Number(addPaySale.total)+adj; const effBal=Math.max(0,effTotal-Number(addPaySale.amount_paid||0)); return (
+                  <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>Total {fmtK(effTotal)}{adj!==0?` (adj ${adj>0?"+":""}${adj})`:""} · Paid {fmtK(Number(addPaySale.amount_paid||0))} · <span style={{color:"#E8A45B",fontWeight:600}}>Balance {fmtK(effBal)}</span></div>
+                  );})()}
+                  <div className="field"><label>Amount received now (KSh)</label><input type="number" value={addPayAmt} onChange={e=>setAddPayAmt(e.target.value)} placeholder="0"/><button onClick={()=>{const adj=Number(addPayAdj||0);const effBal=Math.max(0,Number(addPaySale.total)+adj-Number(addPaySale.amount_paid||0));setAddPayAmt(String(effBal));}} style={{marginTop:6,background:"none",border:"1px solid #1A2A4A",borderRadius:5,color:"#8899AA",fontSize:11,padding:"5px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Pay full balance</button></div>
+                  {!showAdj?<button onClick={()=>setShowAdj(true)} style={{background:"none",border:"1px dashed #24365C",borderRadius:6,color:"#8A97A8",fontSize:12,padding:"7px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:12,width:"100%"}}>+ Price adjustment</button>:(
+                    <div className="field" style={{background:"rgba(232,164,91,0.06)",border:"1px solid rgba(232,164,91,0.25)",borderRadius:8,padding:10}}>
+                      <label>Price adjustment (KSh)</label>
+                      <div style={{fontSize:11,color:"#8A97A8",marginBottom:6}}>Negative to knock off (goodwill), positive to add. Changes the sale total so the balance settles correctly.</div>
+                      <input type="number" value={addPayAdj} onChange={e=>setAddPayAdj(e.target.value)} placeholder="e.g. -100"/>
+                    </div>
+                  )}
                   <div className="field"><label>Method</label><div className="tog"><button className={`tog-btn${addPayMethod==="mpesa"?" on":""}`} onClick={()=>setAddPayMethod("mpesa")}>M-Pesa</button><button className={`tog-btn${addPayMethod==="cash"?" on":""}`} onClick={()=>setAddPayMethod("cash")}>Cash</button></div></div>
                   {addPayMethod==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={addPayCode} onChange={e=>setAddPayCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>}
                   <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${addPayStaff===s?" on":""}`} onClick={()=>setAddPayStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
@@ -2154,7 +2185,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
           <div style={{background:"#0A1128",border:"1px solid #24365C",borderRadius:8,padding:"10px 12px"}}>
             <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>CAPITAL FLOAT</div>
             <div style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(capitalFloat)}</div>
-            <div style={{fontSize:10,color:"#556677",marginTop:2}}>working money going round</div>
+            <div style={{fontSize:10,color:"#8A97A8",marginTop:2}}>cash + stock still circulating</div>
           </div>
           <div style={{background:"#0A1128",border:`1px solid ${netProfitAll>=0?"rgba(76,175,80,0.35)":"rgba(232,91,91,0.35)"}`,borderRadius:8,padding:"10px 12px"}}>
             <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>NET PROFIT EARNED</div>
@@ -2165,7 +2196,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
         <div style={{fontSize:12,color:"#8A97A8",display:"flex",justifyContent:"space-between",padding:"8px 2px 0",borderTop:"1px solid #1A2A4A"}}>
           <span>Gross profit (sales less cost): <b style={{color:"#4CAF50"}}>{fmtK(grossProfitAll)}</b></span>
         </div>
-        <div style={{fontSize:11,color:"#556677",marginTop:8,lineHeight:1.5}}>Of your total worth ({fmtK(totalWorth)} = {fmtK(liquidAll)} liquid + {fmtK(stockAtCost)} stock), {fmtK(capitalFloat)} is capital still circulating and {fmtK(netProfitAll)} is what the business has actually earned on top.</div>
+        <div style={{fontSize:11,color:"#8A97A8",marginTop:8,lineHeight:1.5}}>Worth {fmtK(totalWorth)} = {fmtK(liquidAll)} cash + {fmtK(stockAtCost)} stock (same as Stock tab). Of that, {fmtK(capitalFloat)} is capital and {fmtK(netProfitAll)} is earned profit.</div>
       </div>
 
       {/* Sub-tabs */}
