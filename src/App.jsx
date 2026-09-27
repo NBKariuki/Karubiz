@@ -127,7 +127,7 @@ const GS = () => (
     .rcpt-it .n{flex:1;padding-right:8px}
     .rcpt-tot{display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding:8px 0}
     .rcpt-ft{text-align:center;font-size:12px;color:#555;margin-top:10px;padding-top:10px;border-top:1px dashed #999;line-height:1.6}
-    @media print{.nav,.np,.strip{display:none!important} body{background:#fff} .rcpt{max-width:80mm;border-radius:0;padding:4mm;font-size:13px} .rcpt-logo{font-size:18px}}
+    @media print{.nav,.np,.strip{display:none!important} body{background:#fff} .rcpt{max-width:80mm;border-radius:0;padding:4mm;font-size:13px} .rcpt-logo{font-size:18px}} body.printing-statement *{visibility:hidden} body.printing-statement #karu-statement,body.printing-statement #karu-statement *{visibility:visible} body.printing-statement #karu-statement{position:absolute;left:0;top:0;width:100%}
   `}</style>
 );
 
@@ -2185,7 +2185,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
           <div style={{background:"#0A1128",border:"1px solid #24365C",borderRadius:8,padding:"10px 12px"}}>
             <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>CAPITAL FLOAT</div>
             <div style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(capitalFloat)}</div>
-            <div style={{fontSize:10,color:"#8A97A8",marginTop:2}}>cash + stock still circulating</div>
+            <div style={{fontSize:10,color:"#8A97A8",marginTop:2}}>Cash + Current Stock Value</div>
           </div>
           <div style={{background:"#0A1128",border:`1px solid ${netProfitAll>=0?"rgba(76,175,80,0.35)":"rgba(232,91,91,0.35)"}`,borderRadius:8,padding:"10px 12px"}}>
             <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>NET PROFIT EARNED</div>
@@ -2266,25 +2266,75 @@ function LedgerTab({user,onMoney,bal,onChange}){
         </div>
       )}
 
-      {tab==="statement"&&(
+      {tab==="statement"&&(()=>{
+        // Period P&L from pl data, filtered by from/to
+        const inR=d=>d>=from&&d<=to;
+        const pSales=pl.sales.filter(s=>inR(s.date));
+        const pExp=pl.expenses.filter(e=>inR(e.date));
+        const pLoss=(pl.losses||[]).filter(l=>inR(l.date));
+        const revenue=pSales.reduce((s,x)=>s+Number(x.total),0);
+        // COGS for the period: cost of items sold in period sales
+        const costLookup={}; pl.stock.forEach(st=>{ const k=st.name.toLowerCase(); if(!costLookup[k])costLookup[k]=[]; costLookup[k].push(Number(st.unit_cost)); });
+        const avgC=n=>{ const a=costLookup[(n||"").toLowerCase()]; return a&&a.length?a.reduce((x,y)=>x+y,0)/a.length:0; };
+        const pCogs=pSales.reduce((s,x)=>s+(x.items||[]).reduce((t,it)=>t+avgC(it.name)*Number(it.qty||1),0),0);
+        const pExpTotal=pExp.reduce((s,x)=>s+Number(x.amount),0);
+        const pLossTotal=pLoss.reduce((s,l)=>s+Number(l.cost_value||0),0);
+        const grossP=revenue-pCogs;
+        const netP=grossP-pExpTotal-pLossTotal;
+        // Assets (as of now)
+        const cashA=bal.cash||0, saccoA=bal.sacco||0, pettyA=bal.petty||0;
+        const stockA=stockAtCost;
+        const totalAssets=cashA+saccoA+pettyA+stockA;
+        // Liabilities
+        const owesB=bal.owed_burton||0, owesM=bal.owed_martin||0;
+        const totalLiab=owesB+owesM;
+        const netWorth=totalAssets-totalLiab;
+        const genDate=new Date().toLocaleDateString("en-KE",{day:"2-digit",month:"long",year:"numeric"});
+        const fmtP=n=>"KSh "+Math.round(n).toLocaleString();
+        return (
         <div>
-          <div className="tog" style={{marginBottom:10}}>{ACCTS.map(([id,l])=><button key={id} className={`tog-btn${stmtAcct===id?" on":""}`} onClick={()=>setStmtAcct(id)}>{l}</button>)}</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-            <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="lg-in" style={{margin:0}}/></div>
-            <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} className="lg-in" style={{margin:0}}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>PERIOD FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="lg-in" style={{margin:0}}/></div>
+            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} className="lg-in" style={{margin:0}}/></div>
           </div>
-          <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:10}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#8899AA",marginBottom:4}}><span>Opening balance</span><span style={{color:"#E8E2D4",fontWeight:600}}>{fmtK(opening)}</span></div>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:13,paddingTop:6,borderTop:"1px solid #1A2A4A"}}><span style={{color:"#FFFFFF",fontWeight:600}}>Closing balance</span><span style={{color:"#F5C000",fontWeight:700}}>{fmtK(closing)}</span></div>
-          </div>
-          {stmtWithRun.length===0?<div style={{color:"#556677",textAlign:"center",padding:"16px 0",fontSize:13}}>No movements in range.</div>:stmtWithRun.map(r=>(
-            <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #101B36"}}>
-              <div style={{flex:1,minWidth:0,paddingRight:8}}><div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.description||r.type}</div><div style={{fontSize:10,color:"#556677"}}>{r.date.slice(5)}</div></div>
-              <div style={{textAlign:"right",whiteSpace:"nowrap"}}><div style={{fontSize:12,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div><div style={{fontSize:10,color:"#8899AA"}}>bal {Math.round(r.running).toLocaleString()}</div></div>
+          {/* The formal statement document */}
+          <div id="karu-statement" style={{background:"#fff",color:"#111",borderRadius:10,padding:"20px 18px"}}>
+            <div style={{textAlign:"center",borderBottom:"2px solid #050A1F",paddingBottom:12,marginBottom:14}}>
+              <div style={{fontSize:20,fontWeight:800,letterSpacing:"0.06em",color:"#050A1F"}}>KARU FURNITURE</div>
+              <div style={{fontSize:13,color:"#555",marginTop:2}}>Financial Statement</div>
+              <div style={{fontSize:11,color:"#888",marginTop:2}}>Snapshot as of {genDate} · Performance {from} to {to}</div>
             </div>
-          ))}
+
+            <div style={{fontSize:12,fontWeight:700,color:"#050A1F",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Assets</div>
+            {[["Cash at hand",cashA],["SACCO",saccoA],["Petty cash",pettyA],["Stock (at cost)",stockA]].map(([l,v])=>(
+              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>{l}</span><span style={{fontWeight:500}}>{fmtP(v)}</span></div>
+            ))}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:"1px solid #ccc",marginTop:2}}><span style={{fontWeight:700}}>Total Assets</span><span style={{fontWeight:700}}>{fmtP(totalAssets)}</span></div>
+
+            <div style={{fontSize:12,fontWeight:700,color:"#050A1F",textTransform:"uppercase",letterSpacing:"0.05em",margin:"14px 0 4px"}}>Liabilities</div>
+            {totalLiab===0?<div style={{fontSize:12,color:"#888",padding:"4px 0"}}>None</div>:<>
+              {owesB>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Owed to Burton</span><span style={{fontWeight:500}}>{fmtP(owesB)}</span></div>}
+              {owesM>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Owed to Martin</span><span style={{fontWeight:500}}>{fmtP(owesM)}</span></div>}
+            </>}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderTop:"1px solid #ccc",marginTop:2}}><span style={{fontWeight:700}}>Total Liabilities</span><span style={{fontWeight:700}}>{fmtP(totalLiab)}</span></div>
+
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderTop:"2px solid #050A1F",borderBottom:"2px solid #050A1F",margin:"8px 0",background:"#f7f7f7"}}><span style={{fontWeight:800,fontSize:14}}>NET WORTH</span><span style={{fontWeight:800,fontSize:14}}>{fmtP(netWorth)}</span></div>
+
+            <div style={{fontSize:12,fontWeight:700,color:"#050A1F",textTransform:"uppercase",letterSpacing:"0.05em",margin:"14px 0 4px"}}>Performance ({from} to {to})</div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Revenue (sales invoiced)</span><span style={{fontWeight:500}}>{fmtP(revenue)}</span></div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Less: Cost of goods sold</span><span style={{fontWeight:500,color:"#b00"}}>({fmtP(pCogs)})</span></div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderTop:"1px solid #ddd",fontSize:12}}><span style={{fontWeight:600}}>Gross Profit</span><span style={{fontWeight:600}}>{fmtP(grossP)}</span></div>
+            <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Less: Expenses</span><span style={{fontWeight:500,color:"#b00"}}>({fmtP(pExpTotal)})</span></div>
+            {pLossTotal>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:"#555"}}>Less: Losses</span><span style={{fontWeight:500,color:"#b00"}}>({fmtP(pLossTotal)})</span></div>}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderTop:"2px solid #050A1F",fontSize:14}}><span style={{fontWeight:800}}>NET PROFIT</span><span style={{fontWeight:800,color:netP>=0?"#0a0":"#b00"}}>{fmtP(netP)}</span></div>
+
+            <div style={{textAlign:"center",fontSize:10,color:"#999",marginTop:16,paddingTop:10,borderTop:"1px solid #ddd"}}>KARU Furniture · Off Kihara-Gachie-Karura Rd, Nairobi · 0720 772 866 · 0792 933 413<br/>Generated {genDate} from KARU Accounts</div>
+          </div>
+          <button className="btn-y" onClick={()=>{document.body.classList.add("printing-statement");window.print();setTimeout(()=>document.body.classList.remove("printing-statement"),500);}} style={{width:"100%",marginTop:12}}>Print / Save as PDF</button>
+          <div style={{fontSize:11,color:"#8A97A8",marginTop:8,textAlign:"center"}}>Screenshot this, or Print to save as PDF for a bank or partner.</div>
         </div>
-      )}
+        );
+      })()}
 
       {tab==="petty"&&(
         <div>
