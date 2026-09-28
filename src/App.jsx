@@ -341,7 +341,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
           {bal.owed_martin>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes Martin</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.owed_martin)}</span></div>}
         </div>
         {!act&&<div style={{marginBottom:16}}>
-          {can(user,"money")&&<div style={{fontSize:11,color:"#8899AA",marginBottom:14,lineHeight:1.5,background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:10}}>Money actions — bank, withdraw, partner, petty cash and reconcile — now live in the <strong style={{color:"#F5C000"}}>Ledger</strong> tab.</div>}
+          {can(user,"money")&&null}
           {(can(user,"close")||can(user,"users"))&&<>
             <div style={{fontSize:10,color:"#556677",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Admin</div>
             <div style={{display:"grid",gap:8}}>
@@ -2264,6 +2264,22 @@ function LedgerTab({user,onMoney,bal,onChange}){
         </div>
         <div style={{fontSize:12,color:"#8A97A8",display:"flex",justifyContent:"space-between",padding:"8px 2px 0",borderTop:"1px solid #1A2A4A"}}>
           <span>Gross profit (sales less cost): <b style={{color:"#4CAF50"}}>{fmtK(grossProfitAll)}</b></span>
+        </div>
+        <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #1A2A4A"}}>
+          <div style={{fontSize:11,color:"#8A97A8",marginBottom:6}}>Of everything sold so far:</div>
+          <div style={{display:"flex",gap:10}}>
+            <div style={{flex:1,background:"#0A1128",border:"1px solid #24365C",borderRadius:8,padding:"9px 11px"}}>
+              <div style={{fontSize:11,color:"#8A97A8"}}>COST RECOVERED</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#E8A45B"}}>{fmtK(cogsAll)}</div>
+              <div style={{fontSize:10,color:"#556677",marginTop:1}}>your capital, back</div>
+            </div>
+            <div style={{flex:1,background:"rgba(76,175,80,0.06)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:"9px 11px"}}>
+              <div style={{fontSize:11,color:"#8A97A8"}}>PROFIT EARNED</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#4CAF50"}}>{fmtK(grossProfitAll)}</div>
+              <div style={{fontSize:10,color:"#556677",marginTop:1}}>margin on top</div>
+            </div>
+          </div>
+          <div style={{fontSize:10,color:"#556677",marginTop:6,lineHeight:1.4}}>Sales of {fmtK(salesAll)} = {fmtK(cogsAll)} recovering what the goods cost + {fmtK(grossProfitAll)} gross profit.</div>
         </div>
         <div style={{fontSize:11,color:"#8A97A8",marginTop:8,lineHeight:1.5}}>Worth {fmtK(totalWorth)} = {fmtK(liquidAll)} cash + {fmtK(stockAtCost)} stock (same as Stock tab). Of that, {fmtK(capitalFloat)} is capital and {fmtK(netProfitAll)} is earned profit.</div>
       </div>
