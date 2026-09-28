@@ -2032,13 +2032,14 @@ function LedgerTab({user,onMoney,bal,onChange}){
   const [rows,setRows]=useState([]); const [loading,setLoading]=useState(true);
   const [tab,setTab]=useState("overview"); // overview | register | statement | petty | owed
   const [acctFilter,setAcctFilter]=useState("all");
+  const [regOpen,setRegOpen]=useState({}); const [pcOpen,setPcOpen]=useState({});
   const [typeFilter,setTypeFilter]=useState("all");
   const monthStart=new Date().toISOString().slice(0,7)+"-01";
   const [from,setFrom]=useState(monthStart); const [to,setTo]=useState(todayStr());
   const [stmtAcct,setStmtAcct]=useState("sacco");
   const lastMonthStart=(()=>{ const d=new Date(); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,7)+"-01"; })();
   const lastMonthEnd=(()=>{ const d=new Date(); d.setDate(0); return d.toISOString().split("T")[0]; })();
-  const [cmpOn,setCmpOn]=useState(false); const [fromB,setFromB]=useState(lastMonthStart); const [toB,setToB]=useState(lastMonthEnd);
+  const [periods,setPeriods]=useState([{from:monthStart,to:todayStr()}]);
   const [act,setAct]=useState(null); const [saving,setSaving]=useState(false);
   // action fields
   const [amt,setAmt]=useState(""); const [who,setWho]=useState(user.full_name); const [dir,setDir]=useState("in"); const [acc,setAcc]=useState("sacco");
@@ -2212,17 +2213,13 @@ function LedgerTab({user,onMoney,bal,onChange}){
       {tab==="overview"&&(
         <div>
           {!act&&<div>
-            <div style={{fontSize:10,color:"#556677",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Move money</div>
-            <div style={{display:"grid",gap:8,marginBottom:16}}>
-              <button className="btn-g" onClick={()=>setAct("bank")} style={{fontSize:13}}>Bank cash → SACCO</button>
-              <button className="btn-g" onClick={()=>setAct("withdraw")} style={{fontSize:13}}>Withdraw SACCO → cash</button>
-              <button className="btn-g" onClick={()=>setAct("partner")} style={{fontSize:13}}>Partner money in / out</button>
-              <button className="btn-g" onClick={()=>setAct("reconcile")} style={{fontSize:13}}>Reconcile a balance</button>
-            </div>
-            <div style={{fontSize:10,color:"#556677",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Petty cash</div>
+            <div style={{fontSize:10,color:"#8A97A8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Move money</div>
             <div style={{display:"grid",gap:8}}>
-              <button className="btn-y" onClick={()=>setAct("allocate")} style={{fontSize:13}}>Top up petty cash</button>
-              <button className="btn-g" onClick={()=>setAct("spend")} style={{fontSize:13}}>Record petty spend</button>
+              <button className="btn-g" onClick={()=>setAct("bank")} style={{fontSize:13}}>Bank cash into SACCO</button>
+              <button className="btn-g" onClick={()=>setAct("withdraw")} style={{fontSize:13}}>Withdraw SACCO to cash</button>
+              <button className="btn-g" onClick={()=>setAct("partner")} style={{fontSize:13}}>Partner money in or out</button>
+              <button className="btn-g" onClick={()=>setAct("reconcile")} style={{fontSize:13}}>Reconcile a balance</button>
+              <button className="btn-g" onClick={()=>setAct("allocate")} style={{fontSize:13}}>Top up petty cash</button>
             </div>
           </div>}
           {act==="bank"&&<ActBox title="Bank cash into SACCO"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doBank} off={rb} saving={saving}/></ActBox>}
@@ -2255,17 +2252,54 @@ function LedgerTab({user,onMoney,bal,onChange}){
             <button onClick={()=>setAcctFilter("all")} style={pill(acctFilter==="all")}>All accounts</button>
             {ACCTS.map(([id,l])=><button key={id} onClick={()=>setAcctFilter(id)} style={pill(acctFilter===id)}>{l}</button>)}
           </div>
-          <div style={{fontSize:11,color:"#556677",marginBottom:8}}>{registerRows.length} movements · <button onClick={exportLedger} style={{background:"none",border:"none",color:"#8899AA",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Export CSV</button></div>
-          {registerRows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0",fontSize:13}}>No movements in range.</div>:registerRows.map(r=>{ const isSale=r.type==="sale"&&r.ref; const sp=isSale?saleSplit(r.ref):null; return (
-            <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #101B36"}}>
-              <div style={{flex:1,minWidth:0,paddingRight:8}}>
-                <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.description||r.type}</div>
-                <div style={{fontSize:10,color:"#556677"}}>{r.date.slice(5)} · {acctLabel(r.account)} · {r.recorded_by?.split(" ")[0]||""}</div>
-                {sp&&sp.cost>0&&<div style={{fontSize:10,color:"#8A97A8",marginTop:1}}>capital {fmtK(sp.cost)} · profit <span style={{color:"#4CAF50"}}>{fmtK(Math.max(0,Number(r.amount)-sp.cost))}</span></div>}
+          <div style={{fontSize:11,color:"#8A97A8",marginBottom:8}}>{registerRows.length} movements · <button onClick={exportLedger} style={{background:"none",border:"none",color:"#AEB9C7",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Export CSV</button></div>
+          {registerRows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0",fontSize:13}}>No movements in range.</div>:(()=>{
+            const regRow=(r)=>{ const isSale=r.type==="sale"&&r.ref; const sp=isSale?saleSplit(r.ref):null; return (
+              <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #101B36"}}>
+                <div style={{flex:1,minWidth:0,paddingRight:8}}>
+                  <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.description||r.type}</div>
+                  <div style={{fontSize:10,color:"#8A97A8"}}>{acctLabel(r.account)} · {r.recorded_by?.split(" ")[0]||""}</div>
+                  {sp&&sp.cost>0&&<div style={{fontSize:10,color:"#8A97A8",marginTop:1}}>capital {fmtK(sp.cost)} · profit <span style={{color:"#4CAF50"}}>{fmtK(Math.max(0,Number(r.amount)-sp.cost))}</span></div>}
+                </div>
+                <div style={{fontSize:13,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B",whiteSpace:"nowrap"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
               </div>
-              <div style={{fontSize:13,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B",whiteSpace:"nowrap"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
-            </div>
-            );})}
+            );};
+            const dayNet=arr=>arr.reduce((n,r)=>n+Number(r.amount),0);
+            const tg=k=>setRegOpen(x=>({...x,[k]:!x[k]}));
+            const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+            const now=new Date(); const cm=now.toISOString().slice(0,7); const cy=String(now.getFullYear());
+            const days={}; registerRows.forEach(r=>{ if(!days[r.date])days[r.date]=[]; days[r.date].push(r); });
+            const cmd=[]; const mg={}; const yg={};
+            Object.keys(days).sort((a,b)=>b.localeCompare(a)).forEach(d=>{ const ym=d.slice(0,7),y=d.slice(0,4); if(ym===cm)cmd.push(d); else if(y===cy){(mg[ym]=mg[ym]||[]).push(d);} else {(yg[y]=yg[y]||[]).push(d);} });
+            const fmtD=d=>new Date(d+"T00:00:00").toLocaleDateString("en-KE",{weekday:"short",day:"2-digit",month:"short"});
+            const net=n=>`${n>=0?"+":""}${Math.round(n).toLocaleString()}`;
+            const dayBlock=(d,sub)=>(<div key={d} style={{marginBottom:sub?6:8}}>
+              <div onClick={()=>tg(d)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:sub?"6px 0":"8px 10px",background:sub?"none":"#0A1128",border:sub?"none":"1px solid #1A2A4A",borderRadius:8,borderBottom:sub?"1px solid #101B36":undefined}}>
+                <span style={{fontSize:sub?12:13,fontWeight:600,color:"#E8E2D4"}}>{regOpen[d]?"▾":"▸"} {fmtD(d)}</span>
+                <span style={{fontSize:sub?12:13,fontWeight:600,color:dayNet(days[d])>=0?"#4CAF50":"#E85B5B"}}>{net(dayNet(days[d]))}</span>
+              </div>
+              {regOpen[d]&&<div style={{padding:sub?0:"0 10px"}}>{days[d].map(regRow)}</div>}
+            </div>);
+            return (<div>
+              {cmd.map(d=>dayBlock(d,false))}
+              {Object.keys(mg).sort((a,b)=>b.localeCompare(a)).map(ym=>{ const t=mg[ym].reduce((n,d)=>n+dayNet(days[d]),0); return (
+                <div key={ym} style={{marginBottom:8}}>
+                  <div onClick={()=>tg(ym)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{regOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
+                  </div>
+                  {regOpen[ym]&&<div style={{padding:"4px 10px 0"}}>{mg[ym].map(d=>dayBlock(d,true))}</div>}
+                </div>);})}
+              {Object.keys(yg).sort((a,b)=>b.localeCompare(a)).map(y=>{ const t=yg[y].reduce((n,d)=>n+dayNet(days[d]),0); return (
+                <div key={y} style={{marginBottom:8}}>
+                  <div onClick={()=>tg(y)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
+                    <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{regOpen[y]?"▾":"▸"} {y}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
+                  </div>
+                  {regOpen[y]&&<div style={{padding:"4px 10px 0"}}>{yg[y].map(d=>dayBlock(d,true))}</div>}
+                </div>);})}
+            </div>);
+          })()}
         </div>
       )}
 
@@ -2273,7 +2307,6 @@ function LedgerTab({user,onMoney,bal,onChange}){
         const EXP_CATS_LIST=["Rent","Transport","Utilities","Marketing","Staff","Petty cash","Other"];
         const costLookup={}; pl.stock.forEach(st=>{ const k=st.name.toLowerCase(); if(!costLookup[k])costLookup[k]=[]; costLookup[k].push(Number(st.unit_cost)); });
         const avgC=n=>{ const a=costLookup[(n||"").toLowerCase()]; return a&&a.length?a.reduce((x,y)=>x+y,0)/a.length:0; };
-        // Compute P&L for a date range
         const computePL=(f,t)=>{
           const inR=d=>d>=f&&d<=t;
           const s=pl.sales.filter(x=>inR(x.date)); const e=pl.expenses.filter(x=>inR(x.date)); const lo=(pl.losses||[]).filter(x=>inR(x.date));
@@ -2286,39 +2319,41 @@ function LedgerTab({user,onMoney,bal,onChange}){
           const gross=revenue-cogs; const net=gross-expTotal-lossTotal;
           return {revenue,cogs,byCat,expTotal,lossTotal,gross,net};
         };
-        const A=computePL(from,to); const B=cmpOn?computePL(fromB,toB):null;
+        const results=periods.map(p=>({...p,pl:computePL(p.from,p.to)}));
+        const nCol=results.length;
         const cashA=bal.cash||0, saccoA=bal.sacco||0, pettyA=bal.petty||0, stockA=stockAtCost;
         const totalAssets=cashA+saccoA+pettyA+stockA;
         const owesB=bal.owed_burton||0, owesM=bal.owed_martin||0; const totalLiab=owesB+owesM;
         const netWorth=totalAssets-totalLiab;
         const genDate=new Date().toLocaleDateString("en-KE",{day:"2-digit",month:"long",year:"numeric"});
         const fmtP=n=>Math.round(n).toLocaleString();
-        const perLabel=(f,t)=>`${f.slice(5)} to ${t.slice(5)}`;
-        // A row with one or two value columns
-        const Row=({label,a,b,bold,neg,band,indent,total})=>(
-          <tr style={band?{background:"#e8edf5"}:{}}>
-            <td style={{padding:total||bold?"7px 8px":"3px 8px",fontSize:bold?12.5:12,fontWeight:bold?700:400,color:"#111",paddingLeft:indent?20:8,borderTop:total?"1.5px solid #050A1F":"none"}}>{label}</td>
-            <td style={{padding:total||bold?"7px 8px":"3px 8px",fontSize:bold?12.5:12,fontWeight:bold?700:500,textAlign:"right",color:neg?"#b00":"#111",borderTop:total?"1.5px solid #050A1F":"none",whiteSpace:"nowrap"}}>{a==null?"":(neg?`(${fmtP(a)})`:fmtP(a))}</td>
-            {cmpOn&&<td style={{padding:total||bold?"7px 8px":"3px 8px",fontSize:bold?12.5:12,fontWeight:bold?700:500,textAlign:"right",color:neg?"#b00":"#111",borderTop:total?"1.5px solid #050A1F":"none",whiteSpace:"nowrap"}}>{b==null?"":(neg?`(${fmtP(b)})`:fmtP(b))}</td>}
+        const perLabel=(f,t)=>`${f.slice(5)}–${t.slice(5)}`;
+        const setP=(i,k,v)=>setPeriods(ps=>ps.map((p,j)=>j===i?{...p,[k]:v}:p));
+        const addP=()=>setPeriods(ps=>ps.length<3?[...ps,{from:monthStart,to:todayStr()}]:ps);
+        const rmP=i=>setPeriods(ps=>ps.length>1?ps.filter((_,j)=>j!==i):ps);
+        const Row=({label,vals,bold,neg,total})=>(
+          <tr>
+            <td style={{padding:total||bold?"7px 6px":"3px 6px",fontSize:bold?12:11.5,fontWeight:bold?700:400,color:"#111",paddingLeft:bold?6:16,borderTop:total?"1.5px solid #050A1F":"none"}}>{label}</td>
+            {vals.map((v,i)=><td key={i} style={{padding:total||bold?"7px 6px":"3px 6px",fontSize:bold?12:11.5,fontWeight:bold?700:500,textAlign:"right",color:neg?"#b00":"#111",borderTop:total?"1.5px solid #050A1F":"none",whiteSpace:"nowrap"}}>{v==null?"":(neg?`(${fmtP(v)})`:fmtP(v))}</td>)}
           </tr>
         );
-        const Band=({label})=>(
-          <tr><td colSpan={cmpOn?3:2} style={{background:"#2E4472",color:"#fff",fontSize:12,fontWeight:700,padding:"6px 8px",letterSpacing:"0.04em"}}>{label}</td></tr>
-        );
+        const Band=({label})=>(<tr><td colSpan={nCol+1} style={{background:"#2E4472",color:"#fff",fontSize:11.5,fontWeight:700,padding:"6px 8px",letterSpacing:"0.04em"}}>{label}</td></tr>);
         return (
         <div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>PERIOD A · FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="lg-in" style={{margin:0}}/></div>
-            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} className="lg-in" style={{margin:0}}/></div>
-          </div>
-          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#AEB9C7",marginBottom:8,cursor:"pointer"}}>
-            <input type="checkbox" checked={cmpOn} onChange={e=>setCmpOn(e.target.checked)}/> Compare against a second period
-          </label>
-          {cmpOn&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>PERIOD B · FROM</div><input type="date" value={fromB} onChange={e=>setFromB(e.target.value)} className="lg-in" style={{margin:0}}/></div>
-            <div><div style={{fontSize:11,color:"#8A97A8",marginBottom:3}}>TO</div><input type="date" value={toB} onChange={e=>setToB(e.target.value)} className="lg-in" style={{margin:0}}/></div>
-          </div>}
-          <div id="karu-statement" style={{background:"#fff",color:"#111",borderRadius:10,padding:"18px 14px"}}>
+          {results.map((p,i)=>(
+            <div key={i} style={{marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                <span style={{fontSize:11,color:"#8A97A8",minWidth:64}}>PERIOD {String.fromCharCode(65+i)}</span>
+                {periods.length>1&&<button onClick={()=>rmP(i)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:14,cursor:"pointer",marginLeft:"auto"}}>×</button>}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <input type="date" value={p.from} onChange={e=>setP(i,"from",e.target.value)} className="lg-in" style={{margin:0}}/>
+                <input type="date" value={p.to} onChange={e=>setP(i,"to",e.target.value)} className="lg-in" style={{margin:0}}/>
+              </div>
+            </div>
+          ))}
+          {periods.length<3&&<button onClick={addP} style={{background:"none",border:"1px dashed #24365C",borderRadius:6,color:"#8A97A8",fontSize:12,padding:"7px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:12,width:"100%"}}>+ Add a period to compare (up to 3)</button>}
+          <div id="karu-statement" style={{background:"#fff",color:"#111",borderRadius:10,padding:"18px 12px"}}>
             <div style={{textAlign:"center",borderBottom:"2px solid #050A1F",paddingBottom:10,marginBottom:12}}>
               <div style={{fontSize:19,fontWeight:800,letterSpacing:"0.06em",color:"#050A1F"}}>KARU FURNITURE</div>
               <div style={{fontSize:13,color:"#555",marginTop:2}}>Income Statement &amp; Financial Position</div>
@@ -2326,43 +2361,42 @@ function LedgerTab({user,onMoney,bal,onChange}){
             </div>
             <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead><tr>
-                <th style={{textAlign:"left",fontSize:10,color:"#888",padding:"2px 8px",fontWeight:600}}></th>
-                <th style={{textAlign:"right",fontSize:10.5,color:"#050A1F",padding:"2px 8px",fontWeight:700}}>{perLabel(from,to)}</th>
-                {cmpOn&&<th style={{textAlign:"right",fontSize:10.5,color:"#050A1F",padding:"2px 8px",fontWeight:700}}>{perLabel(fromB,toB)}</th>}
+                <th style={{textAlign:"left",fontSize:10,color:"#888",padding:"2px 6px",fontWeight:600}}></th>
+                {results.map((p,i)=><th key={i} style={{textAlign:"right",fontSize:10,color:"#050A1F",padding:"2px 6px",fontWeight:700,whiteSpace:"nowrap"}}>{perLabel(p.from,p.to)}</th>)}
               </tr></thead>
               <tbody>
                 <Band label="REVENUE"/>
-                <Row label="Sales revenue" a={A.revenue} b={B?.revenue} indent/>
-                <Row label="Total Revenue" a={A.revenue} b={B?.revenue} bold total/>
+                <Row label="Sales revenue" vals={results.map(r=>r.pl.revenue)}/>
+                <Row label="Total Revenue" vals={results.map(r=>r.pl.revenue)} bold total/>
                 <Band label="COST OF GOODS SOLD"/>
-                <Row label="Cost of goods sold" a={A.cogs} b={B?.cogs} neg indent/>
-                <Row label="Gross Profit" a={A.gross} b={B?.gross} bold total/>
+                <Row label="Cost of goods sold" vals={results.map(r=>r.pl.cogs)} neg/>
+                <Row label="Gross Profit" vals={results.map(r=>r.pl.gross)} bold total/>
                 <Band label="EXPENSES"/>
-                {EXP_CATS_LIST.map(c=>((A.byCat[c]>0||(B&&B.byCat[c]>0))?<Row key={c} label={c} a={A.byCat[c]} b={B?B.byCat[c]:null} neg indent/>:null))}
-                {(A.lossTotal>0||(B&&B.lossTotal>0))&&<Row label="Losses (theft/damage)" a={A.lossTotal} b={B?.lossTotal} neg indent/>}
-                <Row label="Total Expenses" a={A.expTotal+A.lossTotal} b={B?(B.expTotal+B.lossTotal):null} bold total/>
-                <tr><td colSpan={cmpOn?3:2} style={{padding:"4px 0"}}></td></tr>
-                <Row label="NET PROFIT" a={A.net} b={B?.net} bold total/>
+                {EXP_CATS_LIST.map(c=>(results.some(r=>r.pl.byCat[c]>0)?<Row key={c} label={c} vals={results.map(r=>r.pl.byCat[c])} neg/>:null))}
+                {results.some(r=>r.pl.lossTotal>0)&&<Row label="Losses (theft/damage)" vals={results.map(r=>r.pl.lossTotal)} neg/>}
+                <Row label="Total Expenses" vals={results.map(r=>r.pl.expTotal+r.pl.lossTotal)} bold total/>
+                <tr><td colSpan={nCol+1} style={{padding:"4px 0"}}></td></tr>
+                <Row label="NET PROFIT" vals={results.map(r=>r.pl.net)} bold total/>
               </tbody>
             </table>
-
             <div style={{marginTop:16}}>
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <tbody>
                   <Band label="FINANCIAL POSITION (AS OF TODAY)"/>
-                  <Row label="Cash at hand" a={cashA} indent/>
-                  <Row label="SACCO" a={saccoA} indent/>
-                  <Row label="Petty cash" a={pettyA} indent/>
-                  <Row label="Stock (at cost)" a={stockA} indent/>
-                  <Row label="Total Assets" a={totalAssets} bold total/>
+                  <Row label="Cash at hand" vals={[cashA,...Array(nCol-1).fill(null)]}/>
+                  <Row label="SACCO" vals={[saccoA,...Array(nCol-1).fill(null)]}/>
+                  <Row label="Petty cash" vals={[pettyA,...Array(nCol-1).fill(null)]}/>
+                  <Row label="Stock (at cost)" vals={[stockA,...Array(nCol-1).fill(null)]}/>
+                  <Row label="Total Assets" vals={[totalAssets,...Array(nCol-1).fill(null)]} bold total/>
                   {totalLiab>0&&<>
-                    {owesB>0&&<Row label="Owed to Burton" a={owesB} neg indent/>}
-                    {owesM>0&&<Row label="Owed to Martin" a={owesM} neg indent/>}
-                    <Row label="Total Liabilities" a={totalLiab} bold total/>
+                    {owesB>0&&<Row label="Owed to Burton" vals={[owesB,...Array(nCol-1).fill(null)]} neg/>}
+                    {owesM>0&&<Row label="Owed to Martin" vals={[owesM,...Array(nCol-1).fill(null)]} neg/>}
+                    <Row label="Total Liabilities" vals={[totalLiab,...Array(nCol-1).fill(null)]} bold total/>
                   </>}
-                  <Row label="NET WORTH" a={netWorth} bold total band/>
+                  <Row label="NET WORTH" vals={[netWorth,...Array(nCol-1).fill(null)]} bold total/>
                 </tbody>
               </table>
+              {nCol>1&&<div style={{fontSize:9.5,color:"#999",marginTop:6}}>Financial position is a single snapshot as of today; only performance figures compare across periods.</div>}
             </div>
             <div style={{textAlign:"center",fontSize:9.5,color:"#999",marginTop:16,paddingTop:10,borderTop:"1px solid #ddd"}}>KARU Furniture · Off Kihara-Gachie-Karura Rd, Nairobi · 0720 772 866 · 0792 933 413<br/>Generated {genDate} from KARU Accounts. Figures management-prepared, unaudited.</div>
           </div>
@@ -2379,15 +2413,52 @@ function LedgerTab({user,onMoney,bal,onChange}){
             <div className="stat"><div className="stat-n" style={{color:"#E85B5B"}}>{fmtK(pettySpent)}</div><div className="stat-l">Spent all time</div></div>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:12}}>
-            <button className="btn-y" onClick={()=>{setTab("overview");setAct("allocate");}} style={{flex:1,fontSize:12}}>Top up</button>
-            <button className="btn-g" onClick={()=>{setTab("overview");setAct("spend");}} style={{flex:1,fontSize:12}}>Record spend</button>
+            <button className="btn-y" onClick={()=>{setTab("overview");setAct("allocate");}} style={{flex:1,fontSize:12}}>Top up petty cash</button>
           </div>
-          {pettyRows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0",fontSize:13}}>No petty cash activity yet.</div>:pettyRows.map(r=>(
-            <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #101B36"}}>
-              <div style={{flex:1,minWidth:0,paddingRight:8}}><div style={{fontSize:12,fontWeight:500}}>{r.description||r.type}</div><div style={{fontSize:10,color:"#556677"}}>{r.date.slice(5)} · {r.recorded_by?.split(" ")[0]||""}</div></div>
-              <div style={{fontSize:13,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
-            </div>
-          ))}
+          <div style={{fontSize:11,color:"#8A97A8",marginBottom:12}}>Record petty spends on the Expenses tab (+ Petty spend). They appear here and in your expenses.</div>
+          {pettyRows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0",fontSize:13}}>No petty cash activity yet.</div>:(()=>{
+            const pcRow=(r)=>(
+              <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #101B36"}}>
+                <div style={{flex:1,minWidth:0,paddingRight:8}}><div style={{fontSize:12,fontWeight:500}}>{r.description||r.type}</div><div style={{fontSize:10,color:"#8A97A8"}}>{r.recorded_by?.split(" ")[0]||""}</div></div>
+                <div style={{fontSize:13,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
+              </div>
+            );
+            const dayNet=arr=>arr.reduce((n,r)=>n+Number(r.amount),0);
+            const tg=k=>setPcOpen(x=>({...x,[k]:!x[k]}));
+            const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+            const now=new Date(); const cm=now.toISOString().slice(0,7); const cy=String(now.getFullYear());
+            const days={}; pettyRows.forEach(r=>{ if(!days[r.date])days[r.date]=[]; days[r.date].push(r); });
+            const cmd=[]; const mg={}; const yg={};
+            Object.keys(days).sort((a,b)=>b.localeCompare(a)).forEach(d=>{ const ym=d.slice(0,7),y=d.slice(0,4); if(ym===cm)cmd.push(d); else if(y===cy){(mg[ym]=mg[ym]||[]).push(d);} else {(yg[y]=yg[y]||[]).push(d);} });
+            const fmtD=d=>new Date(d+"T00:00:00").toLocaleDateString("en-KE",{weekday:"short",day:"2-digit",month:"short"});
+            const net=n=>`${n>=0?"+":""}${Math.round(n).toLocaleString()}`;
+            const dayBlock=(d,sub)=>(<div key={d} style={{marginBottom:sub?6:8}}>
+              <div onClick={()=>tg(d)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:sub?"6px 0":"8px 10px",background:sub?"none":"#0A1128",border:sub?"none":"1px solid #1A2A4A",borderRadius:8,borderBottom:sub?"1px solid #101B36":undefined}}>
+                <span style={{fontSize:sub?12:13,fontWeight:600,color:"#E8E2D4"}}>{pcOpen[d]?"▾":"▸"} {fmtD(d)}</span>
+                <span style={{fontSize:sub?12:13,fontWeight:600,color:dayNet(days[d])>=0?"#4CAF50":"#E85B5B"}}>{net(dayNet(days[d]))}</span>
+              </div>
+              {pcOpen[d]&&<div style={{padding:sub?0:"0 10px"}}>{days[d].map(pcRow)}</div>}
+            </div>);
+            return (<div>
+              {cmd.map(d=>dayBlock(d,false))}
+              {Object.keys(mg).sort((a,b)=>b.localeCompare(a)).map(ym=>{ const t=mg[ym].reduce((n,d)=>n+dayNet(days[d]),0); return (
+                <div key={ym} style={{marginBottom:8}}>
+                  <div onClick={()=>tg(ym)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{pcOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
+                  </div>
+                  {pcOpen[ym]&&<div style={{padding:"4px 10px 0"}}>{mg[ym].map(d=>dayBlock(d,true))}</div>}
+                </div>);})}
+              {Object.keys(yg).sort((a,b)=>b.localeCompare(a)).map(y=>{ const t=yg[y].reduce((n,d)=>n+dayNet(days[d]),0); return (
+                <div key={y} style={{marginBottom:8}}>
+                  <div onClick={()=>tg(y)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
+                    <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{pcOpen[y]?"▾":"▸"} {y}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
+                  </div>
+                  {pcOpen[y]&&<div style={{padding:"4px 10px 0"}}>{yg[y].map(d=>dayBlock(d,true))}</div>}
+                </div>);})}
+            </div>);
+          })()}
         </div>
       )}
     </div>
