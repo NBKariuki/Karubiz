@@ -6,6 +6,15 @@ const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const APP_PW = "GwituMucii@22";
 const C = { navy:"#050A1F",mid:"#0A1128",light:"#0F1A3A",yellow:"#F5C000",white:"#FFFFFF",muted:"#8899AA",dark:"#556677",green:"#4CAF50",red:"#E85B5B" };
 const STAFF = ["Burton Kariuki","Martin Ruguru"];
+// Business identity — defaults; overridden at app start from karu_settings
+const BIZ = { name:"KARU FURNITURE", address:"Off Kihara-Gachie-Karura Rd, Nairobi", phone1:"0720 772 866", phone2:"0792 933 413" };
+const loadBiz = async () => {
+  try{
+    const r = await fetch(`${SB_URL}/rest/v1/karu_settings?id=eq.business&select=*`, {headers:H});
+    if(r.ok){ const rows=await r.json(); if(rows&&rows[0]){ const s=rows[0]; BIZ.name=s.name||BIZ.name; BIZ.address=s.address||BIZ.address; BIZ.phone1=s.phone1||BIZ.phone1; BIZ.phone2=s.phone2!=null?s.phone2:BIZ.phone2; } }
+  }catch(e){ /* keep defaults */ }
+};
+const bizPhones = () => [BIZ.phone1,BIZ.phone2].filter(Boolean).join(" · ");
 const EXP_CATS = ["Rent","Transport","Utilities","Marketing","Staff","Other"];
 const CAT_OPTS = [{id:"living",label:"Living Room"},{id:"bedroom",label:"Bedroom"},{id:"decor",label:"Decor"},{id:"other",label:"Other"}];
 const catLabel = id => ({living:"Living Room",bedroom:"Bedroom",decor:"Decor",other:"Other"}[id]||id);
@@ -135,9 +144,33 @@ export default function App() {
   const [user,setUser]=useState(null); const [tab,setTab]=useState("sale");
   const [bal,setBal]=useState({cash:0,sacco:0,owed_burton:0,owed_martin:0,hasData:false});
   const [panel,setPanel]=useState(false);
+  const [lapsed,setLapsed]=useState(false);
+  const IDLE_MS=5*60*1000; // 5 minutes
+  useEffect(()=>{ loadBiz(); },[]);
+  // Restore a saved session if it's still within the idle window
+  useEffect(()=>{
+    try{
+      const raw=localStorage.getItem("karu_session");
+      if(raw){ const s=JSON.parse(raw); if(s&&s.user&&s.last&&(Date.now()-s.last)<IDLE_MS){ setUser(s.user); } else { localStorage.removeItem("karu_session"); } }
+    }catch{}
+  },[]);
+  // Persist session + reset idle timer on activity
+  const touch=useCallback(()=>{ if(user){ try{ localStorage.setItem("karu_session",JSON.stringify({user,last:Date.now()})); }catch{} } },[user]);
+  useEffect(()=>{
+    if(!user) return;
+    touch();
+    const events=["click","keydown","touchstart","scroll"];
+    const onAct=()=>touch();
+    events.forEach(e=>window.addEventListener(e,onAct,{passive:true}));
+    const iv=setInterval(()=>{
+      try{ const raw=localStorage.getItem("karu_session"); if(raw){ const s=JSON.parse(raw); if(Date.now()-s.last>=IDLE_MS){ localStorage.removeItem("karu_session"); setUser(null); setPanel(false); setLapsed(true); } } }catch{}
+    },15000);
+    return ()=>{ events.forEach(e=>window.removeEventListener(e,onAct)); clearInterval(iv); };
+  },[user,touch]);
+  const doLogout=useCallback(()=>{ try{ localStorage.removeItem("karu_session"); }catch{} setUser(null); setPanel(false); },[]);
   const refreshBal=useCallback(async()=>{ setBal(await fetchBalances()); },[]);
   useEffect(()=>{ if(user) refreshBal(); },[user,refreshBal]);
-  if(!user) return <LoginScreen onLogin={setUser}/>;
+  if(!user) return <LoginScreen onLogin={u=>{setUser(u);setLapsed(false);}} lapsed={lapsed}/>;
   // Attendants only see the Sale tab; others see tabs they have perms for
   const tabs=[["sale","Sale","💰","sale"],["stock","Stock","📦","stock"],["expenses","Expenses","🧾","expenses"],["ledger","Ledger","📒","money"],["reports","Reports","📊","reports"]].filter(([,,,perm])=>can(user,perm));
   const activeTab = tabs.some(t=>t[0]===tab)?tab:tabs[0][0];
@@ -156,13 +189,13 @@ export default function App() {
         {activeTab==="reports"&&<ReportsTab user={user} bal={bal}/>}
       </div>
     </div>
-    {panel&&<SidePanel user={user} bal={bal} onClose={()=>setPanel(false)} onChange={refreshBal} onLogout={()=>{setUser(null);setPanel(false);}}/>}
+    {panel&&<SidePanel user={user} bal={bal} onClose={()=>setPanel(false)} onChange={refreshBal} onLogout={doLogout}/>}
     <nav className="nav">{tabs.map(([id,label,icon])=>(
       <button key={id} className={`nav-btn${activeTab===id?" on":""}`} onClick={()=>setTab(id)}><span className="ni">{icon}</span>{label}</button>
     ))}</nav></>);
 }
 
-function LoginScreen({onLogin}){
+function LoginScreen({onLogin,lapsed}){
   const [stage,setStage]=useState("user");
   const [username,setUsername]=useState(""); const [found,setFound]=useState(null);
   const [cred,setCred]=useState(""); const [cred2,setCred2]=useState(""); const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
@@ -225,6 +258,7 @@ function LoginScreen({onLogin}){
     <div style={{minHeight:"100vh",display:"flex",justifyContent:"center",alignItems:"center",padding:24}}>
       <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:12,padding:"36px 28px",maxWidth:360,width:"100%"}}>
         <div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:24,fontWeight:600,color:"#F5C000",letterSpacing:"0.1em"}}>KARU</div><div style={{fontSize:13,color:"#8899AA",marginTop:4}}>Accounts System</div></div>
+        {lapsed&&<div style={{background:"rgba(232,164,91,0.1)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:"9px 12px",marginBottom:14,fontSize:12,color:"#E8A45B",textAlign:"center"}}>Logged out after 5 minutes of inactivity. Please sign in again.</div>}
         {stage==="user"&&(<>
           <div className="field"><label>Username</label><input value={username} onChange={e=>{setUsername(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&findUser()} placeholder="e.g. burton" autoFocus autoCapitalize="none"/></div>
           {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
@@ -285,7 +319,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
         <div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Money</div>
         <button onClick={onClose} style={{background:"none",border:"none",color:"#8899AA",fontSize:20,cursor:"pointer"}}>×</button>
       </div>
-      {view==="close"?<CloseDay user={user} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="users"?<ManageTeam user={user} onBack={()=>setView("home")}/>:view==="reconcile"?<Reconcile user={user} bal={bal} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="products"?<ProductList user={user} onBack={()=>setView("home")}/>:view==="credit"?<StoreCredit user={user} onBack={()=>setView("home")}/>:!can(user,"money")?(
+      {view==="close"?<CloseDay user={user} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="users"?<ManageTeam user={user} onBack={()=>setView("home")}/>:view==="reconcile"?<Reconcile user={user} bal={bal} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="products"?<ProductList user={user} onBack={()=>setView("home")}/>:view==="credit"?<StoreCredit user={user} onBack={()=>setView("home")}/>:view==="bizsettings"?<BusinessSettings user={user} onBack={()=>setView("home")}/>:!can(user,"money")?(
         <div style={{textAlign:"center",color:"#8899AA",fontSize:14,padding:"20px 0"}}>
           {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{width:"100%",marginBottom:10,fontSize:13}}>Daily cash close</button>}
           <div style={{fontSize:12,color:"#556677",marginTop:8}}>Money controls are owner-only.</div>
@@ -315,6 +349,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
               {can(user,"users")&&<button className="btn-g" onClick={()=>setView("credit")} style={{fontSize:13}}>Store credit</button>}
               {can(user,"users")&&<button className="btn-g" onClick={()=>setView("products")} style={{fontSize:13}}>Product list</button>}
               {can(user,"users")&&<button className="btn-g" onClick={()=>setView("users")} style={{fontSize:13}}>Manage team</button>}
+              {can(user,"users")&&<button className="btn-g" onClick={()=>setView("bizsettings")} style={{fontSize:13}}>Business settings</button>}
             </div>
           </>}
         </div>}
@@ -419,6 +454,36 @@ function StoreCredit({user,onBack}){
           <button className="btn-y" onClick={()=>{ window.__karuCredit={name:c.name,phone:c.phone,balance:c.balance}; alert(`Go to the Sale tab and start a new sale. ${c.name}'s credit of ${fmtK(c.balance)} will be offered to apply.`); onBack(); }} style={{width:"100%",marginTop:10,fontSize:13}}>Start sale with this credit</button>
         </div>
       ))}
+    </div>
+  );
+}
+
+function BusinessSettings({user,onBack}){
+  const [f,setF]=useState({name:BIZ.name,address:BIZ.address,phone1:BIZ.phone1,phone2:BIZ.phone2});
+  const [saving,setSaving]=useState(false); const [msg,setMsg]=useState("");
+  const save=async()=>{
+    if(!f.name.trim()){setMsg("Business name is required.");return;}
+    setSaving(true); setMsg("");
+    try{
+      const payload={name:f.name.trim(),address:f.address.trim(),phone1:f.phone1.trim(),phone2:f.phone2.trim(),updated_by:user.full_name,updated_at:new Date().toISOString()};
+      const existing=await sb.get("karu_settings","id=eq.business&select=id").catch(()=>[]);
+      if(existing&&existing.length){ await sb.patch("karu_settings","business",payload); }
+      else { await sb.post("karu_settings",[{id:"business",...payload}]); }
+      BIZ.name=f.name.trim(); BIZ.address=f.address.trim(); BIZ.phone1=f.phone1.trim(); BIZ.phone2=f.phone2.trim();
+      setMsg("Saved. Receipts and statements now use these details.");
+    }catch(e){ setMsg("Save failed: "+e.message); }
+    setSaving(false);
+  };
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Business Settings</div></div>
+      <div style={{fontSize:12,color:"#8A97A8",marginBottom:14,lineHeight:1.5}}>These appear on every receipt and the financial statement. Change them anytime.</div>
+      <div className="field"><label>Business name</label><input value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))} placeholder="e.g. KARU FURNITURE"/></div>
+      <div className="field"><label>Address</label><input value={f.address} onChange={e=>setF(x=>({...x,address:e.target.value}))} placeholder="Street / area, town"/></div>
+      <div className="field"><label>Phone 1</label><input value={f.phone1} onChange={e=>setF(x=>({...x,phone1:e.target.value}))} placeholder="07XX XXX XXX"/></div>
+      <div className="field"><label>Phone 2 (optional)</label><input value={f.phone2} onChange={e=>setF(x=>({...x,phone2:e.target.value}))} placeholder="07XX XXX XXX"/></div>
+      {msg&&<div style={{fontSize:12,color:msg.startsWith("Save failed")?"#E85B5B":"#4CAF50",marginBottom:12}}>{msg}</div>}
+      <button className="btn-y" onClick={save} disabled={saving} style={{width:"100%",padding:13}}>{saving?"Saving...":"Save Business Settings"}</button>
     </div>
   );
 }
@@ -895,7 +960,7 @@ function SaleTab({user,onMoney}){
 
   const rcptText=r=>{
     const il=r.items.map(i=>`${i.name} x${i.qty}  KSh ${(Number(i.qty)*Number(i.price)).toLocaleString()}`).join("\n");
-    return `KARU FURNITURE\nReceipt ${r.receipt_no}\nDate: ${r.date} ${r.time_str}\nServed by: ${initials(r.served_by)}\n\nCustomer: ${r.customer_name}${r.customer_phone?"\nPhone: "+r.customer_phone:""}\n\n${il}\n\nTOTAL: KSh ${r.total.toLocaleString()}${r.payment_type==="instalment"?`\nPaid: KSh ${Number(r.amount_paid).toLocaleString()}\nBalance: KSh ${Number(r.balance_due).toLocaleString()}`:""}\nPayment: ${r.payment_method}${r.mpesa_code?"\nCode: "+r.mpesa_code:""}${r.notes?"\nNote: "+r.notes:""}\n\nThank you for shopping with us\nOff Kihara-Gachie-Karura Rd\n0720 772 866`;
+    return `${BIZ.name}\nReceipt ${r.receipt_no}\nDate: ${r.date} ${r.time_str}\nServed by: ${initials(r.served_by)}\n\nCustomer: ${r.customer_name}${r.customer_phone?"\nPhone: "+r.customer_phone:""}\n\n${il}\n\nTOTAL: KSh ${r.total.toLocaleString()}${r.payment_type==="instalment"?`\nPaid: KSh ${Number(r.amount_paid).toLocaleString()}\nBalance: KSh ${Number(r.balance_due).toLocaleString()}`:""}\nPayment: ${r.payment_method}${r.mpesa_code?"\nCode: "+r.mpesa_code:""}${r.notes?"\nNote: "+r.notes:""}\n\nThank you for shopping with us\n${BIZ.address}\n${bizPhones()}`;
   };
   const copyText=()=>navigator.clipboard.writeText(rcptText(receipt)).then(()=>alert("Receipt copied"));
 
@@ -904,8 +969,8 @@ function SaleTab({user,onMoney}){
     const c=document.createElement("canvas"); const W=380*S; const lines=r.items.length; const H=(430+lines*30+(r.payment_type==="instalment"?50:0)+(r.notes?24:0))*S;
     c.width=W; c.height=H; const x=c.getContext("2d"); x.scale(S,S);
     x.fillStyle="#fff"; x.fillRect(0,0,380,H/S);
-    x.fillStyle="#111"; x.textAlign="center"; x.font="bold 22px Arial"; x.fillText("KARU FURNITURE",190,34);
-    x.fillStyle="#555"; x.font="12px Arial"; x.fillText("Off Kihara-Gachie-Karura Rd, Nairobi",190,52); x.fillText("0720 772 866 · 0792 933 413",190,68);
+    x.fillStyle="#111"; x.textAlign="center"; x.font="bold 22px Arial"; x.fillText(BIZ.name,190,34);
+    x.fillStyle="#555"; x.font="12px Arial"; x.fillText(BIZ.address,190,52); x.fillText(bizPhones(),190,68);
     const dash=y=>{x.strokeStyle="#999";x.setLineDash([3,3]);x.beginPath();x.moveTo(18,y);x.lineTo(362,y);x.stroke();x.setLineDash([]);};
     dash(82); let y=104; x.font="14px Arial";
     const row=(l,v)=>{x.textAlign="left";x.fillStyle="#555";x.fillText(l,18,y);x.textAlign="right";x.fillStyle="#111";x.font="bold 14px Arial";x.fillText(v,362,y);x.font="14px Arial";y+=22;};
@@ -996,7 +1061,7 @@ function SaleTab({user,onMoney}){
   if(receipt) return (
     <div>
       <div className="rcpt">
-        <div className="rcpt-hd"><div className="rcpt-logo">KARU FURNITURE</div><div className="rcpt-sub">Off Kihara-Gachie-Karura Rd, Nairobi</div><div className="rcpt-sub">0720 772 866 · 0792 933 413</div></div>
+        <div className="rcpt-hd"><div className="rcpt-logo">{BIZ.name}</div><div className="rcpt-sub">{BIZ.address}</div><div className="rcpt-sub">{bizPhones()}</div></div>
         <div className="rcpt-row"><span className="l">Receipt</span><span className="v">{receipt.receipt_no}</span></div>
         <div className="rcpt-row"><span className="l">Date</span><span className="v">{receipt.date} {receipt.time_str}</span></div>
         <div className="rcpt-row"><span className="l">Served by</span><span className="v">{initials(receipt.served_by)}</span></div>
@@ -2355,7 +2420,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
           {periods.length<3&&<button onClick={addP} style={{background:"none",border:"1px dashed #24365C",borderRadius:6,color:"#8A97A8",fontSize:12,padding:"7px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:12,width:"100%"}}>+ Add a period to compare (up to 3)</button>}
           <div id="karu-statement" style={{background:"#fff",color:"#111",borderRadius:10,padding:"18px 12px"}}>
             <div style={{textAlign:"center",borderBottom:"2px solid #050A1F",paddingBottom:10,marginBottom:12}}>
-              <div style={{fontSize:19,fontWeight:800,letterSpacing:"0.06em",color:"#050A1F"}}>KARU FURNITURE</div>
+              <div style={{fontSize:19,fontWeight:800,letterSpacing:"0.06em",color:"#050A1F"}}>{BIZ.name}</div>
               <div style={{fontSize:13,color:"#555",marginTop:2}}>Income Statement &amp; Financial Position</div>
               <div style={{fontSize:10.5,color:"#888",marginTop:2}}>Snapshot as of {genDate}</div>
             </div>
@@ -2398,7 +2463,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
               </table>
               {nCol>1&&<div style={{fontSize:9.5,color:"#999",marginTop:6}}>Financial position is a single snapshot as of today; only performance figures compare across periods.</div>}
             </div>
-            <div style={{textAlign:"center",fontSize:9.5,color:"#999",marginTop:16,paddingTop:10,borderTop:"1px solid #ddd"}}>KARU Furniture · Off Kihara-Gachie-Karura Rd, Nairobi · 0720 772 866 · 0792 933 413<br/>Generated {genDate} from KARU Accounts. Figures management-prepared, unaudited.</div>
+            <div style={{textAlign:"center",fontSize:9.5,color:"#999",marginTop:16,paddingTop:10,borderTop:"1px solid #ddd"}}>{BIZ.name} · {BIZ.address} · {bizPhones()}<br/>Generated {genDate} from KARU Accounts. Figures management-prepared, unaudited.</div>
           </div>
           <button className="btn-y" onClick={()=>{document.body.classList.add("printing-statement");window.print();setTimeout(()=>document.body.classList.remove("printing-statement"),500);}} style={{width:"100%",marginTop:12}}>Print / Save as PDF</button>
           <div style={{fontSize:11,color:"#8A97A8",marginTop:8,textAlign:"center"}}>Screenshot, or Print to save as PDF for a bank or partner.</div>
@@ -2886,46 +2951,6 @@ function ReportsTab({user,bal}){
         <div style={{fontSize:11,color:"#556677",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()} · COGS this period KSh {cogs.toLocaleString()}</div>
       </div>
 
-      {/* CAPITAL BATTERY */}
-      <div className="card" style={{marginBottom:14,border:`1px solid ${capColor}44`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <div style={{fontSize:12,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600}}>Capital health</div>
-          <div style={{fontSize:13,fontWeight:700,color:capColor}}>{capState==="green"?"Charging":capState==="amber"?"Watch":"Draining"}</div>
-        </div>
-        {/* Battery bar: liquid (bright) vs stock (dim), inside a battery-style frame */}
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-          <div style={{flex:1,height:30,border:`2px solid ${capColor}`,borderRadius:6,overflow:"hidden",display:"flex",background:"#0A1128"}}>
-            <div style={{width:`${liquidPct}%`,background:capColor,display:"flex",alignItems:"center",justifyContent:"center",minWidth:liquidPct>0?24:0,transition:"width 0.3s"}}>
-              {liquidPct>=18&&<span style={{fontSize:11,fontWeight:700,color:"#050A1F"}}>{liquidPct}%</span>}
-            </div>
-            <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontSize:11,fontWeight:600,color:"#8A97A8"}}>stock {100-liquidPct}%</span>
-            </div>
-          </div>
-          <div style={{width:5,height:14,background:capColor,borderRadius:"0 2px 2px 0"}}/>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
-          <span style={{color:"#AEB9C7"}}>Liquid money</span><span style={{fontWeight:600,color:capColor}}>{fmtK(liquid)}</span>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
-          <span style={{color:"#AEB9C7"}}>Locked in stock</span><span style={{fontWeight:600}}>{fmtK(stockValue)}</span>
-        </div>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:13,paddingTop:6,marginTop:2,borderTop:"1px solid #1A2A4A"}}>
-          <span style={{color:"#FFFFFF",fontWeight:600}}>Total capital</span><span style={{fontWeight:700,color:"#F5C000"}}>{fmtK(totalCapital)}</span>
-        </div>
-        <div style={{fontSize:12,color:capColor,marginTop:10,lineHeight:1.5,background:`${capColor}12`,border:`1px solid ${capColor}33`,borderRadius:8,padding:"8px 10px"}}>{capMsg}</div>
-        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#8A97A8",marginTop:8}}>
-          <span>Period in: <b style={{color:"#4CAF50"}}>{fmtK(inflow)}</b></span>
-          <span>Period out: <b style={{color:"#E85B5B"}}>{fmtK(outflow)}</b></span>
-          <span>Net: <b style={{color:netFlow>=0?"#4CAF50":"#E85B5B"}}>{netFlow<0?"-":""}{fmtK(Math.abs(netFlow))}</b></span>
-        </div>
-        {can(user,"users")&&<div style={{fontSize:11,color:"#8A97A8",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A",display:"flex",alignItems:"center",gap:6}}>
-          <span>Safety floor:</span>
-          <input type="number" defaultValue={SAFETY_FLOOR} onBlur={e=>{try{localStorage.setItem("karu_safety_floor",String(Number(e.target.value)||0));loadAll();}catch{}}} style={{width:90,background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"4px 8px",color:"#E8E2D4",fontSize:12}}/>
-          <span style={{color:"#556677"}}>minimum liquid cash to keep</span>
-        </div>}
-      </div>
-
       {/* GROWTH PROJECTION */}
       <div className="card" style={{marginBottom:14}}>
         <div style={{fontSize:12,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:4}}>Growth projection</div>
@@ -2942,28 +2967,6 @@ function ReportsTab({user,bal}){
         <div style={{fontSize:10,color:"#556677",marginTop:8,lineHeight:1.4}}>A straight-line estimate, not a forecast. It assumes trading continues as it has. Real results depend on sales, sourcing and seasonality.</div>
       </div>
 
-      {pvData.length>0&&(
-        <div className="card" style={{marginBottom:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-            <div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em"}}>Profit vs Expenses · {monthSummary?"this month":byMonth?"by month":"by day"}</div>
-            <div style={{display:"flex",gap:12,fontSize:10}}><span style={{color:"#4CAF50"}}>● Profit</span><span style={{color:"#E85B5B"}}>● Expenses</span></div>
-          </div>
-          <div style={{display:"flex",gap:16,marginBottom:12,fontSize:12}}>
-            <span style={{color:"#8899AA"}}>Period profit <b style={{color:"#4CAF50"}}>{fmtK(pvTotalProfit)}</b></span>
-            <span style={{color:"#8899AA"}}>Period expenses <b style={{color:"#E85B5B"}}>{fmtK(pvTotalExpenses)}</b></span>
-          </div>
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart data={pvData} margin={{left:-20}}>
-              <XAxis dataKey="date" tick={{fill:"#556677",fontSize:9}}/>
-              <YAxis tick={{fill:"#556677",fontSize:9}}/>
-              <Tooltip contentStyle={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,fontSize:12}}/>
-              <Bar dataKey="Profit" fill="#4CAF50" radius={[3,3,0,0]}/>
-              <Bar dataKey="Expenses" fill="#E85B5B" radius={[3,3,0,0]}/>
-            </BarChart>
-          </ResponsiveContainer>
-          <div style={{fontSize:10,color:"#556677",marginTop:8,lineHeight:1.4}}>{monthSummary?"This month totalled. ":byMonth?"Each bar is one month. ":"Each bar is one day. "}Profit is estimated using this period's blended margin ({Math.round(blendedMargin*100)}%). Actual item-level margins vary.</div>
-        </div>
-      )}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
         <div className="card">
           <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Payment split</div>
@@ -2996,27 +2999,35 @@ function ReportsTab({user,bal}){
       )}
       {/* Month-on-month table */}
       {(()=>{
+        // Per-item average cost for COGS
+        const costLookup={}; data.stock.forEach(st=>{ const k=st.name.toLowerCase(); if(!costLookup[k])costLookup[k]=[]; costLookup[k].push(Number(st.unit_cost)); });
+        const avgCost=n=>{ const a=costLookup[(n||"").toLowerCase()]; return a&&a.length?a.reduce((x,y)=>x+y,0)/a.length:0; };
         const mmap={};
-        data.sales.forEach(s=>{const m=s.date.slice(0,7);if(!mmap[m])mmap[m]={sales:0,expenses:0};mmap[m].sales+=Number(s.amount_paid!=null?s.amount_paid:s.total);});
-        data.expenses.forEach(e=>{const m=e.date.slice(0,7);if(!mmap[m])mmap[m]={sales:0,expenses:0};mmap[m].expenses+=Number(e.amount);});
-        const rows=Object.entries(mmap).sort(([a],[b])=>b.localeCompare(a)).map(([month,d])=>({month,sales:d.sales,expenses:d.expenses,profit:d.sales-d.expenses}));
+        data.sales.forEach(s=>{const m=s.date.slice(0,7);if(!mmap[m])mmap[m]={collected:0,cogs:0,expenses:0};
+          mmap[m].collected+=Number(s.amount_paid!=null?s.amount_paid:s.total);
+          (s.items||[]).forEach(it=>{ mmap[m].cogs+=avgCost(it.name)*Number(it.qty||1); });
+        });
+        data.expenses.forEach(e=>{const m=e.date.slice(0,7);if(!mmap[m])mmap[m]={collected:0,cogs:0,expenses:0};mmap[m].expenses+=Number(e.amount);});
+        const rows=Object.entries(mmap).sort(([a],[b])=>b.localeCompare(a)).map(([month,d])=>({month,collected:d.collected,cogs:d.cogs,expenses:d.expenses,profit:d.collected-d.cogs-d.expenses}));
         if(!rows.length) return null;
-        const tots=rows.reduce((s,r)=>({sales:s.sales+r.sales,expenses:s.expenses+r.expenses,profit:s.profit+r.profit}),{sales:0,expenses:0,profit:0});
+        const tots=rows.reduce((s,r)=>({collected:s.collected+r.collected,cogs:s.cogs+r.cogs,expenses:s.expenses+r.expenses,profit:s.profit+r.profit}),{collected:0,cogs:0,expenses:0,profit:0});
         const fmtM=m=>{const[y,mo]=m.split("-");return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(mo)-1]+" "+y;};
-        const fmt=n=>"KSh "+n.toLocaleString();
+        const fmt=n=>Math.round(n).toLocaleString();
         return (
           <div className="card" style={{marginBottom:14}}>
-            <div style={{fontSize:11,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Month-on-month performance</div>
+            <div style={{fontSize:11,color:"#AEB9C7",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Month-on-month performance</div>
+            <div style={{fontSize:10,color:"#8A97A8",marginBottom:12}}>Profit = Collected − COGS − Expenses. Amounts in KSh.</div>
             <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:320}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:360}}>
                 <thead>
-                  <tr>{["Month","Collected","Expenses","Profit"].map(h=><th key={h} style={{textAlign:h==="Month"?"left":"right",padding:"4px 4px 8px",color:"#8899AA",fontWeight:500,borderBottom:"1px solid #1A2A4A",whiteSpace:"nowrap"}}>{h}</th>)}</tr>
+                  <tr>{["Month","Collected","COGS","Expenses","Profit"].map(h=><th key={h} style={{textAlign:h==="Month"?"left":"right",padding:"4px 4px 8px",color:"#AEB9C7",fontWeight:600,borderBottom:"1px solid #1A2A4A",whiteSpace:"nowrap"}}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {rows.map(r=>(
                     <tr key={r.month} style={{borderBottom:"1px solid #0F1A3A"}}>
                       <td style={{padding:"7px 4px",color:"#E8E2D4",whiteSpace:"nowrap"}}>{fmtM(r.month)}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",color:"#4CAF50",whiteSpace:"nowrap"}}>{fmt(r.sales)}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",color:"#4CAF50",whiteSpace:"nowrap"}}>{fmt(r.collected)}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",color:"#E8A45B",whiteSpace:"nowrap"}}>{fmt(r.cogs)}</td>
                       <td style={{textAlign:"right",padding:"7px 4px",color:"#E85B5B",whiteSpace:"nowrap"}}>{fmt(r.expenses)}</td>
                       <td style={{textAlign:"right",padding:"7px 4px",color:r.profit>=0?"#F5C000":"#E85B5B",fontWeight:600,whiteSpace:"nowrap"}}>{r.profit<0?"-":""}{fmt(Math.abs(r.profit))}</td>
                     </tr>
@@ -3025,7 +3036,8 @@ function ReportsTab({user,bal}){
                 <tfoot>
                   <tr style={{borderTop:"2px solid #1A2A4A"}}>
                     <td style={{padding:"8px 4px",fontWeight:700,color:"#FFFFFF"}}>Total</td>
-                    <td style={{textAlign:"right",padding:"8px 4px",color:"#4CAF50",fontWeight:700}}>{fmt(tots.sales)}</td>
+                    <td style={{textAlign:"right",padding:"8px 4px",color:"#4CAF50",fontWeight:700}}>{fmt(tots.collected)}</td>
+                    <td style={{textAlign:"right",padding:"8px 4px",color:"#E8A45B",fontWeight:700}}>{fmt(tots.cogs)}</td>
                     <td style={{textAlign:"right",padding:"8px 4px",color:"#E85B5B",fontWeight:700}}>{fmt(tots.expenses)}</td>
                     <td style={{textAlign:"right",padding:"8px 4px",color:tots.profit>=0?"#F5C000":"#E85B5B",fontWeight:700}}>{tots.profit<0?"-":""}{fmt(Math.abs(tots.profit))}</td>
                   </tr>
