@@ -1501,13 +1501,19 @@ function StockTab({user,onMoney}){
     try{
       const tripNo=`KARU-TRIP-${String(trips.length+1).padStart(3,"0")}`;
       const totalCost=vi.reduce((s,i)=>s+(Number(i.qty_in)*Number(i.unit_cost)),0);
+      // If this trip is importing a received order, any deposits already paid on that order
+      // ALREADY left the account — so only deduct the remaining balance to avoid double-counting.
+      let alreadyPaid=0;
+      if(importingOrder){ alreadyPaid=(importingOrder.suppliers||[]).filter(s=>s.status!=="cancelled").reduce((t,s)=>t+Number(s.deposit_paid||0),0); }
+      const cashToDeduct=Math.max(0,totalCost-alreadyPaid);
       const [newTrip]=await sb.post("karu_trips",{trip_no:tripNo,date:trip.date,notes:trip.notes,total_cost:totalCost,created_by:trip.created_by,status:"open",paid_from:trip.paid_from});
       const tshort=trip.created_by.split(" ")[0];
       if(trip.paid_from==="personal"){
-        await recordMoney({account:"owed_"+tshort.toLowerCase(),amount:totalCost,type:"trip_personal",partner:trip.created_by,description:`${tripNo} (paid by ${tshort})`,date:trip.date,recorded_by:trip.created_by});
+        if(cashToDeduct>0) await recordMoney({account:"owed_"+tshort.toLowerCase(),amount:cashToDeduct,type:"trip_personal",partner:trip.created_by,description:`${tripNo} (paid by ${tshort})${alreadyPaid>0?` · ${fmtK(alreadyPaid)} deposit already paid`:""}`,date:trip.date,recorded_by:trip.created_by});
       } else {
-        await recordMoney({account:trip.paid_from,amount:-totalCost,type:"trip",ref:tripNo,description:`Sourcing ${tripNo}`,date:trip.date,recorded_by:trip.created_by});
+        if(cashToDeduct>0) await recordMoney({account:trip.paid_from,amount:-cashToDeduct,type:"trip",ref:tripNo,description:`Sourcing ${tripNo}${alreadyPaid>0?` · balance after ${fmtK(alreadyPaid)} deposit`:""}`,date:trip.date,recorded_by:trip.created_by});
       }
+      if(alreadyPaid>0) await logAudit({trip_no:tripNo,record_id:newTrip.id,action:"deposit_netted",field_changed:tripNo,old_value:String(totalCost),new_value:String(cashToDeduct),reason:`${fmtK(alreadyPaid)} deposit already paid on ${importingOrder?.order_no}, only balance deducted`,changed_by:trip.created_by});
       if(onMoney) onMoney();
       await sb.post("karu_stock",vi.map(i=>({trip_id:newTrip.id,trip_no:tripNo,name:i.name,category:i.category,qty_in:Number(i.qty_in),qty_sold:0,unit_cost:Number(i.unit_cost),selling_price:Number(i.selling_price||0),date_in:trip.date})));
       await logAudit({trip_no:tripNo,record_id:newTrip.id,action:"create",reason:"New sourcing trip",changed_by:trip.created_by});
@@ -1816,8 +1822,8 @@ function OrdersTab({user,onMoney}){
   useEffect(()=>{load();},[]);
 
   const subTotal=(sub)=>(sub.items||[]).reduce((t,i)=>t+(Number(i.qty||1)*Number(i.est_cost||0)),0);
-  const orderTotal=(subs)=>(subs||[]).reduce((t,s)=>t+subTotal(s),0);
-  const orderDeposits=(subs)=>(subs||[]).reduce((t,s)=>t+Number(s.deposit_paid||0),0);
+  const orderTotal=(subs)=>(subs||[]).filter(s=>s.status!=="cancelled").reduce((t,s)=>t+subTotal(s),0);
+  const orderDeposits=(subs)=>(subs||[]).filter(s=>s.status!=="cancelled").reduce((t,s)=>t+Number(s.deposit_paid||0),0);
   const badge=s=>({pending:"b-y",ordered:"b-muted",received:"b-g",cancelled:"b-r"}[s]||"b-muted");
   const supSuggest=(val)=>{ const q=(val||"").toLowerCase().trim(); return q?suppliers.filter(s=>s.name.toLowerCase().includes(q)).slice(0,5):[]; };
 
@@ -2002,7 +2008,7 @@ function OrdersTab({user,onMoney}){
                 ):(
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                     {!locked&&<button className="btn-y" onClick={()=>saveSupplier(si)} disabled={busy} style={{fontSize:11,padding:"6px 12px"}}>Save</button>}
-                    {["pending","ordered"].includes(sub.status)&&can(user,"money")&&bal>0&&<button className="btn-g" onClick={()=>{setDepSi(si);setDepAmt("");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(245,192,0,0.3)",color:"#F5C000"}}>{dep>0?"Add deposit":"Deposit"}</button>}
+                    {["pending","ordered","received"].includes(sub.status)&&can(user,"money")&&bal>0&&<button className="btn-g" onClick={()=>{setDepSi(si);setDepAmt("");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(245,192,0,0.3)",color:"#F5C000"}}>{dep>0?"Add payment":"Record payment"}</button>}
                     {sub.status==="pending"&&<button className="btn-g" onClick={()=>markSupplier(si,"ordered")} disabled={busy} style={{fontSize:11,padding:"6px 10px"}}>Mark ordered</button>}
                     {sub.status==="ordered"&&<button className="btn-g" onClick={()=>markSupplier(si,"received")} disabled={busy} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(76,175,80,0.3)",color:"#4CAF50"}}>Received</button>}
                     {["pending","ordered"].includes(sub.status)&&<button className="btn-g" onClick={()=>{if(confirm(`Cancel ${sub.supplier||"this supplier"}?`))markSupplier(si,"cancelled");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Cancel</button>}
