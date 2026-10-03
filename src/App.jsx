@@ -1336,6 +1336,7 @@ function StockTab({user,onMoney}){
   const [trips,setTrips]=useState([]); const [stock,setStock]=useState([]); const [audit,setAudit]=useState([]);
   const [loading,setLoading]=useState(true); const [view,setView]=useState("list");
   const [expanded,setExpanded]=useState({}); const [editItem,setEditItem]=useState(null);
+  const [tripGrp,setTripGrp]=useState({});
   const [editVals,setEditVals]=useState({}); const [editReason,setEditReason]=useState("");
   const [editStaff,setEditStaff]=useState("Burton Kariuki"); const [lockStaff,setLockStaff]=useState("Burton Kariuki");
   const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
@@ -1701,7 +1702,8 @@ function StockTab({user,onMoney}){
       <div style={{display:"flex",justifyContent:"flex-end",marginBottom:14}}>
         <button className="btn-y" onClick={()=>setView("new")} style={{fontSize:13,padding:"9px 16px"}}>+ New Trip</button>
       </div>
-      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:trips.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No trips yet.</div>:trips.map(t=>{
+      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:trips.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No trips yet.</div>:(()=>{
+        const renderTrip=(t)=>{
         const isOpen=expanded[t.id];
         const tItems=stockForTrip(t.trip_no);
         const logs=auditForTrip(t.trip_no);
@@ -1794,7 +1796,37 @@ function StockTab({user,onMoney}){
             )}
           </div>
         );
-      })}
+        };
+        // Group trips: current month as full cards, older months/years collapsed
+        const tg=k=>setTripGrp(x=>({...x,[k]:!x[k]}));
+        const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+        const now=new Date(); const cm=now.toISOString().slice(0,7); const cy=String(now.getFullYear());
+        const sorted=[...trips].sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+        const cur=[]; const mg={}; const yg={};
+        sorted.forEach(t=>{ const ym=(t.date||"").slice(0,7),y=(t.date||"").slice(0,4); if(ym===cm)cur.push(t); else if(y===cy){(mg[ym]=mg[ym]||[]).push(t);} else {(yg[y]=yg[y]||[]).push(t);} });
+        const grpCost=arr=>arr.reduce((n,t)=>n+Number(t.total_cost||0),0);
+        return (<div>
+          {cur.map(renderTrip)}
+          {Object.keys(mg).sort((a,b)=>b.localeCompare(a)).map(ym=>(
+            <div key={ym} style={{marginBottom:10}}>
+              <div onClick={()=>tg(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"9px 12px",background:"#0A1128",border:"1px solid #24365C",borderRadius:10}}>
+                <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{tripGrp[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]} · {mg[ym].length} trip{mg[ym].length!==1?"s":""}</span>
+                <span style={{fontSize:13,fontWeight:600,color:"#F5C000"}}>KSh {grpCost(mg[ym]).toLocaleString()}</span>
+              </div>
+              {tripGrp[ym]&&<div style={{marginTop:8}}>{mg[ym].map(renderTrip)}</div>}
+            </div>
+          ))}
+          {Object.keys(yg).sort((a,b)=>b.localeCompare(a)).map(y=>(
+            <div key={y} style={{marginBottom:10}}>
+              <div onClick={()=>tg(y)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"9px 12px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:10}}>
+                <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{tripGrp[y]?"▾":"▸"} {y} · {yg[y].length} trip{yg[y].length!==1?"s":""}</span>
+                <span style={{fontSize:13,fontWeight:700,color:"#F5C000"}}>KSh {grpCost(yg[y]).toLocaleString()}</span>
+              </div>
+              {tripGrp[y]&&<div style={{marginTop:8}}>{yg[y].map(renderTrip)}</div>}
+            </div>
+          ))}
+        </div>);
+      })()}
       </>)}
     </div>
   );
@@ -2331,6 +2363,12 @@ function LedgerTab({user,onMoney,bal,onChange}){
 
       {tab==="register"&&(
         <div>
+          <div style={{display:"flex",gap:6,marginBottom:8}}>
+            {(()=>{ const y=new Date(); const m3=new Date(); m3.setMonth(m3.getMonth()-3); const yStart=y.getFullYear()+"-01-01";
+              const ranges=[["This month",monthStart,todayStr()],["Last 3 months",m3.toISOString().split("T")[0],todayStr()],["This year",yStart,todayStr()],["All",(rows.length?rows.map(r=>r.date).sort()[0]:yStart),todayStr()]];
+              return ranges.map(([lbl,f,t])=><button key={lbl} onClick={()=>{setFrom(f);setTo(t);}} style={{...pill(from===f&&to===t),fontSize:11,padding:"5px 10px"}}>{lbl}</button>);
+            })()}
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
             <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="lg-in" style={{margin:0}}/></div>
             <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} className="lg-in" style={{margin:0}}/></div>
