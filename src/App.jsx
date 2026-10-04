@@ -2146,6 +2146,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
   const [act,setAct]=useState(null); const [saving,setSaving]=useState(false);
   // action fields
   const [amt,setAmt]=useState(""); const [who,setWho]=useState(user.full_name); const [dir,setDir]=useState("in"); const [acc,setAcc]=useState("sacco");
+  const [inKind,setInKind]=useState("loan");
   const [pcNote,setPcNote]=useState(""); const [pcCat,setPcCat]=useState("Transport"); const [pcFrom,setPcFrom]=useState("cash");
   const [recAcct,setRecAcct]=useState("sacco"); const [recActual,setRecActual]=useState(""); const [recReason,setRecReason]=useState("");
 
@@ -2199,12 +2200,47 @@ function LedgerTab({user,onMoney,bal,onChange}){
   const doWithdraw=async()=>{ const a=Number(amt); if(!a)return; setSaving(true);
     await recordMoney([{account:"sacco",amount:-a,type:"withdraw",description:"Withdrew to cash",date:todayStr(),recorded_by:who},{account:"cash",amount:a,type:"withdraw",description:"Withdrew to cash",date:todayStr(),recorded_by:who}]);
     setSaving(false); rb(); refreshAll(); };
-  const doPartner=async()=>{ const a=Number(amt); if(!a)return; setSaving(true);
-    const short=who.split(" ")[0].toLowerCase();
-    if(dir==="in") await recordMoney([{account:acc,amount:a,type:"partner_in",partner:who,description:`${who.split(" ")[0]} put in`,date:todayStr(),recorded_by:who}]);
-    else if(dir==="out") await recordMoney([{account:acc,amount:-a,type:"partner_out",partner:who,description:`${who.split(" ")[0]} took out`,date:todayStr(),recorded_by:who}]);
-    else await recordMoney([{account:acc,amount:-a,type:"partner_repay",partner:who,description:`Repaid ${who.split(" ")[0]}`,date:todayStr(),recorded_by:who},{account:"owed_"+short,amount:-a,type:"partner_repay",partner:who,description:`Repaid ${who.split(" ")[0]}`,date:todayStr(),recorded_by:who}]);
-    setSaving(false); rb(); refreshAll(); };
+  const doPartner=async()=>{ const a=Number(amt); if(!a||a<=0)return;
+    const short=who.split(" ")[0]; const sk=short.toLowerCase();
+    const owedNow=Number(bal["owed_"+sk]||0);
+    if(dir==="in"){
+      setSaving(true);
+      if(inKind==="loan"){
+        // Partner lends the business: cash in, business owes them more
+        await recordMoney([
+          {account:acc,amount:a,type:"partner_loan_in",partner:who,description:`${short} lent the business`,date:todayStr(),recorded_by:user.full_name},
+          {account:"owed_"+sk,amount:a,type:"partner_loan_in",partner:who,description:`${short} lent the business`,date:todayStr(),recorded_by:user.full_name}
+        ]);
+      } else {
+        // Capital / gift: cash in, tracked as their capital, NOT a repayable debt
+        await recordMoney([
+          {account:acc,amount:a,type:"partner_capital_in",partner:who,description:`${short} added capital`,date:todayStr(),recorded_by:user.full_name},
+          {account:"capital_"+sk,amount:a,type:"partner_capital_in",partner:who,description:`${short} added capital`,date:todayStr(),recorded_by:user.full_name}
+        ]);
+      }
+      setSaving(false); rb(); refreshAll();
+    } else {
+      // Takes out: reduce what's owed first, remainder is a drawing against their share.
+      const fromOwed=Math.min(a,owedNow);
+      const drawing=a-fromOwed;
+      // Warn if drawing into capital beyond their profit share
+      if(drawing>0){
+        const share=Math.max(0,netProfitAll/2); // 50/50 assumption for now
+        const alreadyDrawn=Number(bal["drawn_"+sk]||0);
+        if(alreadyDrawn+drawing>share){
+          const over=alreadyDrawn+drawing-share;
+          if(!confirm(`Heads up: this drawing of ${fmtK(drawing)} takes ${short}'s total drawings to ${fmtK(alreadyDrawn+drawing)}, which is ${fmtK(over)} MORE than their profit share of ${fmtK(share)}. That means drawing into capital. Continue?`)) return;
+        }
+      }
+      setSaving(true);
+      const rows=[{account:acc,amount:-a,type:"partner_out",partner:who,description:`${short} took out`,date:todayStr(),recorded_by:user.full_name}];
+      if(fromOwed>0) rows.push({account:"owed_"+sk,amount:-fromOwed,type:"partner_repay",partner:who,description:`Repaid ${short} (from drawing)`,date:todayStr(),recorded_by:user.full_name});
+      if(drawing>0) rows.push({account:"drawn_"+sk,amount:drawing,type:"partner_drawing",partner:who,description:`${short} drawing against share`,date:todayStr(),recorded_by:user.full_name});
+      await recordMoney(rows);
+      await logAudit({trip_no:null,record_id:null,action:"partner_out",field_changed:short,old_value:`owed ${Math.round(owedNow)}`,new_value:`drew ${Math.round(a)} (${Math.round(fromOwed)} repaid, ${Math.round(drawing)} drawing)`,reason:"Partner took money out",changed_by:user.full_name});
+      setSaving(false); rb(); refreshAll();
+    }
+  };
   const doAllocatePetty=async()=>{ const a=Number(amt); if(!a)return; setSaving(true);
     // Just move money into the petty pocket. It is NOT an expense yet — the actual spends are the expenses.
     await recordMoney([{account:pcFrom,amount:-a,type:"petty_allocate",description:"Petty cash top-up",date:todayStr(),recorded_by:who},{account:"petty",amount:a,type:"petty_allocate",description:"Petty cash top-up",date:todayStr(),recorded_by:who}]);
@@ -2274,12 +2310,29 @@ function LedgerTab({user,onMoney,bal,onChange}){
         </div>
         <div style={{fontSize:11,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>{liquidProfitPortion>0?`You can take up to ${fmtK(liquidProfitPortion)} without touching capital.`:"All liquid money is capital right now — spending eats into the float."}</div>
       </div>
-      {(bal.owed_burton>0||bal.owed_martin>0)&&(
-        <div style={{display:"flex",gap:8,marginBottom:12}}>
-          {bal.owed_burton>0&&<div style={{flex:1,background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:11,color:"#8899AA"}}>Owes Burton</div><div style={{fontSize:14,fontWeight:600,color:"#E8A45B"}}>{fmtK(bal.owed_burton)}</div></div>}
-          {bal.owed_martin>0&&<div style={{flex:1,background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:"8px 10px"}}><div style={{fontSize:11,color:"#8899AA"}}>Owes Martin</div><div style={{fontSize:14,fontWeight:600,color:"#E8A45B"}}>{fmtK(bal.owed_martin)}</div></div>}
-        </div>
-      )}
+      {(()=>{
+        const partners=[...new Set(STAFF.map(s=>s.split(" ")[0]))];
+        const anyActivity=partners.some(p=>{const k=p.toLowerCase();return (bal["owed_"+k]||0)||(bal["drawn_"+k]||0)||(bal["capital_"+k]||0);});
+        if(!anyActivity) return null;
+        return (
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:6}}>Partner accounts</div>
+            {partners.map(p=>{ const k=p.toLowerCase(); const owed=Number(bal["owed_"+k]||0); const drawn=Number(bal["drawn_"+k]||0); const cap=Number(bal["capital_"+k]||0);
+              if(!owed&&!drawn&&!cap) return null;
+              return (
+                <div key={p} style={{background:"#0A1128",border:"1px solid #24365C",borderRadius:8,padding:"9px 11px",marginBottom:6}}>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>{p}</div>
+                  <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12}}>
+                    {owed!==0&&<span style={{color:"#8A97A8"}}>Owed: <b style={{color:"#E8A45B"}}>{fmtK(owed)}</b></span>}
+                    {drawn!==0&&<span style={{color:"#8A97A8"}}>Drawn: <b style={{color:"#E85B5B"}}>{fmtK(drawn)}</b></span>}
+                    {cap!==0&&<span style={{color:"#8A97A8"}}>Capital in: <b style={{color:"#4CAF50"}}>{fmtK(cap)}</b></span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
       {/* Balance check */}
       <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,marginBottom:12,color:checkOK?"#4CAF50":"#E85B5B"}}>
         <span>{checkOK?"✓ Books balanced — every movement reconciles":"⚠ Balance mismatch — review the register"}</span>
@@ -2343,10 +2396,20 @@ function LedgerTab({user,onMoney,bal,onChange}){
           </div>}
           {act==="bank"&&<ActBox title="Bank cash into SACCO"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doBank} off={rb} saving={saving}/></ActBox>}
           {act==="withdraw"&&<ActBox title="Withdraw SACCO to cash"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doWithdraw} off={rb} saving={saving}/></ActBox>}
-          {act==="partner"&&<ActBox title="Partner money"><Whobar who={who} setWho={setWho}/>
-            <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${dir==="in"?" on":""}`} onClick={()=>setDir("in")}>Puts in</button><button className={`tog-btn${dir==="out"?" on":""}`} onClick={()=>setDir("out")}>Takes out</button><button className={`tog-btn${dir==="repay"?" on":""}`} onClick={()=>setDir("repay")}>Repay</button></div>
+          {act==="partner"&&(()=>{ const sk=who.split(" ")[0].toLowerCase(); const owedNow=Number(bal["owed_"+sk]||0); const drawnNow=Number(bal["drawn_"+sk]||0); const share=Math.max(0,netProfitAll/2); const a=Number(amt||0);
+            return (<ActBox title="Partner money"><Whobar who={who} setWho={setWho}/>
+            <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${dir==="in"?" on":""}`} onClick={()=>setDir("in")}>Puts in</button><button className={`tog-btn${dir==="out"?" on":""}`} onClick={()=>setDir("out")}>Takes out</button></div>
+            {dir==="in"&&<div style={{marginBottom:8}}>
+              <div className="tog" style={{marginBottom:6}}><button className={`tog-btn${inKind==="loan"?" on":""}`} onClick={()=>setInKind("loan")}>Loan (repayable)</button><button className={`tog-btn${inKind==="capital"?" on":""}`} onClick={()=>setInKind("capital")}>Capital / gift</button></div>
+              <div style={{fontSize:11,color:"#8A97A8"}}>{inKind==="loan"?"Business will owe this back to "+who.split(" ")[0]+".":"Added to "+who.split(" ")[0]+"'s capital. Not repayable."}</div>
+            </div>}
+            {dir==="out"&&<div style={{fontSize:11,color:"#8A97A8",marginBottom:8,background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",lineHeight:1.5}}>
+              {who.split(" ")[0]} is owed {fmtK(owedNow)}, has drawn {fmtK(drawnNow)} so far. Profit share ~{fmtK(share)}.
+              {a>0&&<div style={{marginTop:4,color:a>owedNow&&(drawnNow+(a-owedNow))>share?"#E8A45B":"#4CAF50"}}>{a<=owedNow?`All ${fmtK(a)} comes off what's owed.`:`${fmtK(owedNow)} off what's owed, ${fmtK(a-owedNow)} as a drawing.${(drawnNow+(a-owedNow))>share?" ⚠ exceeds profit share — into capital.":""}`}</div>}
+            </div>}
             <div className="tog" style={{marginBottom:8}}>{ACCTS.map(([id,l])=><button key={id} className={`tog-btn${acc===id?" on":""}`} onClick={()=>setAcc(id)}>{l}</button>)}</div>
-            <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" className="lg-in"/><Confirm on={doPartner} off={rb} saving={saving}/></ActBox>}
+            <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" className="lg-in"/><Confirm on={doPartner} off={rb} saving={saving}/></ActBox>);
+          })()}
           {act==="allocate"&&<ActBox title="Top up petty cash"><div style={{fontSize:11,color:"#8899AA",marginBottom:8}}>Moves money into petty cash and records it as a Petty cash expense in reports.</div>
             <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${pcFrom==="cash"?" on":""}`} onClick={()=>setPcFrom("cash")}>From Cash</button><button className={`tog-btn${pcFrom==="sacco"?" on":""}`} onClick={()=>setPcFrom("sacco")}>From SACCO</button></div>
             <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doAllocatePetty} off={rb} saving={saving}/></ActBox>}
