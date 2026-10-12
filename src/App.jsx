@@ -89,7 +89,7 @@ const GS = () => (
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
     *{box-sizing:border-box;margin:0;padding:0} body{font-family:'DM Sans',sans-serif;background:#050A1F;color:#E8E2D4} input,select,textarea{outline:none;font-family:'DM Sans',sans-serif}
     .field{margin-bottom:13px} .field label{display:block;font-size:12px;color:#FFFFFF;font-weight:600;margin-bottom:5px;letter-spacing:0.04em;text-transform:uppercase}
-    .field input,.field select,.field textarea{width:100%;background:#0A1128;border:1px solid #1A2A4A;border-radius:6px;padding:10px 12px;color:#E8E2D4;font-size:14px} .field textarea{resize:vertical;min-height:56px}
+    .field input,.field select,.field textarea{width:100%;background:#12203C;border:1px solid #2E4472;border-radius:8px;padding:11px 13px;color:#FFFFFF;font-size:14px} .field textarea{resize:vertical;min-height:56px} .field input::placeholder,.field textarea::placeholder{color:#8A97A8;font-size:13px}
     .tog{display:flex;gap:6px} .tog-btn{flex:1;padding:9px 6px;font-size:14px;font-weight:600;border:1px solid #24365C;border-radius:8px;background:#111C34;color:#AEB9C7;cursor:pointer;text-align:center;transition:all 0.15s}
     .tog-btn.on{background:rgba(245,192,0,0.18);border-color:#F5C000;color:#F5C000;font-weight:700}
     .card{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:14px;margin-bottom:10px}
@@ -122,7 +122,7 @@ const GS = () => (
     .wiz-dot{flex:1;height:4px;border-radius:2px;background:#1A2A4A} .wiz-dot.on{background:#F5C000}
     .wiz-body{padding:16px}
     .wiz-ft{padding:4px 16px 20px;display:flex;gap:8px}
-    .lg-in{width:100%;background:#050A1F;border:1px solid #1A2A4A;border-radius:6px;padding:10px 12px;color:#E8E2D4;font-size:14px;margin-bottom:8px;font-family:'DM Sans',sans-serif}
+    .lg-in{width:100%;background:#12203C;border:1px solid #2E4472;border-radius:8px;padding:11px 13px;color:#FFFFFF;font-size:14px;margin-bottom:8px;font-family:'DM Sans',sans-serif}
     .staff-btn{background:#0A1128;border:2px solid #1A2A4A;border-radius:12px;padding:22px 12px;color:#FFFFFF;font-size:17px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s}
     .staff-btn:hover{border-color:#F5C000;color:#F5C000}
     .rcpt{background:#fff;color:#111;border-radius:8px;padding:18px 16px;max-width:340px;margin:0 auto 14px;font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5}
@@ -631,7 +631,7 @@ function ManageTeam({user,onBack}){
   );
 }
 
-function ProductSearch({user, value, onChange, onPick, placeholder, priceMode}){
+function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, noAdd}){
   // priceMode: "price" fills default_price, "cost" fills default_cost, "none" fills nothing
   const [products,setProducts]=useState([]); const [open,setOpen]=useState(false);
   const [adding,setAdding]=useState(false); const [saving,setSaving]=useState(false);
@@ -669,7 +669,7 @@ function ProductSearch({user, value, onChange, onPick, placeholder, priceMode}){
             </div>
           ))}
           {matches.length===0&&<div style={{padding:"9px 12px",fontSize:12,color:"#556677"}}>No match for "{value}"</div>}
-          {!exactExists&&can(user,"users")&&(
+          {!exactExists&&can(user,"users")&&!noAdd&&(
             adding?(
               <div style={{padding:12,borderTop:"1px solid #1A2A4A"}} onMouseDown={e=>e.preventDefault()}>
                 <div style={{fontSize:12,fontWeight:600,color:"#F5C000",marginBottom:8}}>New product</div>
@@ -1211,7 +1211,18 @@ function SaleTab({user,onMoney}){
             <div style={{marginTop:10}}>
               {addPaySale?(
                 <div>
-                  <div style={{fontSize:13,fontWeight:600,marginBottom:2}}>{addPaySale.customer_name}</div>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>{addPaySale.customer_name}</div>
+                  {(addPaySale.items||[]).length>0&&(
+                    <div style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 11px",marginBottom:8}}>
+                      <div style={{fontSize:10,color:"#8A97A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Paying for</div>
+                      {(addPaySale.items||[]).map((it,i)=>(
+                        <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0",borderBottom:i<(addPaySale.items||[]).length-1?"1px solid #1A2A4A":"none"}}>
+                          <span style={{color:"#E8E2D4"}}>{it.name} <span style={{color:"#8A97A8"}}>x{it.qty}</span></span>
+                          <span style={{color:"#F5C000",fontWeight:600}}>{fmtK(Number(it.qty)*Number(it.price))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {(()=>{ const adj=Number(addPayAdj||0); const effTotal=Number(addPaySale.total)+adj; const effBal=Math.max(0,effTotal-Number(addPaySale.amount_paid||0)); return (
                   <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>Total {fmtK(effTotal)}{adj!==0?` (adj ${adj>0?"+":""}${adj})`:""} · Paid {fmtK(Number(addPaySale.amount_paid||0))} · <span style={{color:"#E8A45B",fontWeight:600}}>Balance {fmtK(effBal)}</span></div>
                   );})()}
@@ -1266,11 +1277,11 @@ function SaleTab({user,onMoney}){
               </>)}
               {step===2&&(<>
                 <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:4}}>Items</div>
-                <div style={{fontSize:12,color:"#8899AA",marginBottom:14}}>Type to search stock. Price fills automatically.</div>
+                <div style={{fontSize:12,color:"#8899AA",marginBottom:14}}>Search for a product by name or keyword.</div>
                 {items.map(i=>(
                   <div key={i.id} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:8}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
-                      <ProductSearch user={user} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>it.id===i.id?{...it,name:p.name,price:p.default_price>0?String(p.default_price):it.price}:it))} placeholder="Search product..."/>
+                      <ProductSearch user={user} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>it.id===i.id?{...it,name:p.name,price:p.default_price>0?String(p.default_price):it.price}:it))} placeholder="Search product..." noAdd/>
                       <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16,paddingTop:6}}>x</button>
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
