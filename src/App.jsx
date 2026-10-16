@@ -523,7 +523,7 @@ function ProductList({user,onBack}){
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Product List</div><span style={{fontSize:12,color:"#556677"}}>{products.length}</span></div>
       <div style={{fontSize:11,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Add tags so people find items fast — "sofa", "3s", "seater" all point to one product. New products are added while recording a sale or trip.</div>
-      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search products or tags..." style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 11px",color:"#E8E2D4",fontSize:13,marginBottom:12}}/>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search products or tags..." style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 11px",color:"#E8E2D4",fontSize:13,marginBottom:12}}/>
       {loading?<div style={{color:"#556677",textAlign:"center",padding:"20px 0"}}>Loading...</div>:shown.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0"}}>No products.</div>:shown.map(p=>(
         <div key={p.id} className="card" style={{opacity:p.active?1:0.5,padding:"10px 12px"}} onClick={()=>setEditing({...p})}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
@@ -659,7 +659,7 @@ function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, n
   return (
     <div style={{position:"relative"}}>
       <input value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),200)}
-        placeholder={placeholder||"Search product..."} style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:open&&(matches.length>0||q.length>0)?"6px 6px 0 0":"6px",padding:"9px 10px",color:"#E8E2D4",fontSize:13}}/>
+        placeholder={placeholder||"Search product..."} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:open&&(matches.length>0||q.length>0)?"8px 8px 0 0":"8px",padding:"10px 12px",color:"#FFFFFF",fontSize:14}}/>
       {open&&q.length>0&&(
         <div className="ac-drop">
           {matches.map(p=>(
@@ -673,12 +673,12 @@ function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, n
             adding?(
               <div style={{padding:12,borderTop:"1px solid #1A2A4A"}} onMouseDown={e=>e.preventDefault()}>
                 <div style={{fontSize:12,fontWeight:600,color:"#F5C000",marginBottom:8}}>New product</div>
-                <input value={nf.name||value} onChange={e=>setNf(x=>({...x,name:e.target.value}))} placeholder="Product name" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,marginBottom:6}}/>
-                <input value={nf.tags} onChange={e=>setNf(x=>({...x,tags:e.target.value}))} placeholder="Search tags: sofa, 3s, seater" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:12,marginBottom:6}}/>
+                <input value={nf.name||value} onChange={e=>setNf(x=>({...x,name:e.target.value}))} placeholder="Product name" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#E8E2D4",fontSize:13,marginBottom:6}}/>
+                <input value={nf.tags} onChange={e=>setNf(x=>({...x,tags:e.target.value}))} placeholder="Search tags: sofa, 3s, seater" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#E8E2D4",fontSize:12,marginBottom:6}}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
-                  <select value={nf.category} onChange={e=>setNf(x=>({...x,category:e.target.value}))} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
-                  <input type="number" value={nf.default_cost} onChange={e=>setNf(x=>({...x,default_cost:e.target.value}))} placeholder="Cost" style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px",color:"#E8E2D4",fontSize:11}}/>
-                  <input type="number" value={nf.default_price} onChange={e=>setNf(x=>({...x,default_price:e.target.value}))} placeholder="Price" style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px",color:"#E8E2D4",fontSize:11}}/>
+                  <select value={nf.category} onChange={e=>setNf(x=>({...x,category:e.target.value}))} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+                  <input type="number" value={nf.default_cost} onChange={e=>setNf(x=>({...x,default_cost:e.target.value}))} placeholder="Cost" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px",color:"#FFFFFF",fontSize:12}}/>
+                  <input type="number" value={nf.default_price} onChange={e=>setNf(x=>({...x,default_price:e.target.value}))} placeholder="Price" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px",color:"#FFFFFF",fontSize:12}}/>
                 </div>
                 <div style={{display:"flex",gap:6}}><button onMouseDown={saveNew} disabled={saving} style={{flex:1,background:"#F5C000",color:"#050A1F",border:"none",borderRadius:6,padding:"7px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{saving?"...":"Add & use"}</button><button onMouseDown={()=>setAdding(false)} style={{background:"transparent",border:"1px solid #1A2A4A",color:"#8899AA",borderRadius:6,padding:"7px 12px",fontSize:12,cursor:"pointer"}}>Cancel</button></div>
               </div>
@@ -699,7 +699,7 @@ function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
   return (
     <div style={{position:"relative"}}>
       <input value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),200)}
-        placeholder={placeholder} style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:open&&matches.length>0?"6px 6px 0 0":"6px",padding:"9px 10px",color:"#E8E2D4",fontSize:13}}/>
+        placeholder={placeholder} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:open&&matches.length>0?"8px 8px 0 0":"8px",padding:"10px 12px",color:"#FFFFFF",fontSize:14}}/>
       {open&&matches.length>0&&(
         <div className="ac-drop">
           {matches.map(s=>(
@@ -1023,8 +1023,8 @@ function SaleTab({user,onMoney}){
               {exchItems.length>1&&<button onClick={()=>exRm(it.id)} style={{background:"none",border:"none",color:"#556677",cursor:"pointer",fontSize:16}}>×</button>}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={it.qty} min={1} onChange={e=>exUp(it.id,"qty",e.target.value)} style={{width:"100%",background:"transparent",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
-              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>PRICE (KSh)</div><input type="number" value={it.price} onChange={e=>exUp(it.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13}}/></div>
+              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={it.qty} min={1} onChange={e=>exUp(it.id,"qty",e.target.value)} style={{width:"100%",background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
+              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>PRICE (KSh)</div><input type="number" value={it.price} onChange={e=>exUp(it.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#FFFFFF",fontSize:14}}/></div>
             </div>
           </div>
         ))}
@@ -1266,9 +1266,9 @@ function SaleTab({user,onMoney}){
             <div className="wiz-body">
               {step===1&&(<>
                 <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:14}}>Customer</div>
-                <div style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:14}}>
+                <div style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:10,marginBottom:14}}>
                   <div style={{fontSize:11,color:"#8899AA",marginBottom:6}}>Paste M-Pesa or SACCO SMS to auto-fill (optional)</div>
-                  <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste SMS here..." style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,resize:"none",minHeight:52,fontFamily:"'DM Sans',sans-serif"}}/>
+                  <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste SMS here..." style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#E8E2D4",fontSize:13,resize:"none",minHeight:52,fontFamily:"'DM Sans',sans-serif"}}/>
                   {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:12,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"SACCO":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||"no name"}</div>}
                 </div>
                 <div className="field"><label>Customer name</label><input value={cName} onChange={e=>setCName(e.target.value)} placeholder="Full name" autoFocus/></div>
@@ -1279,14 +1279,14 @@ function SaleTab({user,onMoney}){
                 <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:4}}>Items</div>
                 <div style={{fontSize:12,color:"#8899AA",marginBottom:14}}>Search for a product by name or keyword.</div>
                 {items.map(i=>(
-                  <div key={i.id} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:8}}>
+                  <div key={i.id} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:10,marginBottom:8}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
                       <ProductSearch user={user} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>it.id===i.id?{...it,name:p.name,price:p.default_price>0?String(p.default_price):it.price}:it))} placeholder="Search product..." noAdd/>
                       <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16,paddingTop:6}}>x</button>
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                      <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
-                      <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>UNIT PRICE (KSh)</div><input type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13}}/></div>
+                      <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
+                      <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>UNIT PRICE (KSh)</div><input type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#FFFFFF",fontSize:14}}/></div>
                     </div>
                     {i.name&&i.price&&i.qty&&<div style={{fontSize:11,color:"#F5C000",marginTop:5,textAlign:"right"}}>{fmtK(Number(i.qty)*Number(i.price))}</div>}
                   </div>
@@ -1299,7 +1299,7 @@ function SaleTab({user,onMoney}){
                 {can(user,"users")&&(
                   <div className="field"><label>Serving as</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${staff===s?" on":""}`} onClick={()=>setStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
                 )}
-                <div style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:14}}>
+                <div style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:12,marginBottom:14}}>
                   <div style={{fontSize:13,fontWeight:600,marginBottom:2}}>{cName}{cPhone?<span style={{color:"#8899AA",fontWeight:400}}> · {cPhone}</span>:null}</div>
                   {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#8899AA",padding:"2px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:600,color:"#F5C000",marginTop:6,paddingTop:6,borderTop:"1px solid #1A2A4A"}}><span>Total</span><span>{fmtK(total)}</span></div>
@@ -1608,12 +1608,12 @@ function StockTab({user,onMoney}){
               <button onClick={()=>rmTI(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16}}>x</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
-              <select value={i.category} onChange={e=>upTI(i.id,"category",e.target.value)} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:12}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
-              <input type="number" value={i.qty_in} min={1} onChange={e=>upTI(i.id,"qty_in",e.target.value)} placeholder="Qty" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/>
+              <select value={i.category} onChange={e=>upTI(i.id,"category",e.target.value)} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#E8E2D4",fontSize:12}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+              <input type="number" value={i.qty_in} min={1} onChange={e=>upTI(i.id,"qty_in",e.target.value)} placeholder="Qty" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-              <input type="number" value={i.unit_cost} onChange={e=>upTI(i.id,"unit_cost",e.target.value)} placeholder="Cost each (KSh)" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:12}}/>
-              <input type="number" value={i.selling_price} onChange={e=>upTI(i.id,"selling_price",e.target.value)} placeholder="Sell at (KSh)" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:12}}/>
+              <input type="number" value={i.unit_cost} onChange={e=>upTI(i.id,"unit_cost",e.target.value)} placeholder="Cost each (KSh)" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#FFFFFF",fontSize:13}}/>
+              <input type="number" value={i.selling_price} onChange={e=>upTI(i.id,"selling_price",e.target.value)} placeholder="Sell at (KSh)" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#FFFFFF",fontSize:13}}/>
             </div>
             {i.unit_cost&&i.selling_price&&<div style={{fontSize:11,color:"#8899AA",marginTop:5}}>Margin: {Math.round((1-i.unit_cost/i.selling_price)*100)}% | Cost: KSh {(Number(i.qty_in||1)*Number(i.unit_cost)).toLocaleString()}</div>}
           </div>
@@ -1672,9 +1672,9 @@ function StockTab({user,onMoney}){
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,color:"#AEB9C7"}}>{s.trip_no}</div><div style={{fontSize:11,color:"#8A97A8"}}>KSh {Number(s.unit_cost).toLocaleString()} each · in {s.date_in?.slice(5)||""}</div></div>
                           <div style={{textAlign:"center",minWidth:48}}><div style={{fontSize:10,color:"#8A97A8"}}>SYSTEM</div><div style={{fontSize:15,fontWeight:700}}>{s.available}</div></div>
-                          <div style={{minWidth:66,marginLeft:8}}><div style={{fontSize:10,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"#0A1128",border:`1px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#1A2A4A"}`,borderRadius:6,padding:"6px 8px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/></div>
+                          <div style={{minWidth:66,marginLeft:8}}><div style={{fontSize:10,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"#12203C",border:`1px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#1A2A4A"}`,borderRadius:6,padding:"6px 8px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/></div>
                         </div>
-                        {diff!==0&&<div style={{marginTop:6}}><div style={{fontSize:11,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"#0A1128",border:"1px solid #24365C",borderRadius:6,padding:"7px 9px",color:"#E8E2D4",fontSize:12}}/></div>}
+                        {diff!==0&&<div style={{marginTop:6}}><div style={{fontSize:11,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"#0A1128",border:"1px solid #24365C",borderRadius:6,padding:"7px 9px",color:"#FFFFFF",fontSize:13}}/></div>}
                       </div>
                     );
                   })}
@@ -1759,15 +1759,15 @@ function StockTab({user,onMoney}){
                       <div>
                         <div style={{fontSize:13,fontWeight:600,marginBottom:10,color:"#F5C000"}}>Add items to {t.trip_no}</div>
                         {addExtraItems.map(i=>(
-                          <div key={i.id} style={{background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:8,padding:8,marginBottom:7}}>
+                          <div key={i.id} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:8,marginBottom:7}}>
                             <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:5,marginBottom:5}}>
                               <ProductSearch user={user} value={i.name} onChange={v=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,name:v}:a))} onPick={p=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,name:p.name,category:p.category,unit_cost:p.default_cost>0?String(p.default_cost):a.unit_cost,selling_price:p.default_price>0?String(p.default_price):a.selling_price}:a))} placeholder="Search product..."/>
                               <button onClick={()=>setAddExtraItems(x=>x.filter(a=>a.id!==i.id))} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:14}}>x</button>
                             </div>
                             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5}}>
-                              <select value={i.category} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,category:e.target.value}:a))} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
-                              <input type="number" value={i.qty_in} min={1} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,qty_in:e.target.value}:a))} placeholder="Qty" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:11,textAlign:"center",width:"100%"}}/>
-                              <input type="number" value={i.unit_cost} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,unit_cost:e.target.value}:a))} placeholder="Cost (KSh)" style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:11,width:"100%"}}/>
+                              <select value={i.category} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,category:e.target.value}:a))} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"7px 8px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+                              <input type="number" value={i.qty_in} min={1} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,qty_in:e.target.value}:a))} placeholder="Qty" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"7px 8px",color:"#E8E2D4",fontSize:11,textAlign:"center",width:"100%"}}/>
+                              <input type="number" value={i.unit_cost} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,unit_cost:e.target.value}:a))} placeholder="Cost (KSh)" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"7px 8px",color:"#E8E2D4",fontSize:11,width:"100%"}}/>
                             </div>
                           </div>
                         ))}
@@ -1990,7 +1990,7 @@ function OrdersTab({user,onMoney}){
           const locked=["ordered","received","cancelled"].includes(sub.status);
           const st=subTotal(sub); const dep=Number(sub.deposit_paid||0); const bal=Math.max(0,st-dep);
           return (
-            <div key={si} style={{background:"#0A1128",border:`1px solid ${locked?"#1A2A4A":"rgba(245,192,0,0.35)"}`,borderRadius:10,padding:12,marginBottom:12}}>
+            <div key={si} style={{background:"#12203C",border:`1px solid ${locked?"#1A2A4A":"rgba(245,192,0,0.35)"}`,borderRadius:10,padding:12,marginBottom:12}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{fontSize:12,color:"#8899AA",fontWeight:600}}>Supplier {si+1}</div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2001,7 +2001,7 @@ function OrdersTab({user,onMoney}){
 
               {!locked?(<>
                 <div style={{position:"relative",marginBottom:8}}>
-                  <input value={sub.supplier} onChange={e=>upDraft(si,{supplier:e.target.value,_sug:true})} onFocus={()=>upDraft(si,{_sug:true})} onBlur={()=>setTimeout(()=>upDraft(si,{_sug:false}),200)} placeholder="Supplier name" style={{width:"100%",background:"#050A1F",border:"1px solid #1A2A4A",borderRadius:6,padding:"9px 10px",color:"#E8E2D4",fontSize:13}}/>
+                  <input value={sub.supplier} onChange={e=>upDraft(si,{supplier:e.target.value,_sug:true})} onFocus={()=>upDraft(si,{_sug:true})} onBlur={()=>setTimeout(()=>upDraft(si,{_sug:false}),200)} placeholder="Supplier name" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"10px 12px",color:"#FFFFFF",fontSize:14}}/>
                   {sub._sug&&supSuggest(sub.supplier).length>0&&(
                     <div className="ac-drop">{supSuggest(sub.supplier).map(sg=><div key={sg.id} className="ac-item" onMouseDown={()=>upDraft(si,{supplier:sg.name,_sug:false})}>{sg.name}</div>)}</div>
                   )}
@@ -2013,9 +2013,9 @@ function OrdersTab({user,onMoney}){
                       {sub.items.length>1&&<button onClick={()=>rmDraftItem(si,ii)} style={{background:"none",border:"none",color:"#556677",cursor:"pointer",fontSize:16}}>×</button>}
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr 1fr",gap:6}}>
-                      <select value={it.category} onChange={e=>upDraftItem(si,ii,"category",e.target.value)} style={{background:"transparent",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#8899AA",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id} style={{background:"#0A1128"}}>{c.label}</option>)}</select>
-                      <input type="number" value={it.qty} min={1} onChange={e=>upDraftItem(si,ii,"qty",e.target.value)} placeholder="Qty" style={{background:"transparent",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:12,textAlign:"center",width:"100%"}}/>
-                      <input type="number" value={it.est_cost} onChange={e=>upDraftItem(si,ii,"est_cost",e.target.value)} placeholder="Cost" style={{background:"transparent",border:"1px solid #1A2A4A",borderRadius:5,padding:"7px 8px",color:"#E8E2D4",fontSize:12,width:"100%"}}/>
+                      <select value={it.category} onChange={e=>upDraftItem(si,ii,"category",e.target.value)} style={{background:"transparent",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#8899AA",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id} style={{background:"#0A1128"}}>{c.label}</option>)}</select>
+                      <input type="number" value={it.qty} min={1} onChange={e=>upDraftItem(si,ii,"qty",e.target.value)} placeholder="Qty" style={{background:"transparent",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#E8E2D4",fontSize:12,textAlign:"center",width:"100%"}}/>
+                      <input type="number" value={it.est_cost} onChange={e=>upDraftItem(si,ii,"est_cost",e.target.value)} placeholder="Cost" style={{background:"transparent",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#E8E2D4",fontSize:12,width:"100%"}}/>
                     </div>
                   </div>
                 ))}
@@ -2358,7 +2358,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
             <div style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(capitalFloat)}</div>
             <div style={{fontSize:10,color:"#8A97A8",marginTop:2}}>Cash + Current Stock Value</div>
           </div>
-          <div style={{background:"#0A1128",border:`1px solid ${netProfitAll>=0?"rgba(76,175,80,0.35)":"rgba(232,91,91,0.35)"}`,borderRadius:8,padding:"10px 12px"}}>
+          <div style={{background:"#12203C",border:`1px solid ${netProfitAll>=0?"rgba(76,175,80,0.35)":"rgba(232,91,91,0.35)"}`,borderRadius:8,padding:"10px 12px"}}>
             <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>NET PROFIT EARNED</div>
             <div style={{fontSize:18,fontWeight:700,color:netProfitAll>=0?"#4CAF50":"#E85B5B"}}>{netProfitAll<0?"-":""}{fmtK(Math.abs(netProfitAll))}</div>
             <div style={{fontSize:10,color:"#556677",marginTop:2}}>after cost, expenses, losses</div>
@@ -2414,7 +2414,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
               <div className="tog" style={{marginBottom:6}}><button className={`tog-btn${inKind==="loan"?" on":""}`} onClick={()=>setInKind("loan")}>Loan (repayable)</button><button className={`tog-btn${inKind==="capital"?" on":""}`} onClick={()=>setInKind("capital")}>Capital / gift</button></div>
               <div style={{fontSize:11,color:"#8A97A8"}}>{inKind==="loan"?"Business will owe this back to "+who.split(" ")[0]+".":"Added to "+who.split(" ")[0]+"'s capital. Not repayable."}</div>
             </div>}
-            {dir==="out"&&<div style={{fontSize:11,color:"#8A97A8",marginBottom:8,background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",lineHeight:1.5}}>
+            {dir==="out"&&<div style={{fontSize:11,color:"#8A97A8",marginBottom:8,background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",lineHeight:1.5}}>
               {who.split(" ")[0]} is owed {fmtK(owedNow)}, has drawn {fmtK(drawnNow)} so far. Profit share ~{fmtK(share)}.
               {a>0&&<div style={{marginTop:4,color:a>owedNow&&(drawnNow+(a-owedNow))>share?"#E8A45B":"#4CAF50"}}>{a<=owedNow?`All ${fmtK(a)} comes off what's owed.`:`${fmtK(owedNow)} off what's owed, ${fmtK(a-owedNow)} as a drawing.${(drawnNow+(a-owedNow))>share?" ⚠ exceeds profit share — into capital.":""}`}</div>}
             </div>}
@@ -2774,8 +2774,8 @@ function ExpensesTab({user,onMoney}){
       </div>
       {showRange&&(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13}}/></div>
-          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{width:"100%",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:6,padding:"8px 10px",color:"#E8E2D4",fontSize:13}}/></div>
+          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#FFFFFF",fontSize:14}}/></div>
+          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#FFFFFF",fontSize:14}}/></div>
         </div>
       )}
 
