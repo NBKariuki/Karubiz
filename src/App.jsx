@@ -23,6 +23,7 @@ const sb = {
   get: async (t,p="") => { const r=await fetch(`${SB_URL}/rest/v1/${t}?${p}`,{headers:H}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
   post: async (t,d) => { const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:"POST",headers:H,body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
   patch: async (t,id,d) => { const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",headers:H,body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  rpc: async (fn,args) => { const r=await fetch(`${SB_URL}/rest/v1/rpc/${fn}`,{method:"POST",headers:H,body:JSON.stringify(args)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
   del: async (t,id) => { const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:"DELETE",headers:H}); if(!r.ok) throw new Error("Delete failed"); },
 };
 const logAudit = async d => { try { await sb.post("karu_audit",d); } catch(e){ console.error(e); } };
@@ -797,40 +798,68 @@ function SaleTab({user,onMoney}){
     else if(step===2){ if(!validItems.length){setErr("Add at least one item with a price.");return;} setStep(3); }
   };
 
-  const genReceipt=async(withReceipt=true)=>{
-    setErr("");
+  const [confirmSale,setConfirmSale]=useState(false);
+  const salePlan=()=>{
+    const creditToUse=useCredit&&custCredit>0?Math.min(custCredit,total):0;
+    const dueAfterCredit=total-creditToUse;
+    const amtPaid=payType==="instalment"?Number(initPay||0):dueAfterCredit;
+    const balDue=payType==="instalment"?dueAfterCredit-amtPaid:0;
+    const cPart=pay==="split"?Number(cashPart||0):pay==="cash"?amtPaid:0;
+    const mPart=pay==="split"?Number(mpesaPart||0):pay==="mpesa"?amtPaid:0;
+    const methodLabel=pay==="split"?"Split":pay==="mpesa"?"M-Pesa":"Cash";
+    return {creditToUse,dueAfterCredit,amtPaid,balDue,cPart,mPart,methodLabel};
+  };
+  const payError=()=>{
     const creditPreview=useCredit&&custCredit>0?Math.min(custCredit,total):0;
     const dueNow=payType==="instalment"?Number(initPay||0):(total-creditPreview);
-    if(pay==="mpesa"&&!mpesaCode.trim()){setErr("M-Pesa code required.");return;}
-    if(pay==="split"){ const c=Number(cashPart||0),m=Number(mpesaPart||0); if(c+m!==dueNow){setErr("Split amounts must add up to "+fmtK(dueNow)+".");return;} if(m>0&&!mpesaCode.trim()){setErr("M-Pesa code required for the M-Pesa part.");return;} }
-    if(payType==="instalment"&&(!initPay||Number(initPay)<=0)){setErr("Enter the initial payment.");return;}
-    if(payType==="instalment"&&Number(initPay)>total){setErr("Initial payment cannot exceed total.");return;}
+    if(pay==="mpesa"&&!mpesaCode.trim()) return "M-Pesa code required.";
+    if(pay==="split"){ const c=Number(cashPart||0),m=Number(mpesaPart||0); if(c+m!==dueNow) return "Split amounts must add up to "+fmtK(dueNow)+"."; if(m>0&&!mpesaCode.trim()) return "M-Pesa code required for the M-Pesa part."; }
+    if(payType==="instalment"&&(!initPay||Number(initPay)<=0)) return "Enter the initial payment.";
+    if(payType==="instalment"&&Number(initPay)>total) return "Initial payment cannot exceed total.";
+    return "";
+  };
+  const completeSale=()=>{ const e=payError(); if(e){setErr(e);return;} setErr(""); setConfirmSale(true); };
+
+  // Fallback used only if KARU_SALE_RPC_SETUP.sql has not been run yet.
+  const legacySave=async(base)=>{
+    const now=new Date();
+    const last=await sb.get("karu_sales","select=receipt_no&order=created_at.desc&limit=1");
+    const lastNo=last.length?parseInt(last[0].receipt_no.split("-").pop()||"0"):0;
+    const receipt_no=`KARU-${now.getFullYear().toString().slice(2)}${String(now.getMonth()+1).padStart(2,"0")}-${String(lastNo+1).padStart(3,"0")}`;
+    const data={receipt_no,...base};
+    const [newSale]=await sb.post("karu_sales",data);
+    if(base.credit_applied>0){ await sb.post("karu_credit",{customer_name:cName,customer_phone:cPhone,amount:-base.credit_applied,reason:`Applied to ${receipt_no}`,ref_receipt:receipt_no,recorded_by:staff,date:base.date}); }
+    if(payType==="instalment"&&newSale?.id) await sb.post("karu_payments",{sale_id:newSale.id,receipt_no,customer_name:cName,amount:base.amount_paid,payment_method:base.payment_method,mpesa_code:base.mpesa_code,date:base.date,recorded_by:staff,notes:"Initial instalment payment"});
+    await reduceStock(base.items);
+    if(base.cash_part>0) await recordMoney({account:"cash",amount:base.cash_part,type:"sale",ref:receipt_no,description:`Sale ${receipt_no} · ${cName}${base.mpesa_part>0?" (cash part)":""}`,date:base.date,recorded_by:staff});
+    if(base.mpesa_part>0) await recordMoney({account:"sacco",amount:base.mpesa_part,type:"sale",ref:receipt_no,description:`Sale ${receipt_no} · ${cName}${base.cash_part>0?" (mpesa part)":""}`,date:base.date,recorded_by:staff});
+    return data;
+  };
+
+  const genReceipt=async(withReceipt=true)=>{
+    setErr("");
+    const pe=payError(); if(pe){setErr(pe);setConfirmSale(false);return;}
     setSaving(true);
     try{
       const now=new Date(); const date=todayStr();
       const time_str=now.toLocaleTimeString("en-KE",{hour:"2-digit",minute:"2-digit",hour12:true});
-      const last=await sb.get("karu_sales","select=receipt_no&order=created_at.desc&limit=1");
-      const lastNo=last.length?parseInt(last[0].receipt_no.split("-").pop()||"0"):0;
-      const receipt_no=`KARU-${now.getFullYear().toString().slice(2)}${String(now.getMonth()+1).padStart(2,"0")}-${String(lastNo+1).padStart(3,"0")}`;
-      const creditToUse=useCredit&&custCredit>0?Math.min(custCredit,total):0;
-      const dueAfterCredit=total-creditToUse;
-      const amtPaid=payType==="instalment"?Number(initPay):dueAfterCredit; const balDue=payType==="instalment"?dueAfterCredit-amtPaid:0;
-      const cPart=pay==="split"?Number(cashPart||0):pay==="cash"?amtPaid:0;
-      const mPart=pay==="split"?Number(mpesaPart||0):pay==="mpesa"?amtPaid:0;
-      const methodLabel=pay==="split"?"Split":pay==="mpesa"?"M-Pesa":"Cash";
-      const data={receipt_no,date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:validItems,payment_method:methodLabel,mpesa_code:mpesaCode.toUpperCase(),cash_part:cPart,mpesa_part:mPart,total,amount_paid:amtPaid,balance_due:balDue,payment_type:payType,notes};
-      data.credit_applied=creditToUse;
-      const [newSale]=await sb.post("karu_sales",data);
-      if(creditToUse>0){ await sb.post("karu_credit",{customer_name:cName,customer_phone:cPhone,amount:-creditToUse,reason:`Applied to ${receipt_no}`,ref_receipt:receipt_no,recorded_by:staff,date}); }
-      if(payType==="instalment"&&newSale?.id) await sb.post("karu_payments",{sale_id:newSale.id,receipt_no,customer_name:cName,amount:amtPaid,payment_method:methodLabel,mpesa_code:data.mpesa_code,date,recorded_by:staff,notes:"Initial instalment payment"});
-      await reduceStock(validItems);
-      if(cPart>0) await recordMoney({account:"cash",amount:cPart,type:"sale",ref:receipt_no,description:`Sale ${receipt_no} · ${cName}${mPart>0?" (cash part)":""}`,date,recorded_by:staff});
-      if(mPart>0) await recordMoney({account:"sacco",amount:mPart,type:"sale",ref:receipt_no,description:`Sale ${receipt_no} · ${cName}${cPart>0?" (mpesa part)":""}`,date,recorded_by:staff});
+      const {creditToUse,amtPaid,balDue,cPart,mPart,methodLabel}=salePlan();
+      const base={date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:validItems,payment_method:methodLabel,mpesa_code:mpesaCode.toUpperCase(),cash_part:cPart,mpesa_part:mPart,total,amount_paid:amtPaid,balance_due:balDue,payment_type:payType,notes,credit_applied:creditToUse};
+      let data;
+      try{
+        const r=await sb.rpc("karu_create_sale",{p:base});
+        data={receipt_no:r.receipt_no,...base};
+        if(r.short&&r.short.length) alert("Sale recorded, but stock was short for: "+r.short.map(x=>`${x.name} (${x.missing})`).join(", ")+". Check the Stock tab.");
+      }catch(e){
+        if(!/PGRST202|Could not find the function/.test(e.message)) throw e;
+        data=await legacySave(base);
+      }
       if(onMoney) onMoney();
       await loadStock(); await loadToday(); await loadPendingSales();
+      setConfirmSale(false);
       setWiz(false);
       if(withReceipt) setReceipt(data); else setSaved(data);
-    }catch(e){setErr("Save failed: "+e.message);}
+    }catch(e){setConfirmSale(false); setErr("Save failed: "+e.message);}
     setSaving(false);
   };
 
@@ -1332,8 +1361,33 @@ function SaleTab({user,onMoney}){
             <div className="wiz-ft">
               {step>1&&<button className="btn-g" onClick={()=>{setErr("");setStep(step-1);}} style={{fontSize:13}}>Back</button>}
               {step<3&&<button className="btn-y" onClick={nextStep} style={{flex:1,fontSize:14}}>Next</button>}
-              {step===3&&<><button className="btn-g" onClick={()=>genReceipt(false)} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Record Sale"}</button><button className="btn-y" onClick={()=>genReceipt(true)} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Record + Receipt"}</button></>}
+              {step===3&&<button className="btn-y" onClick={completeSale} disabled={saving} style={{flex:1,fontSize:14}}>Complete</button>}
             </div>
+            {confirmSale&&(()=>{ const pl=salePlan(); const row=(l,v,c)=><div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0",color:c||"#E8E2D4"}}><span style={{color:"#8A97A8"}}>{l}</span><span>{v}</span></div>; return (
+              <div onClick={()=>{ if(!saving) setConfirmSale(false); }} style={{position:"fixed",inset:0,background:"rgba(5,10,31,0.88)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+                <div onClick={e=>e.stopPropagation()} style={{background:"#0A1128",border:"1px solid #2E4472",borderTop:"3px solid #F5C000",borderRadius:12,width:"100%",maxWidth:420,maxHeight:"90vh",overflowY:"auto",padding:18}}>
+                  <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:2}}>Confirm sale</div>
+                  <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>Check everything before recording. Stock and money update when you confirm.</div>
+                  <div style={{fontSize:14,fontWeight:600,marginBottom:6}}>{cName}{cPhone?<span style={{color:"#8A97A8",fontWeight:400}}> · {cPhone}</span>:null}</div>
+                  <div style={{borderTop:"1px solid #1A2A4A",borderBottom:"1px solid #1A2A4A",padding:"6px 0",marginBottom:8}}>
+                    {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
+                  </div>
+                  {row("Total",fmtK(total),"#F5C000")}
+                  {pl.creditToUse>0&&row("Store credit applied","- "+fmtK(pl.creditToUse),"#4CAF50")}
+                  {row(payType==="instalment"?"Paying now (instalment)":"Paying now",fmtK(pl.amtPaid))}
+                  {pl.cPart>0&&row("Cash",fmtK(pl.cPart))}
+                  {pl.mPart>0&&row("M-Pesa"+(mpesaCode?" · "+mpesaCode.toUpperCase():""),fmtK(pl.mPart))}
+                  {pl.balDue>0&&row("Balance owed",fmtK(pl.balDue),"#E8A45B")}
+                  {row("Served by",staff)}
+                  {notes&&row("Notes",notes)}
+                  <div style={{display:"flex",gap:8,marginTop:16}}>
+                    <button className="btn-g" onClick={()=>setConfirmSale(false)} disabled={saving} style={{fontSize:13}}>Edit</button>
+                    <button className="btn-g" onClick={()=>genReceipt(false)} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Record Sale"}</button>
+                    <button className="btn-y" onClick={()=>genReceipt(true)} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Record + Receipt"}</button>
+                  </div>
+                </div>
+              </div>
+            );})()}
           </div>
         </div>
       )}
