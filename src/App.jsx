@@ -2526,7 +2526,9 @@ function LedgerTab({user,onMoney,bal,onChange}){
         const netWorth=totalAssets-totalLiab;
         const genDate=new Date().toLocaleDateString("en-KE",{day:"2-digit",month:"long",year:"numeric"});
         const fmtP=n=>Math.round(n).toLocaleString();
-        const perLabel=(f,t)=>`${f.slice(5)}–${t.slice(5)}`;
+        const _MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const _fd=d=>`${parseInt(d.slice(8,10))} ${_MN[parseInt(d.slice(5,7))-1]}`;
+        const perLabel=(f,t)=>f.slice(0,4)===t.slice(0,4)?`${_fd(f)} to ${_fd(t)} ${t.slice(0,4)}`:`${_fd(f)} ${f.slice(0,4)} to ${_fd(t)} ${t.slice(0,4)}`;
         const setP=(i,k,v)=>setPeriods(ps=>ps.map((p,j)=>j===i?{...p,[k]:v}:p));
         const addP=()=>setPeriods(ps=>ps.length<3?[...ps,{from:monthStart,to:todayStr()}]:ps);
         const rmP=i=>setPeriods(ps=>ps.length>1?ps.filter((_,j)=>j!==i):ps);
@@ -3054,83 +3056,6 @@ function ReportsTab({user,bal}){
 
   return (
     <div>
-      <div className="field" style={{marginBottom:14}}>
-        <div className="tog">{[["week","Week"],["month","Month"],["year","Year"],["all","All"]].map(([id,label])=>(
-          <button key={id} className={`tog-btn${period===id?" on":""}`} onClick={()=>setPeriod(id)} style={{fontSize:12}}>{label}</button>
-        ))}</div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-        <div className="stat" onClick={()=>setDrill(drillCollected())} style={{cursor:"pointer"}}><div className="stat-n" style={{color:"#4CAF50"}}>KSh {collected.toLocaleString()}</div><div className="stat-l">Collected ›</div></div>
-        <div className="stat" onClick={()=>setDrill(drillExpenses())} style={{cursor:"pointer"}}><div className="stat-n" style={{color:"#E85B5B"}}>KSh {expenses.toLocaleString()}</div><div className="stat-l">Expenses ›</div></div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-        <div className="stat" onClick={()=>setDrill(drillSalesValue())} style={{cursor:"pointer"}}><div className="stat-n" style={{fontSize:18,color:"#8899AA"}}>KSh {salesValue.toLocaleString()}</div><div className="stat-l">Sales value ›</div></div>
-        <div className="stat" onClick={()=>setDrill(drillOwed())} style={{cursor:"pointer",...(receivables>0?{border:"1px solid rgba(232,164,91,0.4)"}:{})}}><div className="stat-n" style={{fontSize:18,color:receivables>0?"#E8A45B":"#8899AA"}}>KSh {receivables.toLocaleString()}</div><div className="stat-l">Owed to us ›</div></div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-        <div className="stat" onClick={()=>setDrill(drillGross())} style={{cursor:"pointer"}}><div className="stat-n" style={{color:"#F5C000"}}>KSh {grossProfit.toLocaleString()}</div><div className="stat-l">Gross profit ›</div></div>
-        <div className="stat" onClick={()=>setDrill(drillNet())} style={{cursor:"pointer",border:`1px solid ${netProfit>=0?"rgba(76,175,80,0.4)":"rgba(232,91,91,0.4)"}`}}>
-          <div className="stat-n" style={{color:netProfit>=0?"#4CAF50":"#E85B5B"}}>KSh {Math.abs(netProfit).toLocaleString()}</div>
-          <div className="stat-l">Net {netProfit>=0?"profit":"loss"} ›</div>
-        </div>
-      </div>
-      {lossCost>0&&<div style={{background:"rgba(232,91,91,0.08)",border:"1px solid rgba(232,91,91,0.3)",borderRadius:8,padding:12,marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:600,color:"#E85B5B"}}>Losses this period</div><div style={{fontSize:11,color:"#8899AA"}}>{fLosses.length} incident{fLosses.length!==1?"s":""} · theft, unpaid, damage</div></div><div style={{fontSize:16,fontWeight:600,color:"#E85B5B"}}>{fmtK(lossCost)}</div></div>}
-      <div style={{fontSize:11,color:"#556677",marginBottom:14,lineHeight:1.5,padding:"0 2px"}}>Profit is on sales value (what's invoiced), less cost of goods, expenses and losses. Collected is cash actually received; Owed to us is the outstanding balance on instalment sales.</div>
-      <div className="card" style={{marginBottom:14}}>
-        <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div><div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div><div style={{fontSize:10,color:"#556677"}}>AT COST</div></div>
-          <div><div style={{fontSize:20,fontWeight:600,color:"#4CAF50"}}>KSh {stockPotentialProfit.toLocaleString()}</div><div style={{fontSize:10,color:"#556677"}}>EST. PROFIT IF ALL SELLS</div></div>
-        </div>
-        <div style={{fontSize:11,color:"#556677",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()} · COGS this period KSh {cogs.toLocaleString()}</div>
-      </div>
-
-      {/* GROWTH PROJECTION */}
-      <div className="card" style={{marginBottom:14}}>
-        <div style={{fontSize:12,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:4}}>Growth projection</div>
-        <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>If the current trend holds ({avgMonthlyNet>=0?"+":""}{fmtK(avgMonthlyNet)}/month average over {monthsOfData} month{monthsOfData!==1?"s":""} of data)</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-          {proj.map(p=>(
-            <div key={p.months} style={{textAlign:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 6px"}}>
-              <div style={{fontSize:15,fontWeight:700,color:p.value>=totalCapital?"#4CAF50":"#E85B5B"}}>{fmtK(p.value)}</div>
-              <div style={{fontSize:11,color:"#8A97A8",marginTop:2}}>in {p.months} mo</div>
-            </div>
-          ))}
-        </div>
-        {monthsOfData<2&&<div style={{fontSize:11,color:"#E8A45B",marginTop:10,lineHeight:1.4}}>Only {monthsOfData} month of data — this projection will get meaningful after 2-3 months of trading.</div>}
-        <div style={{fontSize:10,color:"#556677",marginTop:8,lineHeight:1.4}}>A straight-line estimate, not a forecast. It assumes trading continues as it has. Real results depend on sales, sourcing and seasonality.</div>
-      </div>
-
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-        <div className="card">
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Payment split</div>
-          {collected>0?<>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#4CAF50"}}>M-Pesa</span><span>KSh {mpesa.toLocaleString()}</span></div>
-            <div style={{height:4,background:"#1A2A4A",borderRadius:2,marginBottom:8}}><div style={{height:4,background:"#4CAF50",borderRadius:2,width:`${collected>0?Math.round(mpesa/collected*100):0}%`}}/></div>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#F5C000"}}>Cash</span><span>KSh {cash.toLocaleString()}</span></div>
-          </>:<div style={{color:"#556677",fontSize:12}}>No sales yet</div>}
-        </div>
-        <div className="card">
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Expenses</div>
-          {expBreakdown.length>0?expBreakdown.slice(0,4).map(([cat,amt])=>(
-            <div key={cat} style={{marginBottom:6}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}><span style={{color:"#E8E2D4"}}>{cat}</span><span style={{color:"#E85B5B"}}>{expenses>0?Math.round(amt/expenses*100):0}%</span></div>
-              <div style={{height:3,background:"#1A2A4A",borderRadius:2}}><div style={{height:3,background:"#E85B5B",borderRadius:2,width:`${expenses>0?(amt/expenses*100):0}%`}}/></div>
-            </div>
-          )):<div style={{color:"#556677",fontSize:12}}>No expenses yet</div>}
-        </div>
-      </div>
-      {topItems.length>0&&(
-        <div className="card" style={{marginBottom:14}}>
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Top selling items</div>
-          {topItems.map(([name,{qty,revenue:rev}],i)=>(
-            <div key={name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<topItems.length-1?"1px solid #1A2A4A":"none"}}>
-              <div><div style={{fontSize:13,fontWeight:500}}>{name}</div><div style={{fontSize:11,color:"#556677"}}>{qty} sold</div></div>
-              <div style={{fontSize:13,fontWeight:600,color:"#4CAF50"}}>KSh {rev.toLocaleString()}</div>
-            </div>
-          ))}
-        </div>
-      )}
       {/* Month-on-month table */}
       {(()=>{
         // Per-item average cost for COGS
@@ -3181,6 +3106,61 @@ function ReportsTab({user,bal}){
           </div>
         );
       })()}
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div><div style={{fontSize:10,color:"#556677"}}>AT COST</div></div>
+          <div><div style={{fontSize:20,fontWeight:600,color:"#4CAF50"}}>KSh {stockPotentialProfit.toLocaleString()}</div><div style={{fontSize:10,color:"#556677"}}>EST. PROFIT IF ALL SELLS</div></div>
+        </div>
+        <div style={{fontSize:11,color:"#556677",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()}</div>
+      </div>
+
+      {/* GROWTH PROJECTION */}
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{fontSize:12,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:4}}>Growth projection</div>
+        <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>If the current trend holds ({avgMonthlyNet>=0?"+":""}{fmtK(avgMonthlyNet)}/month average over {monthsOfData} month{monthsOfData!==1?"s":""} of data)</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          {proj.map(p=>(
+            <div key={p.months} style={{textAlign:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 6px"}}>
+              <div style={{fontSize:15,fontWeight:700,color:p.value>=totalCapital?"#4CAF50":"#E85B5B"}}>{fmtK(p.value)}</div>
+              <div style={{fontSize:11,color:"#8A97A8",marginTop:2}}>in {p.months} mo</div>
+            </div>
+          ))}
+        </div>
+        {monthsOfData<2&&<div style={{fontSize:11,color:"#E8A45B",marginTop:10,lineHeight:1.4}}>Only {monthsOfData} month of data — this projection will get meaningful after 2-3 months of trading.</div>}
+        <div style={{fontSize:10,color:"#556677",marginTop:8,lineHeight:1.4}}>A straight-line estimate, not a forecast. It assumes trading continues as it has. Real results depend on sales, sourcing and seasonality.</div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div className="card">
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Payment split</div>
+          {collected>0?<>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#4CAF50"}}>M-Pesa</span><span>KSh {mpesa.toLocaleString()}</span></div>
+            <div style={{height:4,background:"#1A2A4A",borderRadius:2,marginBottom:8}}><div style={{height:4,background:"#4CAF50",borderRadius:2,width:`${collected>0?Math.round(mpesa/collected*100):0}%`}}/></div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#F5C000"}}>Cash</span><span>KSh {cash.toLocaleString()}</span></div>
+          </>:<div style={{color:"#556677",fontSize:12}}>No sales yet</div>}
+        </div>
+        <div className="card">
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Expenses</div>
+          {expBreakdown.length>0?expBreakdown.slice(0,4).map(([cat,amt])=>(
+            <div key={cat} style={{marginBottom:6}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}><span style={{color:"#E8E2D4"}}>{cat}</span><span style={{color:"#E85B5B"}}>{expenses>0?Math.round(amt/expenses*100):0}%</span></div>
+              <div style={{height:3,background:"#1A2A4A",borderRadius:2}}><div style={{height:3,background:"#E85B5B",borderRadius:2,width:`${expenses>0?(amt/expenses*100):0}%`}}/></div>
+            </div>
+          )):<div style={{color:"#556677",fontSize:12}}>No expenses yet</div>}
+        </div>
+      </div>
+      {topItems.length>0&&(
+        <div className="card" style={{marginBottom:14}}>
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Top selling items</div>
+          {topItems.map(([name,{qty,revenue:rev}],i)=>(
+            <div key={name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<topItems.length-1?"1px solid #1A2A4A":"none"}}>
+              <div><div style={{fontSize:13,fontWeight:500}}>{name}</div><div style={{fontSize:11,color:"#556677"}}>{qty} sold</div></div>
+              <div style={{fontSize:13,fontWeight:600,color:"#4CAF50"}}>KSh {rev.toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
         <button className="btn-g" onClick={()=>exportCSV("sales")} style={{fontSize:12}}>Export sales</button>
         <button className="btn-g" onClick={()=>exportCSV("expenses")} style={{fontSize:12}}>Export expenses</button>
