@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 const SB_URL = "https://pdfadcnrxlojuxjqtzil.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZmFkY25yeGxvanV4anF0emlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMTQ0MzksImV4cCI6MjEwMjg5MDQzOX0.1gRq0MWGc6EFOtm5-rma4Fo1shVSWIW8kFDX-Np6CIM";
 const APP_PW = "GwituMucii@22";
-const C = { navy:"#050A1F",mid:"#0A1128",light:"#0F1A3A",yellow:"#F5C000",white:"#FFFFFF",muted:"#8899AA",dark:"#556677",green:"#4CAF50",red:"#E85B5B" };
+const C = { navy:"#050A1F",mid:"#0A1128",light:"#0F1A3A",yellow:"#F5C000",white:"#FFFFFF",muted:"#8899AA",dark:"#8A97A8",green:"#4CAF50",red:"#E85B5B" };
 const STAFF = ["Burton Kariuki","Martin Ruguru"];
 // Business identity — defaults; overridden at app start from karu_settings
 const BIZ = { name:"KARU FURNITURE", address:"Off Kihara-Gachie-Karura Rd, Nairobi", phone1:"0720 772 866", phone2:"0792 933 413" };
@@ -87,7 +87,7 @@ function parseMpesa(sms) {
 const GS = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
-    *{box-sizing:border-box;margin:0;padding:0} body{font-family:'DM Sans',sans-serif;background:#050A1F;color:#E8E2D4} input,select,textarea{outline:none;font-family:'DM Sans',sans-serif}
+    *{box-sizing:border-box;margin:0;padding:0} body{font-family:'DM Sans',sans-serif;background:#050A1F;color:#E8E2D4} input,select,textarea{outline:none;font-family:'DM Sans',sans-serif;color-scheme:dark}
     .field{margin-bottom:13px} .field label{display:block;font-size:12px;color:#FFFFFF;font-weight:600;margin-bottom:5px;letter-spacing:0.04em;text-transform:uppercase}
     .field input,.field select,.field textarea{width:100%;background:#12203C;border:1px solid #2E4472;border-radius:8px;padding:11px 13px;color:#FFFFFF;font-size:14px} .field textarea{resize:vertical;min-height:56px} .field input::placeholder,.field textarea::placeholder{color:#8A97A8;font-size:13px}
     .tog{display:flex;gap:6px} .tog-btn{flex:1;padding:9px 6px;font-size:14px;font-weight:600;border:1px solid #24365C;border-radius:8px;background:#111C34;color:#AEB9C7;cursor:pointer;text-align:center;transition:all 0.15s}
@@ -178,7 +178,7 @@ export default function App() {
     <div style={{maxWidth:500,margin:"0 auto",paddingBottom:72}}>
       <div style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#050A1F",position:"sticky",top:0,zIndex:40,borderBottom:"1px solid #0A1128"}}>
         <span style={{fontSize:16,fontWeight:600,color:"#F5C000",letterSpacing:"0.08em"}}>KARU</span>
-        <span style={{fontSize:12,color:"#556677"}}>{user.full_name.split(" ")[0]} · {ROLES[user.role].label}</span>
+        <span style={{fontSize:12,color:"#8A97A8"}}>{user.full_name.split(" ")[0]} · {ROLES[user.role].label}</span>
         <button onClick={()=>setPanel(true)} style={{background:"none",border:"1px solid #1A2A4A",borderRadius:6,color:"#F5C000",padding:"5px 10px",fontSize:16,cursor:"pointer",lineHeight:1}}>☰</button>
       </div>
       <div style={{padding:16}}>
@@ -322,7 +322,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
       {view==="close"?<CloseDay user={user} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="users"?<ManageTeam user={user} onBack={()=>setView("home")}/>:view==="reconcile"?<Reconcile user={user} bal={bal} onBack={()=>setView("home")} onDone={()=>{onChange();setView("home");}}/>:view==="products"?<ProductList user={user} onBack={()=>setView("home")}/>:view==="credit"?<StoreCredit user={user} onBack={()=>setView("home")}/>:view==="bizsettings"?<BusinessSettings user={user} onBack={()=>setView("home")}/>:!can(user,"money")?(
         <div style={{textAlign:"center",color:"#8899AA",fontSize:14,padding:"20px 0"}}>
           {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{width:"100%",marginBottom:10,fontSize:13}}>Daily cash close</button>}
-          <div style={{fontSize:12,color:"#556677",marginTop:8}}>Money controls are owner-only.</div>
+          <div style={{fontSize:12,color:"#8A97A8",marginTop:8}}>Money controls are owner-only.</div>
         </div>
       ):!bal.hasData?(
         <div className="qa">
@@ -343,7 +343,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
         {!act&&<div style={{marginBottom:16}}>
           {can(user,"money")&&null}
           {(can(user,"close")||can(user,"users"))&&<>
-            <div style={{fontSize:10,color:"#556677",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Admin</div>
+            <div style={{fontSize:10,color:"#8A97A8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Admin</div>
             <div style={{display:"grid",gap:8}}>
               {can(user,"close")&&<button className="btn-g" onClick={()=>setView("close")} style={{fontSize:13}}>Daily cash close</button>}
               {can(user,"users")&&<button className="btn-g" onClick={()=>setView("credit")} style={{fontSize:13}}>Store credit</button>}
@@ -361,7 +361,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
           <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${acc==="cash"?" on":""}`} onClick={()=>setAcc("cash")}>Cash</button><button className={`tog-btn${acc==="sacco"?" on":""}`} onClick={()=>setAcc("sacco")}>SACCO</button></div>
           <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)"/>
           <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={doPartner} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setAct(null);setAmt("");}} style={{fontSize:13}}>Cancel</button></div></div>}
-        {moves.length>0&&<div><div style={{fontSize:11,color:"#556677",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Recent movements</div>
+        {moves.length>0&&<div><div style={{fontSize:11,color:"#8A97A8",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Recent movements</div>
           {moves.map(m=><div key={m.id} className="mv"><span style={{color:"#8899AA"}}>{m.date.slice(5)} · {m.description||m.type}</span><span style={{color:m.amount>=0?"#4CAF50":"#E85B5B",fontWeight:600}}>{m.amount>=0?"+":""}{Math.round(m.amount).toLocaleString()}</span></div>)}
         </div>}
       </>)}
@@ -409,7 +409,7 @@ function CloseDay({user,onBack,onDone}){
         <div style={{background:"rgba(76,175,80,0.1)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:16,textAlign:"center"}}>
           <div style={{fontSize:15,fontWeight:600,color:"#4CAF50",marginBottom:6}}>Today is closed</div>
           <div style={{fontSize:13,color:"#8899AA"}}>Counted {fmtK(alreadyClosed.cash_counted)} · Variance {alreadyClosed.variance===0?"none":fmtK(alreadyClosed.variance)}</div>
-          <div style={{fontSize:12,color:"#556677",marginTop:4}}>Closed by {alreadyClosed.closed_by?.split(" ")[0]}</div>
+          <div style={{fontSize:12,color:"#8A97A8",marginTop:4}}>Closed by {alreadyClosed.closed_by?.split(" ")[0]}</div>
         </div>
       ):(<>
         <div className="qa"><div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>Cash sales today</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(data.cash)}</span></div>
@@ -445,7 +445,7 @@ function StoreCredit({user,onBack}){
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Store Credit</div></div>
       <div style={{fontSize:12,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Customers holding credit from over-payments. Tap one to start a sale — their credit is applied first, they pay only the difference.</div>
       <div className="stat" style={{marginBottom:14}}><div className="stat-n" style={{color:"#E8A45B"}}>{fmtK(totalOut)}</div><div className="stat-l">Total credit outstanding</div></div>
-      {loading?<div style={{color:"#556677",textAlign:"center",padding:"20px 0"}}>Loading...</div>:holders.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0"}}>No outstanding credit.</div>:holders.map((c,i)=>(
+      {loading?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0"}}>Loading...</div>:holders.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0"}}>No outstanding credit.</div>:holders.map((c,i)=>(
         <div key={i} className="card">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div><div style={{fontSize:14,fontWeight:600}}>{c.name}</div><div style={{fontSize:11,color:"#8899AA"}}>{c.phone||"no phone"}</div></div>
@@ -521,17 +521,17 @@ function ProductList({user,onBack}){
   );
   return (
     <div>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Product List</div><span style={{fontSize:12,color:"#556677"}}>{products.length}</span></div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Product List</div><span style={{fontSize:12,color:"#8A97A8"}}>{products.length}</span></div>
       <div style={{fontSize:11,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Add tags so people find items fast — "sofa", "3s", "seater" all point to one product. New products are added while recording a sale or trip.</div>
       <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search products or tags..." style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 11px",color:"#E8E2D4",fontSize:13,marginBottom:12}}/>
-      {loading?<div style={{color:"#556677",textAlign:"center",padding:"20px 0"}}>Loading...</div>:shown.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0"}}>No products.</div>:shown.map(p=>(
+      {loading?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0"}}>Loading...</div>:shown.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0"}}>No products.</div>:shown.map(p=>(
         <div key={p.id} className="card" style={{opacity:p.active?1:0.5,padding:"10px 12px"}} onClick={()=>setEditing({...p})}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:600}}>{p.name}{!p.active&&<span style={{color:"#556677",fontWeight:400}}> · retired</span>}</div>
-              <div style={{fontSize:11,color:"#556677",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{catLabel(p.category)}{p.tags?` · ${p.tags}`:" · no tags yet"}</div>
+              <div style={{fontSize:13,fontWeight:600}}>{p.name}{!p.active&&<span style={{color:"#8A97A8",fontWeight:400}}> · retired</span>}</div>
+              <div style={{fontSize:11,color:"#8A97A8",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{catLabel(p.category)}{p.tags?` · ${p.tags}`:" · no tags yet"}</div>
             </div>
-            <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,color:"#F5C000",fontWeight:600}}>{p.default_price>0?fmtK(Number(p.default_price)):"—"}</div><div style={{fontSize:10,color:"#556677"}}>edit</div></div>
+            <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,color:"#F5C000",fontWeight:600}}>{p.default_price>0?fmtK(Number(p.default_price)):"—"}</div><div style={{fontSize:10,color:"#8A97A8"}}>edit</div></div>
           </div>
         </div>
       ))}
@@ -668,7 +668,7 @@ function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, n
               <div style={{fontSize:11,color:"#8899AA"}}>{catLabel(p.category)}{p.default_price>0?` · KSh ${Number(p.default_price).toLocaleString()}`:""}{p.tags?` · ${p.tags}`:""}</div>
             </div>
           ))}
-          {matches.length===0&&<div style={{padding:"9px 12px",fontSize:12,color:"#556677"}}>No match for "{value}"</div>}
+          {matches.length===0&&<div style={{padding:"9px 12px",fontSize:12,color:"#8A97A8"}}>No match for "{value}"</div>}
           {!exactExists&&can(user,"users")&&!noAdd&&(
             adding?(
               <div style={{padding:12,borderTop:"1px solid #1A2A4A"}} onMouseDown={e=>e.preventDefault()}>
@@ -686,7 +686,7 @@ function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, n
               <div className="ac-item" style={{color:"#F5C000"}} onMouseDown={e=>{e.preventDefault();setNf(x=>({...x,name:value}));setAdding(true);}}>+ New product "{value}"</div>
             )
           )}
-          {!exactExists&&!can(user,"users")&&matches.length===0&&<div style={{padding:"9px 12px",fontSize:11,color:"#556677"}}>Not in the list — ask an owner to add it.</div>}
+          {!exactExists&&!can(user,"users")&&matches.length===0&&<div style={{padding:"9px 12px",fontSize:11,color:"#8A97A8"}}>Not in the list — ask an owner to add it.</div>}
         </div>
       )}
     </div>
@@ -1020,11 +1020,11 @@ function SaleTab({user,onMoney}){
           <div key={it.id} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid #101B36"}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 24px",gap:6,marginBottom:6,alignItems:"center"}}>
               <ProductSearch user={user} value={it.name} onChange={v=>exUp(it.id,"name",v)} onPick={p=>exSelect(it.id,p)} placeholder="Search product..."/>
-              {exchItems.length>1&&<button onClick={()=>exRm(it.id)} style={{background:"none",border:"none",color:"#556677",cursor:"pointer",fontSize:16}}>×</button>}
+              {exchItems.length>1&&<button onClick={()=>exRm(it.id)} style={{background:"none",border:"none",color:"#8A97A8",cursor:"pointer",fontSize:16}}>×</button>}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={it.qty} min={1} onChange={e=>exUp(it.id,"qty",e.target.value)} style={{width:"100%",background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
-              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>PRICE (KSh)</div><input type="number" value={it.price} onChange={e=>exUp(it.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#FFFFFF",fontSize:14}}/></div>
+              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={it.qty} min={1} onChange={e=>exUp(it.id,"qty",e.target.value)} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
+              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>PRICE (KSh)</div><input type="number" value={it.price} onChange={e=>exUp(it.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#FFFFFF",fontSize:14}}/></div>
             </div>
           </div>
         ))}
@@ -1116,12 +1116,12 @@ function SaleTab({user,onMoney}){
           ):(
             <div>
               <div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Recent sales</div>
-              {histSales.length===0?<div style={{color:"#556677",fontSize:13}}>No sales yet.</div>:(()=>{
+              {histSales.length===0?<div style={{color:"#8A97A8",fontSize:13}}>No sales yet.</div>:(()=>{
                 // Row renderer for one sale (keeps all actions)
                 const saleRow=(s)=>(
                   <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #101B36",opacity:s.voided?0.45:1}}>
                     <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8A97A8"}}>{s.receipt_no} · {initials(s.served_by)} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div></div>
-                    <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:2}}>{!s.voided&&<button onClick={()=>{setReceipt(s);setShowHistory(false);}} style={{background:"none",border:"none",color:"#AEB9C7",fontSize:11,cursor:"pointer",padding:0}}>Receipt</button>}{!s.voided&&can(user,"users")&&canModify(s)&&<button onClick={()=>startExchange(s)} style={{background:"none",border:"none",color:"#E8A45B",fontSize:11,cursor:"pointer",padding:0}}>{Number(s.balance_due||0)>0?"Edit":"Exchange"}</button>}{!s.voided&&can(user,"void")&&(withinWindow(s.created_at)?<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:0}}>Void</button>:<span style={{fontSize:10,color:"#556677"}}>🔒</span>)}</div></div>
+                    <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:2}}>{!s.voided&&<button onClick={()=>{setReceipt(s);setShowHistory(false);}} style={{background:"none",border:"none",color:"#AEB9C7",fontSize:11,cursor:"pointer",padding:0}}>Receipt</button>}{!s.voided&&can(user,"users")&&canModify(s)&&<button onClick={()=>startExchange(s)} style={{background:"none",border:"none",color:"#E8A45B",fontSize:11,cursor:"pointer",padding:0}}>{Number(s.balance_due||0)>0?"Edit":"Exchange"}</button>}{!s.voided&&can(user,"void")&&(withinWindow(s.created_at)?<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:0}}>Void</button>:<span style={{fontSize:10,color:"#8A97A8"}}>🔒</span>)}</div></div>
                   </div>
                 );
                 const dayTotal=arr=>arr.filter(s=>!s.voided).reduce((n,s)=>n+Number(s.total),0);
@@ -1713,7 +1713,7 @@ function StockTab({user,onMoney}){
       <div style={{display:"flex",justifyContent:"flex-end",marginBottom:14}}>
         <button className="btn-y" onClick={()=>setView("new")} style={{fontSize:13,padding:"9px 16px"}}>+ New Trip</button>
       </div>
-      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:trips.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No trips yet.</div>:(()=>{
+      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading...</div>:trips.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>No trips yet.</div>:(()=>{
         const renderTrip=(t)=>{
         const isOpen=expanded[t.id];
         const tItems=stockForTrip(t.trip_no);
@@ -1730,7 +1730,7 @@ function StockTab({user,onMoney}){
                 <div style={{fontSize:12,color:"#8899AA"}}>{t.date} · {t.created_by?.split(" ")[0]} · KSh {Number(t.total_cost).toLocaleString()} · {tItems.length} item{tItems.length!==1?"s":""}</div>
                 {locked&&<div style={{fontSize:11,color:"#4CAF50",marginTop:2}}>Locked by {t.locked_by?.split(" ")[0]} on {t.locked_at?new Date(t.locked_at).toLocaleDateString("en-KE"):""}</div>}
               </div>
-              <span style={{color:"#556677",fontSize:18}}>{isOpen?"▲":"▼"}</span>
+              <span style={{color:"#8A97A8",fontSize:18}}>{isOpen?"▲":"▼"}</span>
             </div>
             {isOpen&&(
               <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #1A2A4A"}}>
@@ -1741,7 +1741,7 @@ function StockTab({user,onMoney}){
                       <div style={{flex:1}}>
                         <div style={{fontSize:13,fontWeight:500}}>{s.name}</div>
                         <div style={{fontSize:11,color:"#8899AA",marginTop:2}}>{catLabel(s.category)} · Cost: KSh {Number(s.unit_cost).toLocaleString()} · Sell: KSh {Number(s.selling_price).toLocaleString()}</div>
-                        <div style={{fontSize:11,color:"#556677",marginTop:1}}>In: {s.qty_in} · Sold: {s.qty_sold}{adj>0?` · Adjusted: ${adj}`:""} · Left: {avail}</div>
+                        <div style={{fontSize:11,color:"#8A97A8",marginTop:1}}>In: {s.qty_in} · Sold: {s.qty_sold}{adj>0?` · Adjusted: ${adj}`:""} · Left: {avail}</div>
                       </div>
                       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
                         <span className={`badge ${avail>0?"b-g":"b-r"}`}>{avail>0?`${avail} left`:"None left"}</span>
@@ -1791,14 +1791,14 @@ function StockTab({user,onMoney}){
                 )}
                 {logs.length>0&&(
                   <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #0F1A3A"}}>
-                    <div style={{fontSize:11,color:"#556677",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Audit trail</div>
+                    <div style={{fontSize:11,color:"#8A97A8",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Audit trail</div>
                     {logs.map(a=>(
                       <div key={a.id} className="audit-entry">
                         <span style={{color:"#8899AA"}}>{new Date(a.changed_at).toLocaleDateString("en-KE",{day:"2-digit",month:"short"})} {new Date(a.changed_at).toLocaleTimeString("en-KE",{hour:"2-digit",minute:"2-digit",hour12:true})}</span>
                         {" "}<span style={{color:"#E8E2D4"}}>{a.changed_by?.split(" ")[0]}</span>
                         {" "}<span style={{color:"#F5C000"}}>{a.action}</span>
                         {a.field_changed&&<span style={{color:"#8899AA"}}> · {a.field_changed}: {a.old_value} to {a.new_value}</span>}
-                        {a.reason&&<div style={{color:"#556677",paddingLeft:4}}>"{a.reason}"</div>}
+                        {a.reason&&<div style={{color:"#8A97A8",paddingLeft:4}}>"{a.reason}"</div>}
                       </div>
                     ))}
                   </div>
@@ -2010,12 +2010,12 @@ function OrdersTab({user,onMoney}){
                   <div key={ii} style={{marginBottom:10,paddingBottom:10,borderBottom:ii<sub.items.length-1?"1px solid #101B36":"none"}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 24px",gap:6,marginBottom:6,alignItems:"center"}}>
                       <ProductSearch user={user} value={it.name} onChange={v=>upDraftItem(si,ii,"name",v)} onPick={p=>{upDraftItem(si,ii,"name",p.name);upDraftItem(si,ii,"category",p.category);if(p.default_cost>0)upDraftItem(si,ii,"est_cost",p.default_cost);}} placeholder="Search product..."/>
-                      {sub.items.length>1&&<button onClick={()=>rmDraftItem(si,ii)} style={{background:"none",border:"none",color:"#556677",cursor:"pointer",fontSize:16}}>×</button>}
+                      {sub.items.length>1&&<button onClick={()=>rmDraftItem(si,ii)} style={{background:"none",border:"none",color:"#8A97A8",cursor:"pointer",fontSize:16}}>×</button>}
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr 1fr",gap:6}}>
-                      <select value={it.category} onChange={e=>upDraftItem(si,ii,"category",e.target.value)} style={{background:"transparent",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#8899AA",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id} style={{background:"#0A1128"}}>{c.label}</option>)}</select>
-                      <input type="number" value={it.qty} min={1} onChange={e=>upDraftItem(si,ii,"qty",e.target.value)} placeholder="Qty" style={{background:"transparent",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#E8E2D4",fontSize:12,textAlign:"center",width:"100%"}}/>
-                      <input type="number" value={it.est_cost} onChange={e=>upDraftItem(si,ii,"est_cost",e.target.value)} placeholder="Cost" style={{background:"transparent",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#E8E2D4",fontSize:12,width:"100%"}}/>
+                      <select value={it.category} onChange={e=>upDraftItem(si,ii,"category",e.target.value)} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#8899AA",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id} style={{background:"#0A1128"}}>{c.label}</option>)}</select>
+                      <input type="number" value={it.qty} min={1} onChange={e=>upDraftItem(si,ii,"qty",e.target.value)} placeholder="Qty" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#E8E2D4",fontSize:12,textAlign:"center",width:"100%"}}/>
+                      <input type="number" value={it.est_cost} onChange={e=>upDraftItem(si,ii,"est_cost",e.target.value)} placeholder="Cost" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#E8E2D4",fontSize:12,width:"100%"}}/>
                     </div>
                   </div>
                 ))}
@@ -2089,7 +2089,7 @@ function OrdersTab({user,onMoney}){
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {[["open","Open"],["done","Completed"],["all","All"]].map(([id,l])=><button key={id} onClick={()=>setFilter(id)} style={{padding:"5px 12px",borderRadius:100,border:`1px solid ${filter===id?"#F5C000":"#1A2A4A"}`,background:filter===id?"rgba(245,192,0,0.1)":"transparent",color:filter===id?"#F5C000":"#8899AA",fontSize:12,cursor:"pointer"}}>{l}</button>)}
       </div>
-      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:shown.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No orders here.</div>:(()=>{
+      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading...</div>:shown.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>No orders here.</div>:(()=>{
         const orderCard=(o)=>{
           const subs=o.suppliers||[];
           return (
@@ -2100,7 +2100,7 @@ function OrdersTab({user,onMoney}){
             </div>
             <div style={{fontSize:11,color:"#8A97A8"}}>{subs.map(s=>s.supplier).filter(Boolean).join(" · ")||"No suppliers yet"}</div>
             {orderDeposits(subs)>0&&<div style={{fontSize:11,color:"#4CAF50",marginTop:4}}>Deposits {fmtK(orderDeposits(subs))} · Balance {fmtK(Math.max(0,orderTotal(subs)-orderDeposits(subs)))}</div>}
-            <div style={{fontSize:11,color:"#556677",marginTop:6}}>Tap to open</div>
+            <div style={{fontSize:11,color:"#8A97A8",marginTop:6}}>Tap to open</div>
           </div>
           );
         };
@@ -2361,7 +2361,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
           <div style={{background:"#12203C",border:`1px solid ${netProfitAll>=0?"rgba(76,175,80,0.35)":"rgba(232,91,91,0.35)"}`,borderRadius:8,padding:"10px 12px"}}>
             <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>NET PROFIT EARNED</div>
             <div style={{fontSize:18,fontWeight:700,color:netProfitAll>=0?"#4CAF50":"#E85B5B"}}>{netProfitAll<0?"-":""}{fmtK(Math.abs(netProfitAll))}</div>
-            <div style={{fontSize:10,color:"#556677",marginTop:2}}>after cost, expenses, losses</div>
+            <div style={{fontSize:10,color:"#8A97A8",marginTop:2}}>after cost, expenses, losses</div>
           </div>
         </div>
         <div style={{fontSize:12,color:"#8A97A8",display:"flex",justifyContent:"space-between",padding:"8px 2px 0",borderTop:"1px solid #1A2A4A"}}>
@@ -2373,15 +2373,15 @@ function LedgerTab({user,onMoney,bal,onChange}){
             <div style={{flex:1,background:"#0A1128",border:"1px solid #24365C",borderRadius:8,padding:"9px 11px"}}>
               <div style={{fontSize:11,color:"#8A97A8"}}>COST RECOVERED</div>
               <div style={{fontSize:15,fontWeight:700,color:"#E8A45B"}}>{fmtK(cogsAll)}</div>
-              <div style={{fontSize:10,color:"#556677",marginTop:1}}>your capital, back</div>
+              <div style={{fontSize:10,color:"#8A97A8",marginTop:1}}>your capital, back</div>
             </div>
             <div style={{flex:1,background:"rgba(76,175,80,0.06)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:"9px 11px"}}>
               <div style={{fontSize:11,color:"#8A97A8"}}>PROFIT EARNED</div>
               <div style={{fontSize:15,fontWeight:700,color:"#4CAF50"}}>{fmtK(grossProfitAll)}</div>
-              <div style={{fontSize:10,color:"#556677",marginTop:1}}>margin on top</div>
+              <div style={{fontSize:10,color:"#8A97A8",marginTop:1}}>margin on top</div>
             </div>
           </div>
-          <div style={{fontSize:10,color:"#556677",marginTop:6,lineHeight:1.4}}>Sales of {fmtK(salesAll)} = {fmtK(cogsAll)} recovering what the goods cost + {fmtK(grossProfitAll)} gross profit.</div>
+          <div style={{fontSize:10,color:"#8A97A8",marginTop:6,lineHeight:1.4}}>Sales of {fmtK(salesAll)} = {fmtK(cogsAll)} recovering what the goods cost + {fmtK(grossProfitAll)} gross profit.</div>
         </div>
         <div style={{fontSize:11,color:"#8A97A8",marginTop:8,lineHeight:1.5}}>Worth {fmtK(totalWorth)} = {fmtK(liquidAll)} cash + {fmtK(stockAtCost)} stock (same as Stock tab). Of that, {fmtK(capitalFloat)} is capital and {fmtK(netProfitAll)} is earned profit.</div>
       </div>
@@ -2452,7 +2452,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
             {ACCTS.map(([id,l])=><button key={id} onClick={()=>setAcctFilter(id)} style={pill(acctFilter===id)}>{l}</button>)}
           </div>
           <div style={{fontSize:11,color:"#8A97A8",marginBottom:8}}>{registerRows.length} movements · <button onClick={exportLedger} style={{background:"none",border:"none",color:"#AEB9C7",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Export CSV</button></div>
-          {registerRows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0",fontSize:13}}>No movements in range.</div>:(()=>{
+          {registerRows.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0",fontSize:13}}>No movements in range.</div>:(()=>{
             const regRow=(r)=>{ const isSale=r.type==="sale"&&r.ref; const sp=isSale?saleSplit(r.ref):null; return (
               <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #101B36"}}>
                 <div style={{flex:1,minWidth:0,paddingRight:8}}>
@@ -2617,7 +2617,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
             <button className="btn-y" onClick={()=>{setTab("overview");setAct("allocate");}} style={{flex:1,fontSize:12}}>Top up petty cash</button>
           </div>
           <div style={{fontSize:11,color:"#8A97A8",marginBottom:12}}>Record petty spends on the Expenses tab (+ Petty spend). They appear here and in your expenses.</div>
-          {pettyRows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"20px 0",fontSize:13}}>No petty cash activity yet.</div>:(()=>{
+          {pettyRows.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0",fontSize:13}}>No petty cash activity yet.</div>:(()=>{
             const pcRow=(r)=>(
               <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #101B36"}}>
                 <div style={{flex:1,minWidth:0,paddingRight:8}}><div style={{fontSize:12,fontWeight:500}}>{r.description||r.type}</div><div style={{fontSize:10,color:"#8A97A8"}}>{r.recorded_by?.split(" ")[0]||""}</div></div>
@@ -2824,7 +2824,7 @@ function ExpensesTab({user,onMoney}){
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={saveEdit} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save Changes"}</button><button className="btn-g" onClick={()=>{setEditing(null);setErr("");}}>Cancel</button></div>
         </div>
       )}
-      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading...</div>:exp.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>No expenses in this period.</div>:(()=>{
+      {loading?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading...</div>:exp.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>No expenses in this period.</div>:(()=>{
         const expRow=(e,last)=>(
           <div key={e.id} style={{padding:"9px 0",borderBottom:last?"none":"1px solid #101B36"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -2837,7 +2837,7 @@ function ExpensesTab({user,onMoney}){
             {can(user,"edit_expense")&&(withinWindow(e.created_at)?<div style={{display:"flex",gap:6,marginTop:6}}>
               <button className="btn-g" onClick={()=>startEdit(e)} style={{fontSize:11,padding:"4px 10px"}}>Edit</button>
               {can(user,"void")&&<button className="btn-g" onClick={()=>delExpense(e)} style={{fontSize:11,padding:"4px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Delete</button>}
-            </div>:<div style={{fontSize:10,color:"#556677",marginTop:6}}>🔒 Locked (over 24h)</div>)}
+            </div>:<div style={{fontSize:10,color:"#8A97A8",marginTop:6}}>🔒 Locked (over 24h)</div>)}
           </div>
         );
         const dayTotal=arr=>arr.reduce((n,e)=>n+Number(e.amount),0);
@@ -3052,7 +3052,7 @@ function ReportsTab({user,bal}){
   const drillNet=()=>({ title:"Net profit breakdown", color:netProfit>=0?"#4CAF50":"#E85B5B", total:netProfit,
     rows:[{label:"Gross profit",sub:"sales value less COGS",amount:grossProfit},{label:"Less: expenses",sub:`${fExp.length} entries`,amount:-expenses},...(lossCost>0?[{label:"Less: losses",sub:`${fLosses.length} incidents`,amount:-lossCost}]:[])] });
 
-  if(loading) return <div style={{textAlign:"center",padding:"2rem",color:"#556677"}}>Loading reports...</div>;
+  if(loading) return <div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading reports...</div>;
 
   return (
     <div>
@@ -3109,10 +3109,10 @@ function ReportsTab({user,bal}){
       <div className="card" style={{marginBottom:14}}>
         <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div><div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div><div style={{fontSize:10,color:"#556677"}}>AT COST</div></div>
-          <div><div style={{fontSize:20,fontWeight:600,color:"#4CAF50"}}>KSh {stockPotentialProfit.toLocaleString()}</div><div style={{fontSize:10,color:"#556677"}}>EST. PROFIT IF ALL SELLS</div></div>
+          <div><div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div><div style={{fontSize:10,color:"#8A97A8"}}>AT COST</div></div>
+          <div><div style={{fontSize:20,fontWeight:600,color:"#4CAF50"}}>KSh {stockPotentialProfit.toLocaleString()}</div><div style={{fontSize:10,color:"#8A97A8"}}>EST. PROFIT IF ALL SELLS</div></div>
         </div>
-        <div style={{fontSize:11,color:"#556677",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()}</div>
+        <div style={{fontSize:11,color:"#8A97A8",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()}</div>
       </div>
 
       {/* GROWTH PROJECTION */}
@@ -3128,7 +3128,7 @@ function ReportsTab({user,bal}){
           ))}
         </div>
         {monthsOfData<2&&<div style={{fontSize:11,color:"#E8A45B",marginTop:10,lineHeight:1.4}}>Only {monthsOfData} month of data — this projection will get meaningful after 2-3 months of trading.</div>}
-        <div style={{fontSize:10,color:"#556677",marginTop:8,lineHeight:1.4}}>A straight-line estimate, not a forecast. It assumes trading continues as it has. Real results depend on sales, sourcing and seasonality.</div>
+        <div style={{fontSize:10,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>A straight-line estimate, not a forecast. It assumes trading continues as it has. Real results depend on sales, sourcing and seasonality.</div>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
@@ -3138,7 +3138,7 @@ function ReportsTab({user,bal}){
             <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#4CAF50"}}>M-Pesa</span><span>KSh {mpesa.toLocaleString()}</span></div>
             <div style={{height:4,background:"#1A2A4A",borderRadius:2,marginBottom:8}}><div style={{height:4,background:"#4CAF50",borderRadius:2,width:`${collected>0?Math.round(mpesa/collected*100):0}%`}}/></div>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#F5C000"}}>Cash</span><span>KSh {cash.toLocaleString()}</span></div>
-          </>:<div style={{color:"#556677",fontSize:12}}>No sales yet</div>}
+          </>:<div style={{color:"#8A97A8",fontSize:12}}>No sales yet</div>}
         </div>
         <div className="card">
           <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Expenses</div>
@@ -3147,7 +3147,7 @@ function ReportsTab({user,bal}){
               <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}><span style={{color:"#E8E2D4"}}>{cat}</span><span style={{color:"#E85B5B"}}>{expenses>0?Math.round(amt/expenses*100):0}%</span></div>
               <div style={{height:3,background:"#1A2A4A",borderRadius:2}}><div style={{height:3,background:"#E85B5B",borderRadius:2,width:`${expenses>0?(amt/expenses*100):0}%`}}/></div>
             </div>
-          )):<div style={{color:"#556677",fontSize:12}}>No expenses yet</div>}
+          )):<div style={{color:"#8A97A8",fontSize:12}}>No expenses yet</div>}
         </div>
       </div>
       {topItems.length>0&&(
@@ -3155,7 +3155,7 @@ function ReportsTab({user,bal}){
           <div style={{fontSize:11,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Top selling items</div>
           {topItems.map(([name,{qty,revenue:rev}],i)=>(
             <div key={name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<topItems.length-1?"1px solid #1A2A4A":"none"}}>
-              <div><div style={{fontSize:13,fontWeight:500}}>{name}</div><div style={{fontSize:11,color:"#556677"}}>{qty} sold</div></div>
+              <div><div style={{fontSize:13,fontWeight:500}}>{name}</div><div style={{fontSize:11,color:"#8A97A8"}}>{qty} sold</div></div>
               <div style={{fontSize:13,fontWeight:600,color:"#4CAF50"}}>KSh {rev.toLocaleString()}</div>
             </div>
           ))}
@@ -3178,9 +3178,9 @@ function ReportsTab({user,bal}){
               <button onClick={()=>setDrill(null)} style={{background:"none",border:"none",color:"#8899AA",fontSize:22,cursor:"pointer"}}>×</button>
             </div>
             <div style={{overflowY:"auto",padding:"8px 18px 24px"}}>
-              {drill.rows.length===0?<div style={{color:"#556677",textAlign:"center",padding:"24px 0",fontSize:13}}>Nothing in this period.</div>:drill.rows.map((r,i)=>(
+              {drill.rows.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"24px 0",fontSize:13}}>Nothing in this period.</div>:drill.rows.map((r,i)=>(
                 <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 0",borderBottom:i<drill.rows.length-1?"1px solid #101B36":"none"}}>
-                  <div style={{flex:1,minWidth:0,paddingRight:10}}><div style={{fontSize:13,fontWeight:500}}>{r.label}</div>{r.sub&&<div style={{fontSize:11,color:"#556677"}}>{r.sub}</div>}</div>
+                  <div style={{flex:1,minWidth:0,paddingRight:10}}><div style={{fontSize:13,fontWeight:500}}>{r.label}</div>{r.sub&&<div style={{fontSize:11,color:"#8A97A8"}}>{r.sub}</div>}</div>
                   <div style={{fontSize:13,fontWeight:600,color:r.amount<0?"#E85B5B":"#E8E2D4",whiteSpace:"nowrap"}}>{r.amount<0?"-":""}KSh {Math.abs(r.amount).toLocaleString()}</div>
                 </div>
               ))}
