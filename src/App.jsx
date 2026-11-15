@@ -92,19 +92,19 @@ const GS = () => (
     .field{margin-bottom:20px} .field label{display:block;font-size:13px;color:#A9B5C6;font-weight:500;margin-bottom:2px;letter-spacing:0;text-transform:none}
     .field input,.field select,.field textarea{width:100%;background:transparent;border:none;border-bottom:1px solid #5B73A3;border-radius:0;padding:10px 2px;min-height:44px;color:#FFFFFF;font-size:15px} .field input:focus,.field select:focus,.field textarea:focus{border-bottom-color:#F5C000;box-shadow:0 1px 0 0 #F5C000} .field textarea{resize:vertical;min-height:64px} .field input::placeholder,.field textarea::placeholder{color:#8A97A8;font-size:13px}
     .dtl>summary{list-style:none;cursor:pointer} .dtl>summary::-webkit-details-marker{display:none}
-    .tog{display:flex;gap:6px} .tog-btn{flex:1;padding:9px 6px;font-size:14px;font-weight:600;border:1px solid #24365C;border-radius:8px;background:#111C34;color:#AEB9C7;cursor:pointer;text-align:center;transition:all 0.15s}
-    .tog-btn.on{background:rgba(245,192,0,0.18);border-color:#F5C000;color:#F5C000;font-weight:700}
+    .tog{display:flex;gap:0;border:1px solid #2E4472;border-radius:8px;overflow:hidden} .tog-btn{flex:1;padding:10px 6px;min-height:42px;font-size:14px;font-weight:500;border:none;border-right:1px solid #2E4472;border-radius:0;background:transparent;color:#C2CBD6;cursor:pointer;text-align:center;transition:all 0.15s;font-family:'DM Sans',sans-serif} .tog-btn:last-child{border-right:none}
+    .tog-btn.on{background:rgba(245,192,0,0.16);color:#F5C000;font-weight:600}
     .card{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:14px;margin-bottom:10px}
     .btn-y{background:#F5C000;color:#050A1F;border:none;padding:11px 18px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif} .btn-y:disabled{background:#444;color:#888;cursor:not-allowed}
     .btn-g{background:transparent;color:#C2CBD6;border:1px solid #24365C;padding:10px 15px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
     .btn-r{background:rgba(232,91,91,0.12);color:#E85B5B;border:1px solid rgba(232,91,91,0.3);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
-    .badge{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:100px} .b-y{background:rgba(245,192,0,0.12);color:#F5C000} .b-g{background:rgba(76,175,80,0.12);color:#4CAF50} .b-r{background:rgba(232,91,91,0.12);color:#E85B5B}
+    .badge{display:inline-block;font-size:13px;font-weight:600;padding:3px 9px;border-radius:100px} .b-y{background:rgba(245,192,0,0.12);color:#F5C000} .b-g{background:rgba(76,175,80,0.12);color:#4CAF50} .b-r{background:rgba(232,91,91,0.12);color:#E85B5B}
     .stat{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:14px;text-align:center} .stat-n{font-size:22px;font-weight:600;margin-bottom:2px} .stat-l{font-size:12px;color:#AEB9C7;text-transform:uppercase;letter-spacing:0.06em}
     .nav{display:flex;background:#0A1128;border-top:1px solid #1A2A4A;position:fixed;bottom:0;left:0;right:0;z-index:50}
     .nav-btn{flex:1;padding:10px 4px 8px;background:none;border:none;color:#8A97A8;cursor:pointer;font-size:12px;font-weight:500;letter-spacing:0.03em;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'DM Sans',sans-serif} .nav-btn .ni{font-size:20px} .nav-btn.on{color:#F5C000}
     .ac-drop{position:absolute;top:100%;left:0;right:0;background:#0A1128;border:1px solid #F5C000;border-top:none;border-radius:0 0 6px 6px;z-index:200;max-height:200px;overflow-y:auto}
     .ac-item{padding:9px 12px;cursor:pointer;border-bottom:1px solid #1A2A4A} .ac-item:hover{background:#0F1A3A} .ac-item:last-child{border-bottom:none}
-    .audit-entry{font-size:12px;color:#8A97A8;padding:6px 0;border-bottom:1px solid #0F1A3A;line-height:1.55} .audit-entry:last-child{border-bottom:none}
+    .audit-entry{font-size:13px;color:#8A97A8;padding:6px 0;border-bottom:1px solid #0F1A3A;line-height:1.55} .audit-entry:last-child{border-bottom:none}
     .trip-hdr{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:2px 0}
     .strip{display:flex;justify-content:center;gap:16px;padding:6px 16px;background:#0A1128;border-bottom:1px solid #1A2A4A;font-size:12px}
     .strip span{color:#8899AA} .strip b{color:#F5C000;font-weight:600}
@@ -525,7 +525,7 @@ function ProductList({user,onBack}){
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Product List</div><span style={{fontSize:12,color:"#8A97A8"}}>{products.length}</span></div>
       <div style={{fontSize:11,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Add tags so people find items fast — "sofa", "3s", "seater" all point to one product. New products are added while recording a sale or trip.</div>
-      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search products or tags..." style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 11px",color:"#E8E2D4",fontSize:13,marginBottom:12}}/>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search products or tags..." style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,marginBottom:12}}/>
       {loading?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0"}}>Loading...</div>:shown.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0"}}>No products.</div>:shown.map(p=>(
         <div key={p.id} className="card" style={{opacity:p.active?1:0.5,padding:"10px 12px"}} onClick={()=>setEditing({...p})}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}>
@@ -661,7 +661,7 @@ function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, n
   return (
     <div style={{position:"relative"}}>
       <input value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),200)}
-        placeholder={placeholder||"Search product..."} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:open&&(matches.length>0||q.length>0)?"8px 8px 0 0":"8px",padding:"10px 12px",color:"#FFFFFF",fontSize:14}}/>
+        placeholder={placeholder||"Search product..."} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"10px 2px",color:"#FFFFFF",fontSize:15}}/>
       {open&&q.length>0&&(
         <div className="ac-drop">
           {matches.map(p=>(
@@ -675,12 +675,12 @@ function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, n
             adding?(
               <div style={{padding:12,borderTop:"1px solid #1A2A4A"}} onMouseDown={e=>e.preventDefault()}>
                 <div style={{fontSize:12,fontWeight:600,color:"#F5C000",marginBottom:8}}>New product</div>
-                <input value={nf.name||value} onChange={e=>setNf(x=>({...x,name:e.target.value}))} placeholder="Product name" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#E8E2D4",fontSize:13,marginBottom:6}}/>
-                <input value={nf.tags} onChange={e=>setNf(x=>({...x,tags:e.target.value}))} placeholder="Search tags: sofa, 3s, seater" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#E8E2D4",fontSize:12,marginBottom:6}}/>
+                <input value={nf.name||value} onChange={e=>setNf(x=>({...x,name:e.target.value}))} placeholder="Product name" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,marginBottom:6}}/>
+                <input value={nf.tags} onChange={e=>setNf(x=>({...x,tags:e.target.value}))} placeholder="Search tags: sofa, 3s, seater" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,marginBottom:6}}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:8}}>
-                  <select value={nf.category} onChange={e=>setNf(x=>({...x,category:e.target.value}))} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
-                  <input type="number" value={nf.default_cost} onChange={e=>setNf(x=>({...x,default_cost:e.target.value}))} placeholder="Cost" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px",color:"#FFFFFF",fontSize:12}}/>
-                  <input type="number" value={nf.default_price} onChange={e=>setNf(x=>({...x,default_price:e.target.value}))} placeholder="Price" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px",color:"#FFFFFF",fontSize:12}}/>
+                  <select value={nf.category} onChange={e=>setNf(x=>({...x,category:e.target.value}))} style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+                  <input type="number" value={nf.default_cost} onChange={e=>setNf(x=>({...x,default_cost:e.target.value}))} placeholder="Cost" style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
+                  <input type="number" value={nf.default_price} onChange={e=>setNf(x=>({...x,default_price:e.target.value}))} placeholder="Price" style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
                 </div>
                 <div style={{display:"flex",gap:6}}><button onMouseDown={saveNew} disabled={saving} style={{flex:1,background:"#F5C000",color:"#050A1F",border:"none",borderRadius:6,padding:"7px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{saving?"...":"Add & use"}</button><button onMouseDown={()=>setAdding(false)} style={{background:"transparent",border:"1px solid #1A2A4A",color:"#8899AA",borderRadius:6,padding:"7px 12px",fontSize:12,cursor:"pointer"}}>Cancel</button></div>
               </div>
@@ -701,7 +701,7 @@ function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
   return (
     <div style={{position:"relative"}}>
       <input value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),200)}
-        placeholder={placeholder} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:open&&matches.length>0?"8px 8px 0 0":"8px",padding:"10px 12px",color:"#FFFFFF",fontSize:14}}/>
+        placeholder={placeholder} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"10px 2px",color:"#FFFFFF",fontSize:15}}/>
       {open&&matches.length>0&&(
         <div className="ac-drop">
           {matches.map(s=>(
@@ -1037,10 +1037,10 @@ function SaleTab({user,onMoney}){
   if(exchSale) return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <button className="btn-g" onClick={()=>setExchSale(null)} style={{fontSize:13}}>Back</button>
-        <div style={{fontSize:15,fontWeight:600}}>{Number(exchSale.balance_due||0)>0?"Edit Sale":"Exchange"}</div>
+        <button className="btn-g" onClick={()=>setExchSale(null)} style={{fontSize:15}}>Back</button>
+        <div style={{fontSize:17,fontWeight:600}}>{Number(exchSale.balance_due||0)>0?"Edit Sale":"Exchange"}</div>
       </div>
-      <div style={{background:"#0A1128",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12,marginBottom:14,fontSize:12,color:"#8899AA"}}>
+      <div style={{background:"#0A1128",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12,marginBottom:14,fontSize:14,color:"#8899AA"}}>
         <div style={{marginBottom:4}}><strong style={{color:"#E8E2D4"}}>{exchSale.customer_name}</strong> · {exchSale.receipt_no}</div>
         <div>Originally: {(exchSale.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")}</div>
         <div style={{marginTop:4}}>Paid so far: <span style={{color:"#4CAF50"}}>{fmtK(Number(exchSale.amount_paid!=null?exchSale.amount_paid:exchSale.total))}</span>. Money paid is not refunded — any excess becomes store credit.</div>
@@ -1050,27 +1050,27 @@ function SaleTab({user,onMoney}){
           <div key={it.id} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid #101B36"}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 24px",gap:6,marginBottom:6,alignItems:"center"}}>
               <ProductSearch user={user} value={it.name} onChange={v=>exUp(it.id,"name",v)} onPick={p=>exSelect(it.id,p)} placeholder="Search product..."/>
-              {exchItems.length>1&&<button onClick={()=>exRm(it.id)} style={{background:"none",border:"none",color:"#8A97A8",cursor:"pointer",fontSize:16}}>×</button>}
+              {exchItems.length>1&&<button onClick={()=>exRm(it.id)} style={{background:"none",border:"none",color:"#8A97A8",cursor:"pointer",fontSize:18}}>×</button>}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={it.qty} min={1} onChange={e=>exUp(it.id,"qty",e.target.value)} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
-              <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>PRICE (KSh)</div><input type="number" value={it.price} onChange={e=>exUp(it.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#FFFFFF",fontSize:14}}/></div>
+              <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Qty</div><input type="number" value={it.qty} min={1} onChange={e=>exUp(it.id,"qty",e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/></div>
+              <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Price (KSh)</div><input type="number" value={it.price} onChange={e=>exUp(it.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/></div>
             </div>
           </div>
         ))}
-        <button onClick={exAdd} style={{width:"100%",fontSize:12,background:"none",border:"1px dashed #1A2A4A",borderRadius:6,color:"#8899AA",padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Add item</button>
+        <button onClick={exAdd} style={{width:"100%",fontSize:14,background:"none",border:"1px dashed #1A2A4A",borderRadius:6,color:"#8899AA",padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Add item</button>
       </div>
       {(()=>{ const nt=exchItems.reduce((a,i)=>a+(Number(i.qty||0)*Number(i.price||0)),0); const paid=Number(exchSale.amount_paid!=null?exchSale.amount_paid:exchSale.total); const bal=Math.max(0,nt-paid); const cr=Math.max(0,paid-nt); return (
         <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:12}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}><span style={{color:"#8899AA"}}>New total</span><span style={{color:"#F5C000",fontWeight:600}}>{fmtK(nt)}</span></div>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#8899AA"}}>Already paid</span><span style={{color:"#4CAF50"}}>{fmtK(paid)}</span></div>
-          {bal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,paddingTop:4,borderTop:"1px solid #1A2A4A"}}><span style={{color:"#E8A45B",fontWeight:600}}>New balance owed</span><span style={{color:"#E8A45B",fontWeight:700}}>{fmtK(bal)}</span></div>}
-          {cr>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,paddingTop:4,borderTop:"1px solid #1A2A4A"}}><span style={{color:"#4CAF50",fontWeight:600}}>Store credit created</span><span style={{color:"#4CAF50",fontWeight:700}}>{fmtK(cr)}</span></div>}
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:15,marginBottom:4}}><span style={{color:"#8899AA"}}>New total</span><span style={{color:"#F5C000",fontWeight:600}}>{fmtK(nt)}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:14,marginBottom:4}}><span style={{color:"#8899AA"}}>Already paid</span><span style={{color:"#4CAF50"}}>{fmtK(paid)}</span></div>
+          {bal>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:15,paddingTop:4,borderTop:"1px solid #1A2A4A"}}><span style={{color:"#E8A45B",fontWeight:600}}>New balance owed</span><span style={{color:"#E8A45B",fontWeight:700}}>{fmtK(bal)}</span></div>}
+          {cr>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:15,paddingTop:4,borderTop:"1px solid #1A2A4A"}}><span style={{color:"#4CAF50",fontWeight:600}}>Store credit created</span><span style={{color:"#4CAF50",fontWeight:700}}>{fmtK(cr)}</span></div>}
         </div>
       );})()}
       <div className="field"><label>Who is handling this</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${exchStaff===s?" on":""}`} onClick={()=>setExchStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
       <div className="field"><label>Reason (required)</label><textarea value={exchReason} onChange={e=>setExchReason(e.target.value)} placeholder="e.g. Customer swapped table for sofa"/></div>
-      {exchErr&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{exchErr}</div>}
+      {exchErr&&<div style={{color:"#E85B5B",fontSize:15,marginBottom:10}}>{exchErr}</div>}
       <button className="btn-y" onClick={saveExchange} disabled={exchSaving} style={{width:"100%",padding:14}}>{exchSaving?"Saving...":Number(exchSale.balance_due||0)>0?"Save Changes":"Confirm Exchange"}</button>
     </div>
   );
@@ -1079,11 +1079,11 @@ function SaleTab({user,onMoney}){
     <div style={{textAlign:"center",padding:"40px 20px"}}>
       <div style={{fontSize:48,marginBottom:16}}>✅</div>
       <div style={{fontSize:18,fontWeight:600,marginBottom:8}}>Sale Recorded</div>
-      <div style={{color:"#8899AA",fontSize:14,marginBottom:4}}>{saved.customer_name}</div>
+      <div style={{color:"#8899AA",fontSize:16,marginBottom:4}}>{saved.customer_name}</div>
       <div style={{color:"#F5C000",fontSize:24,fontWeight:600,marginBottom:4}}>{fmtK(Number(saved.total))}</div>
-      {saved.payment_type==="instalment"&&<div style={{color:"#E8A45B",fontSize:14,marginBottom:4}}>Paid: {fmtK(Number(saved.amount_paid))} · Balance: {fmtK(Number(saved.balance_due))}</div>}
-      <div style={{color:"#8899AA",fontSize:13,marginBottom:24}}>{saved.payment_method} · {saved.receipt_no} · {initials(saved.served_by)}</div>
-      <div style={{color:"#4CAF50",fontSize:13,marginBottom:32}}>Stock and money updated</div>
+      {saved.payment_type==="instalment"&&<div style={{color:"#E8A45B",fontSize:16,marginBottom:4}}>Paid: {fmtK(Number(saved.amount_paid))} · Balance: {fmtK(Number(saved.balance_due))}</div>}
+      <div style={{color:"#8899AA",fontSize:15,marginBottom:24}}>{saved.payment_method} · {saved.receipt_no} · {initials(saved.served_by)}</div>
+      <div style={{color:"#4CAF50",fontSize:15,marginBottom:32}}>Stock and money updated</div>
       <button className="btn-y" onClick={()=>setSaved(null)} style={{width:"100%",padding:14}}>Done</button>
     </div>
   );
@@ -1102,7 +1102,7 @@ function SaleTab({user,onMoney}){
         {receipt.payment_type==="instalment"&&<><div className="rcpt-row"><span className="l">Paid</span><span className="v">KSh {Number(receipt.amount_paid).toLocaleString()}</span></div><div className="rcpt-row"><span className="l">Balance</span><span className="v" style={{color:"#B45309"}}>KSh {Number(receipt.balance_due).toLocaleString()}</span></div></>}
         {receipt.payment_type==="instalment"&&payTrail.length>0&&(
           <div style={{margin:"8px 0",padding:"8px 0",borderTop:"1px dashed #999",borderBottom:"1px dashed #999"}}>
-            <div style={{fontSize:11,color:"#555",marginBottom:4,fontWeight:600}}>PAYMENT HISTORY</div>
+            <div style={{fontSize:13,color:"#555",marginBottom:4,fontWeight:600}}>PAYMENT HISTORY</div>
             {payTrail.map((p,i)=>(
               <div key={i} className="rcpt-row"><span className="l">{p.date?.slice(5)} · {p.payment_method}</span><span className="v">KSh {Number(p.amount).toLocaleString()}</span></div>
             ))}
@@ -1112,16 +1112,16 @@ function SaleTab({user,onMoney}){
         )}
         <div className="rcpt-row"><span className="l">Payment</span><span className="v">{receipt.payment_method}{receipt.mpesa_code?" · "+receipt.mpesa_code:""}</span></div>{receipt.payment_method==="Split"&&<div className="rcpt-row"><span className="l">Cash / M-Pesa</span><span className="v">KSh {Number(receipt.cash_part).toLocaleString()} / KSh {Number(receipt.mpesa_part).toLocaleString()}</span></div>}
         {receipt.notes&&<div className="rcpt-row"><span className="l">Note</span><span className="v">{receipt.notes}</span></div>}
-        {Number(receipt.store_credit_note)>0&&<div style={{background:"rgba(76,175,80,0.1)",border:"1px dashed rgba(76,175,80,0.4)",borderRadius:6,padding:"8px 10px",margin:"10px 0",fontSize:12,color:"#1a7a2e",textAlign:"center"}}>Store credit: KSh {Number(receipt.store_credit_note).toLocaleString()} — redeemable on a future purchase. Payments made are not refundable.</div>}
+        {Number(receipt.store_credit_note)>0&&<div style={{background:"rgba(76,175,80,0.1)",border:"1px dashed rgba(76,175,80,0.4)",borderRadius:6,padding:"8px 10px",margin:"10px 0",fontSize:14,color:"#1a7a2e",textAlign:"center"}}>Store credit: KSh {Number(receipt.store_credit_note).toLocaleString()} — redeemable on a future purchase. Payments made are not refundable.</div>}
         <div className="rcpt-ft">Thank you for shopping with us<br/>karufurniture.netlify.app</div>
       </div>
-      <button className="btn-y np" onClick={shareReceipt} style={{width:"100%",fontSize:14,padding:13,marginBottom:8}}>Share Receipt</button>
+      <button className="btn-y np" onClick={shareReceipt} style={{width:"100%",fontSize:16,padding:13,marginBottom:8}}>Share Receipt</button>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}} className="np">
-        <button className="btn-g" onClick={copyText} style={{fontSize:12}}>Copy text</button>
-        <button className="btn-g" onClick={downloadJPEG} style={{fontSize:12}}>Save image</button>
-        <button className="btn-g" onClick={()=>window.print()} style={{fontSize:12}}>Print</button>
+        <button className="btn-g" onClick={copyText} style={{fontSize:14}}>Copy text</button>
+        <button className="btn-g" onClick={downloadJPEG} style={{fontSize:14}}>Save image</button>
+        <button className="btn-g" onClick={()=>window.print()} style={{fontSize:14}}>Print</button>
       </div>
-      <button className="btn-g np" onClick={()=>setReceipt(null)} style={{width:"100%",fontSize:13}}>Done</button>
+      <button className="btn-g np" onClick={()=>setReceipt(null)} style={{width:"100%",fontSize:15}}>Done</button>
     </div>
   );
 
@@ -1130,28 +1130,28 @@ function SaleTab({user,onMoney}){
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
-        <div><div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em"}}>Today</div><div style={{fontSize:14,fontWeight:600,color:"#FFFFFF"}}>{liveToday.length} sale{liveToday.length!==1?"s":""} · <span style={{color:"#F5C000"}}>{fmtK(todayTot)}</span></div></div>
-        <button className="btn-g" onClick={()=>{setShowHistory(x=>!x);if(!showHistory)loadHistory();}} style={{fontSize:12,padding:"6px 12px"}}>{showHistory?"Hide":"History"}</button>
+        <div><div style={{fontSize:13,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em"}}>Today</div><div style={{fontSize:16,fontWeight:600,color:"#FFFFFF"}}>{liveToday.length} sale{liveToday.length!==1?"s":""} · <span style={{color:"#F5C000"}}>{fmtK(todayTot)}</span></div></div>
+        <button className="btn-g" onClick={()=>{setShowHistory(x=>!x);if(!showHistory)loadHistory();}} style={{fontSize:14,padding:"6px 12px"}}>{showHistory?"Hide":"History"}</button>
       </div>
       {showHistory&&(
         <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:12,marginBottom:14}}>
           {voidSale?(
             <div>
-              <div style={{fontSize:13,fontWeight:600,marginBottom:4,color:"#E85B5B"}}>Void {voidSale.receipt_no}</div>
-              <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>{voidSale.customer_name} · {fmtK(Number(voidSale.total))}. Stock returned, money reversed.</div>
+              <div style={{fontSize:15,fontWeight:600,marginBottom:4,color:"#E85B5B"}}>Void {voidSale.receipt_no}</div>
+              <div style={{fontSize:14,color:"#8899AA",marginBottom:10}}>{voidSale.customer_name} · {fmtK(Number(voidSale.total))}. Stock returned, money reversed.</div>
               <div className="field"><label>Reason (required)</label><textarea value={voidReason} onChange={e=>setVoidReason(e.target.value)} placeholder="e.g. Wrong item, customer returned"/></div>
               <div className="field"><label>Voided by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${voidStaff===s?" on":""}`} onClick={()=>setVoidStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
-              <div style={{display:"flex",gap:8}}><button className="btn-r" onClick={doVoid} disabled={voiding} style={{flex:1,padding:10}}>{voiding?"Voiding...":"Confirm Void"}</button><button className="btn-g" onClick={()=>{setVoidSale(null);setVoidReason("");}} style={{fontSize:13}}>Cancel</button></div>
+              <div style={{display:"flex",gap:8}}><button className="btn-r" onClick={doVoid} disabled={voiding} style={{flex:1,padding:10}}>{voiding?"Voiding...":"Confirm Void"}</button><button className="btn-g" onClick={()=>{setVoidSale(null);setVoidReason("");}} style={{fontSize:15}}>Cancel</button></div>
             </div>
           ):(
             <div>
-              <div style={{fontSize:11,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Recent sales</div>
-              {histSales.length===0?<div style={{color:"#8A97A8",fontSize:13}}>No sales yet.</div>:(()=>{
+              <div style={{fontSize:13,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Recent sales</div>
+              {histSales.length===0?<div style={{color:"#8A97A8",fontSize:15}}>No sales yet.</div>:(()=>{
                 // Row renderer for one sale (keeps all actions)
                 const saleRow=(s)=>(
                   <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #101B36",opacity:s.voided?0.45:1}}>
-                    <div style={{flex:1}}><div style={{fontSize:13,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8A97A8"}}>{s.receipt_no} · {initials(s.served_by)} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div></div>
-                    <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:13,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:2}}>{!s.voided&&<button onClick={()=>{setReceipt(s);setShowHistory(false);}} style={{background:"none",border:"none",color:"#AEB9C7",fontSize:11,cursor:"pointer",padding:0}}>Receipt</button>}{!s.voided&&can(user,"users")&&canModify(s)&&<button onClick={()=>startExchange(s)} style={{background:"none",border:"none",color:"#E8A45B",fontSize:11,cursor:"pointer",padding:0}}>{Number(s.balance_due||0)>0?"Edit":"Exchange"}</button>}{!s.voided&&can(user,"void")&&(withinWindow(s.created_at)?<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:11,cursor:"pointer",padding:0}}>Void</button>:<span style={{fontSize:10,color:"#8A97A8"}}>🔒</span>)}</div></div>
+                    <div style={{flex:1}}><div style={{fontSize:15,fontWeight:500,textDecoration:s.voided?"line-through":"none"}}>{s.customer_name}</div><div style={{fontSize:13,color:"#8A97A8"}}>{s.receipt_no} · {initials(s.served_by)} · {s.payment_method}{s.voided?` · VOID: ${s.void_reason}`:""}</div></div>
+                    <div style={{textAlign:"right",marginLeft:8}}><div style={{fontSize:15,fontWeight:600,color:s.voided?"#556677":"#F5C000"}}>{fmtK(Number(s.total))}</div><div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:2}}>{!s.voided&&<button onClick={()=>{setReceipt(s);setShowHistory(false);}} style={{background:"none",border:"none",color:"#AEB9C7",fontSize:13,cursor:"pointer",padding:0}}>Receipt</button>}{!s.voided&&can(user,"users")&&canModify(s)&&<button onClick={()=>startExchange(s)} style={{background:"none",border:"none",color:"#E8A45B",fontSize:13,cursor:"pointer",padding:0}}>{Number(s.balance_due||0)>0?"Edit":"Exchange"}</button>}{!s.voided&&can(user,"void")&&(withinWindow(s.created_at)?<button onClick={()=>setVoidSale(s)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:13,cursor:"pointer",padding:0}}>Void</button>:<span style={{fontSize:12,color:"#8A97A8"}}>🔒</span>)}</div></div>
                   </div>
                 );
                 const dayTotal=arr=>arr.filter(s=>!s.voided).reduce((n,s)=>n+Number(s.total),0);
@@ -1176,8 +1176,8 @@ function SaleTab({user,onMoney}){
                     {currentMonthDays.map(date=>(
                       <div key={date} style={{marginBottom:8}}>
                         <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8}}>
-                          <span style={{fontSize:13,fontWeight:600,color:"#E8E2D4"}}>{histOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
-                          <span style={{fontSize:13,fontWeight:600,color:"#F5C000"}}>{fmtK(dayTotal(days[date]))}</span>
+                          <span style={{fontSize:15,fontWeight:600,color:"#E8E2D4"}}>{histOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                          <span style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>{fmtK(dayTotal(days[date]))}</span>
                         </div>
                         {histOpen[date]&&<div style={{padding:"0 10px"}}>{days[date].map(saleRow)}</div>}
                       </div>
@@ -1188,14 +1188,14 @@ function SaleTab({user,onMoney}){
                       return (
                         <div key={ym} style={{marginBottom:8}}>
                           <div onClick={()=>toggle(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
-                            <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{histOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
-                            <span style={{fontSize:13,fontWeight:600,color:"#F5C000"}}>{fmtK(mTotal)}</span>
+                            <span style={{fontSize:15,fontWeight:600,color:"#AEB9C7"}}>{histOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
+                            <span style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>{fmtK(mTotal)}</span>
                           </div>
                           {histOpen[ym]&&<div style={{padding:"4px 10px 0"}}>{dates.map(date=>(
                             <div key={date} style={{marginBottom:6}}>
                               <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid #101B36"}}>
-                                <span style={{fontSize:12,color:"#AEB9C7"}}>{histOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
-                                <span style={{fontSize:12,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
+                                <span style={{fontSize:14,color:"#AEB9C7"}}>{histOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                                <span style={{fontSize:14,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
                               </div>
                               {histOpen[date]&&<div>{days[date].map(saleRow)}</div>}
                             </div>
@@ -1209,14 +1209,14 @@ function SaleTab({user,onMoney}){
                       return (
                         <div key={y} style={{marginBottom:8}}>
                           <div onClick={()=>toggle(y)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
-                            <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{histOpen[y]?"▾":"▸"} {y}</span>
-                            <span style={{fontSize:13,fontWeight:700,color:"#F5C000"}}>{fmtK(yTotal)}</span>
+                            <span style={{fontSize:15,fontWeight:700,color:"#E8E2D4"}}>{histOpen[y]?"▾":"▸"} {y}</span>
+                            <span style={{fontSize:15,fontWeight:700,color:"#F5C000"}}>{fmtK(yTotal)}</span>
                           </div>
                           {histOpen[y]&&<div style={{padding:"4px 10px 0"}}>{dates.map(date=>(
                             <div key={date} style={{marginBottom:6}}>
                               <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid #101B36"}}>
-                                <span style={{fontSize:12,color:"#AEB9C7"}}>{histOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
-                                <span style={{fontSize:12,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
+                                <span style={{fontSize:14,color:"#AEB9C7"}}>{histOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                                <span style={{fontSize:14,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
                               </div>
                               {histOpen[date]&&<div>{days[date].map(saleRow)}</div>}
                             </div>
@@ -1234,19 +1234,19 @@ function SaleTab({user,onMoney}){
       {pendingSales.length>0&&(
         <div style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.4)",borderRadius:8,padding:12,marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setShowPending(x=>!x)}>
-            <div><span style={{color:"#E8A45B",fontWeight:600,fontSize:13}}>Pending Balances</span><span style={{background:"rgba(232,164,91,0.2)",color:"#E8A45B",fontSize:11,padding:"2px 8px",borderRadius:100,marginLeft:8}}>{pendingSales.length}</span></div>
+            <div><span style={{color:"#E8A45B",fontWeight:600,fontSize:15}}>Pending Balances</span><span style={{background:"rgba(232,164,91,0.2)",color:"#E8A45B",fontSize:13,padding:"2px 8px",borderRadius:100,marginLeft:8}}>{pendingSales.length}</span></div>
             <span style={{color:"#E8A45B"}}>{showPending?"▲":"▼"}</span>
           </div>
           {showPending&&(
             <div style={{marginTop:10}}>
               {addPaySale?(
                 <div>
-                  <div style={{fontSize:13,fontWeight:600,marginBottom:6}}>{addPaySale.customer_name}</div>
+                  <div style={{fontSize:15,fontWeight:600,marginBottom:6}}>{addPaySale.customer_name}</div>
                   {(addPaySale.items||[]).length>0&&(
                     <div style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 11px",marginBottom:8}}>
-                      <div style={{fontSize:10,color:"#8A97A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Paying for</div>
+                      <div style={{fontSize:12,color:"#8A97A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Paying for</div>
                       {(addPaySale.items||[]).map((it,i)=>(
-                        <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0",borderBottom:i<(addPaySale.items||[]).length-1?"1px solid #1A2A4A":"none"}}>
+                        <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:15,padding:"3px 0",borderBottom:i<(addPaySale.items||[]).length-1?"1px solid #1A2A4A":"none"}}>
                           <span style={{color:"#E8E2D4"}}>{it.name} <span style={{color:"#8A97A8"}}>x{it.qty}</span></span>
                           <span style={{color:"#F5C000",fontWeight:600}}>{fmtK(Number(it.qty)*Number(it.price))}</span>
                         </div>
@@ -1254,13 +1254,13 @@ function SaleTab({user,onMoney}){
                     </div>
                   )}
                   {(()=>{ const adj=Number(addPayAdj||0); const effTotal=Number(addPaySale.total)+adj; const effBal=Math.max(0,effTotal-Number(addPaySale.amount_paid||0)); return (
-                  <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>Total {fmtK(effTotal)}{adj!==0?` (adj ${adj>0?"+":""}${adj})`:""} · Paid {fmtK(Number(addPaySale.amount_paid||0))} · <span style={{color:"#E8A45B",fontWeight:600}}>Balance {fmtK(effBal)}</span></div>
+                  <div style={{fontSize:14,color:"#8899AA",marginBottom:10}}>Total {fmtK(effTotal)}{adj!==0?` (adj ${adj>0?"+":""}${adj})`:""} · Paid {fmtK(Number(addPaySale.amount_paid||0))} · <span style={{color:"#E8A45B",fontWeight:600}}>Balance {fmtK(effBal)}</span></div>
                   );})()}
-                  <div className="field"><label>Amount received now (KSh)</label><input type="number" value={addPayAmt} onChange={e=>setAddPayAmt(e.target.value)} placeholder="0"/><button onClick={()=>{const adj=Number(addPayAdj||0);const effBal=Math.max(0,Number(addPaySale.total)+adj-Number(addPaySale.amount_paid||0));setAddPayAmt(String(effBal));}} style={{marginTop:6,background:"none",border:"1px solid #1A2A4A",borderRadius:5,color:"#8899AA",fontSize:11,padding:"5px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Pay full balance</button></div>
-                  {!showAdj?<button onClick={()=>setShowAdj(true)} style={{background:"none",border:"1px dashed #24365C",borderRadius:6,color:"#8A97A8",fontSize:12,padding:"7px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:12,width:"100%"}}>+ Price adjustment</button>:(
+                  <div className="field"><label>Amount received now (KSh)</label><input type="number" value={addPayAmt} onChange={e=>setAddPayAmt(e.target.value)} placeholder="0"/><button onClick={()=>{const adj=Number(addPayAdj||0);const effBal=Math.max(0,Number(addPaySale.total)+adj-Number(addPaySale.amount_paid||0));setAddPayAmt(String(effBal));}} style={{marginTop:6,background:"none",border:"1px solid #1A2A4A",borderRadius:5,color:"#8899AA",fontSize:13,padding:"5px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Pay full balance</button></div>
+                  {!showAdj?<button onClick={()=>setShowAdj(true)} style={{background:"none",border:"1px dashed #24365C",borderRadius:6,color:"#8A97A8",fontSize:14,padding:"7px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:12,width:"100%"}}>+ Price adjustment</button>:(
                     <div className="field" style={{background:"rgba(232,164,91,0.06)",border:"1px solid rgba(232,164,91,0.25)",borderRadius:8,padding:10}}>
                       <label>Price adjustment (KSh)</label>
-                      <div style={{fontSize:11,color:"#8A97A8",marginBottom:6}}>Negative to knock off (goodwill), positive to add. Changes the sale total so the balance settles correctly.</div>
+                      <div style={{fontSize:13,color:"#8A97A8",marginBottom:6}}>Negative to knock off (goodwill), positive to add. Changes the sale total so the balance settles correctly.</div>
                       <input type="number" value={addPayAdj} onChange={e=>setAddPayAdj(e.target.value)} placeholder="e.g. -100"/>
                     </div>
                   )}
@@ -1268,12 +1268,12 @@ function SaleTab({user,onMoney}){
                   {addPayMethod==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={addPayCode} onChange={e=>setAddPayCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>}
                   <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${addPayStaff===s?" on":""}`} onClick={()=>setAddPayStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
                   <div className="field"><label>Notes (optional)</label><input value={addPayNotes} onChange={e=>setAddPayNotes(e.target.value)} placeholder="e.g. Second instalment"/></div>
-                  <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={addPaymentToSale} disabled={addPaySaving} style={{flex:1,fontSize:13}}>{addPaySaving?"Saving...":"Record Payment"}</button><button className="btn-g" onClick={()=>setAddPaySale(null)} style={{fontSize:13}}>Cancel</button></div>
+                  <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={addPaymentToSale} disabled={addPaySaving} style={{flex:1,fontSize:15}}>{addPaySaving?"Saving...":"Record Payment"}</button><button className="btn-g" onClick={()=>setAddPaySale(null)} style={{fontSize:15}}>Cancel</button></div>
                 </div>
               ):pendingSales.map(s=>(
                 <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1A2A4A"}}>
-                  <div><div style={{fontSize:13,fontWeight:500}}>{s.customer_name}</div><div style={{fontSize:11,color:"#8899AA"}}>{s.receipt_no} · Total {fmtK(Number(s.total))} · Paid {fmtK(Number(s.amount_paid||0))}</div></div>
-                  <div style={{textAlign:"right"}}><div style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(Number(s.balance_due))}</div><button className="btn-g" onClick={()=>setAddPaySale(s)} style={{fontSize:11,padding:"4px 10px",marginTop:4}}>Add payment</button></div>
+                  <div><div style={{fontSize:15,fontWeight:500}}>{s.customer_name}</div><div style={{fontSize:13,color:"#8899AA"}}>{s.receipt_no} · Total {fmtK(Number(s.total))} · Paid {fmtK(Number(s.amount_paid||0))}</div></div>
+                  <div style={{textAlign:"right"}}><div style={{color:"#E8A45B",fontSize:15,fontWeight:600}}>{fmtK(Number(s.balance_due))}</div><button className="btn-g" onClick={()=>setAddPaySale(s)} style={{fontSize:13,padding:"4px 10px",marginTop:4}}>Add payment</button></div>
                 </div>
               ))}
             </div>
@@ -1282,96 +1282,96 @@ function SaleTab({user,onMoney}){
       )}
 
       <div style={{marginTop:6}}>
-        <button className="btn-y" onClick={()=>openWiz(user.full_name)} style={{width:"100%",padding:16,fontSize:16}}>+ New Sale</button>
+        <button className="btn-y" onClick={()=>openWiz(user.full_name)} style={{width:"100%",padding:16,fontSize:18}}>+ New Sale</button>
       </div>
 
       {wiz&&(
         <div className="wiz-overlay">
           <div className="wiz">
             <div className="wiz-hd">
-              <div><div style={{fontSize:14,fontWeight:600,color:"#FFFFFF"}}>New Sale</div><div style={{fontSize:12,color:"#8899AA"}}>{staff.split(" ")[0]} · Step {step} of 3</div></div>
+              <div><div style={{fontSize:16,fontWeight:600,color:"#FFFFFF"}}>New Sale</div><div style={{fontSize:14,color:"#8899AA"}}>{staff.split(" ")[0]} · Step {step} of 3</div></div>
               <button onClick={closeWiz} style={{background:"none",border:"none",color:"#8899AA",fontSize:22,cursor:"pointer",lineHeight:1}}>×</button>
             </div>
             <div className="wiz-steps">{[1,2,3].map(n=><div key={n} className={`wiz-dot${step>=n?" on":""}`}/>)}</div>
             <div className="wiz-body">
               {step===1&&(<>
-                <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:14}}>Customer</div>
+                <div style={{fontSize:18,fontWeight:600,color:"#FFFFFF",marginBottom:14}}>Customer</div>
                 <div style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:10,marginBottom:14}}>
-                  <div style={{fontSize:11,color:"#8899AA",marginBottom:6}}>Paste M-Pesa or SACCO SMS to auto-fill (optional)</div>
-                  <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste SMS here..." style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#E8E2D4",fontSize:13,resize:"none",minHeight:52,fontFamily:"'DM Sans',sans-serif"}}/>
-                  {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:12,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"SACCO":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||"no name"}</div>}
+                  <div style={{fontSize:13,color:"#8899AA",marginBottom:6}}>Paste M-Pesa or SACCO SMS to auto-fill (optional)</div>
+                  <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste SMS here..." style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,resize:"none",minHeight:52,fontFamily:"'DM Sans',sans-serif"}}/>
+                  {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:14,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"SACCO":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||"no name"}</div>}
                 </div>
                 <div className="field"><label>Customer name</label><input value={cName} onChange={e=>setCName(e.target.value)} placeholder="Full name" autoFocus/></div>
                 <div className="field"><label>Phone (optional)</label><input value={cPhone} onChange={e=>setCPhone(e.target.value)} onBlur={e=>checkCredit(e.target.value)} placeholder="07XX XXX XXX" type="tel"/></div>
-                {custCredit>0&&<div style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:10,fontSize:12,color:"#4CAF50"}}>This customer holds {fmtK(custCredit)} store credit. It will be offered at payment.</div>}
+                {custCredit>0&&<div style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:10,fontSize:14,color:"#4CAF50"}}>This customer holds {fmtK(custCredit)} store credit. It will be offered at payment.</div>}
               </>)}
               {step===2&&(<>
-                <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:4}}>Items</div>
-                <div style={{fontSize:12,color:"#8899AA",marginBottom:14}}>Search for a product by name or keyword.</div>
+                <div style={{fontSize:18,fontWeight:600,color:"#FFFFFF",marginBottom:4}}>Items</div>
+                <div style={{fontSize:14,color:"#8899AA",marginBottom:14}}>Search for a product by name or keyword.</div>
                 {items.map(i=>(
-                  <div key={i.id} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:10,marginBottom:8}}>
+                  <div key={i.id} style={{borderBottom:"1px solid #1A2A4A",padding:"6px 0 14px",marginBottom:12}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
                       <ProductSearch user={user} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>it.id===i.id?{...it,name:p.name,price:p.default_price>0?String(p.default_price):it.price}:it))} placeholder="Search product..." noAdd/>
-                      <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16,paddingTop:6}}>x</button>
+                      <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:18,paddingTop:6}}>x</button>
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                      <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>QTY</div><input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/></div>
-                      <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>UNIT PRICE (KSh)</div><input type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#FFFFFF",fontSize:14}}/></div>
+                      <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Qty</div><input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/></div>
+                      <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Unit price (KSh)</div><input type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/></div>
                     </div>
-                    {i.name&&i.price&&i.qty&&<div style={{fontSize:11,color:"#F5C000",marginTop:5,textAlign:"right"}}>{fmtK(Number(i.qty)*Number(i.price))}</div>}
+                    {i.name&&i.price&&i.qty&&<div style={{fontSize:13,color:"#F5C000",marginTop:5,textAlign:"right"}}>{fmtK(Number(i.qty)*Number(i.price))}</div>}
                   </div>
                 ))}
-                <button className="btn-g" onClick={addItem} style={{width:"100%",fontSize:13}}>+ Add another item</button>
-                {total>0&&<div style={{textAlign:"right",marginTop:12,fontSize:16,fontWeight:600,color:"#F5C000"}}>Total {fmtK(total)}</div>}
+                <button className="btn-g" onClick={addItem} style={{width:"100%",fontSize:15}}>+ Add another item</button>
+                {total>0&&<div style={{textAlign:"right",marginTop:12,fontSize:18,fontWeight:600,color:"#F5C000"}}>Total {fmtK(total)}</div>}
               </>)}
               {step===3&&(<>
-                <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:12}}>Payment</div>
+                <div style={{fontSize:18,fontWeight:600,color:"#FFFFFF",marginBottom:12}}>Payment</div>
                 {can(user,"users")&&(
                   <div className="field"><label>Serving as</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${staff===s?" on":""}`} onClick={()=>setStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
                 )}
                 <div style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:12,marginBottom:14}}>
-                  <div style={{fontSize:13,fontWeight:600,marginBottom:2}}>{cName}{cPhone?<span style={{color:"#8899AA",fontWeight:400}}> · {cPhone}</span>:null}</div>
-                  {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#8899AA",padding:"2px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:600,color:"#F5C000",marginTop:6,paddingTop:6,borderTop:"1px solid #1A2A4A"}}><span>Total</span><span>{fmtK(total)}</span></div>
+                  <div style={{fontSize:15,fontWeight:600,marginBottom:2}}>{cName}{cPhone?<span style={{color:"#8899AA",fontWeight:400}}> · {cPhone}</span>:null}</div>
+                  {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:14,color:"#8899AA",padding:"2px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:600,color:"#F5C000",marginTop:6,paddingTop:6,borderTop:"1px solid #1A2A4A"}}><span>Total</span><span>{fmtK(total)}</span></div>
                 </div>
                 {custCredit>0&&(
                   <div style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:12,marginBottom:12}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <div><div style={{fontSize:13,fontWeight:600,color:"#4CAF50"}}>Store credit: {fmtK(custCredit)}</div><div style={{fontSize:11,color:"#8899AA"}}>Apply {fmtK(Math.min(custCredit,total))} to this sale</div></div>
-                      <button onClick={()=>setUseCredit(u=>!u)} style={{background:useCredit?"#4CAF50":"transparent",border:"1px solid #4CAF50",color:useCredit?"#050A1F":"#4CAF50",borderRadius:6,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>{useCredit?"Applied":"Apply"}</button>
+                      <div><div style={{fontSize:15,fontWeight:600,color:"#4CAF50"}}>Store credit: {fmtK(custCredit)}</div><div style={{fontSize:13,color:"#8899AA"}}>Apply {fmtK(Math.min(custCredit,total))} to this sale</div></div>
+                      <button onClick={()=>setUseCredit(u=>!u)} style={{background:useCredit?"#4CAF50":"transparent",border:"1px solid #4CAF50",color:useCredit?"#050A1F":"#4CAF50",borderRadius:6,padding:"7px 14px",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>{useCredit?"Applied":"Apply"}</button>
                     </div>
                   </div>
                 )}
                 <div className="field"><label>Payment type</label><div className="tog"><button className={`tog-btn${payType==="full"?" on":""}`} onClick={()=>setPayType("full")}>Full</button><button className={`tog-btn${payType==="instalment"?" on":""}`} onClick={()=>setPayType("instalment")}>Instalment</button></div></div>
-                {payType==="instalment"&&<div className="field" style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12}}><label style={{color:"#E8A45B"}}>Paying now (KSh)</label><input type="number" value={initPay} onChange={e=>setInitPay(e.target.value)} placeholder="Amount"/>{initPay&&<div style={{fontSize:12,color:"#E8A45B",marginTop:6}}>Balance: {fmtK(Math.max(0,total-Number(initPay)))}</div>}</div>}
+                {payType==="instalment"&&<div className="field" style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12}}><label style={{color:"#E8A45B"}}>Paying now (KSh)</label><input type="number" value={initPay} onChange={e=>setInitPay(e.target.value)} placeholder="Amount"/>{initPay&&<div style={{fontSize:14,color:"#E8A45B",marginTop:6}}>Balance: {fmtK(Math.max(0,total-Number(initPay)))}</div>}</div>}
                 <div className="field"><label>Method</label><div className="tog"><button className={`tog-btn${pay==="mpesa"?" on":""}`} onClick={()=>setPay("mpesa")}>M-Pesa</button><button className={`tog-btn${pay==="cash"?" on":""}`} onClick={()=>setPay("cash")}>Cash</button><button className={`tog-btn${pay==="split"?" on":""}`} onClick={()=>setPay("split")}>Split</button></div></div>
                 {pay==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace",letterSpacing:"0.05em"}}/></div>}
                 {pay==="split"&&(()=>{ const due=payType==="instalment"?Number(initPay||0):total; const c=Number(cashPart||0),m=Number(mpesaPart||0),sum=c+m; return (
                   <div style={{background:"rgba(245,192,0,0.06)",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:12,marginBottom:12}}>
-                    <div style={{fontSize:12,color:"#8899AA",marginBottom:8}}>Paying {fmtK(due)} across both. Amounts must add up.</div>
+                    <div style={{fontSize:14,color:"#8899AA",marginBottom:8}}>Paying {fmtK(due)} across both. Amounts must add up.</div>
                     <div className="field"><label>Cash part (KSh)</label><input type="number" value={cashPart} onChange={e=>setCashPart(e.target.value)} placeholder="0"/></div>
                     <div className="field"><label>M-Pesa part (KSh)</label><input type="number" value={mpesaPart} onChange={e=>setMpesaPart(e.target.value)} placeholder="0"/></div>
                     <div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>
-                    <div style={{fontSize:12,fontWeight:600,color:sum===due?"#4CAF50":"#E85B5B"}}>{sum===due?"Balanced ✓":sum<due?`Short by ${fmtK(due-sum)}`:`Over by ${fmtK(sum-due)}`}</div>
+                    <div style={{fontSize:14,fontWeight:600,color:sum===due?"#4CAF50":"#E85B5B"}}>{sum===due?"Balanced ✓":sum<due?`Short by ${fmtK(due-sum)}`:`Over by ${fmtK(sum-due)}`}</div>
                   </div>
                 );})()}
                 <div className="field"><label>Notes (optional)</label><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Deliver Saturday"/></div>
               </>)}
-              {err&&<div style={{color:"#E85B5B",fontSize:13,marginTop:8}}>{err}</div>}
+              {err&&<div style={{color:"#E85B5B",fontSize:15,marginTop:8}}>{err}</div>}
             </div>
             <div className="wiz-ft">
-              {step>1&&<button className="btn-g" onClick={()=>{setErr("");setStep(step-1);}} style={{fontSize:13}}>Back</button>}
-              {step<3&&<button className="btn-y" onClick={nextStep} style={{flex:1,fontSize:14}}>Next</button>}
-              {step===3&&<button className="btn-y" onClick={completeSale} disabled={saving} style={{flex:1,fontSize:14}}>Complete</button>}
+              {step>1&&<button className="btn-g" onClick={()=>{setErr("");setStep(step-1);}} style={{fontSize:15}}>Back</button>}
+              {step<3&&<button className="btn-y" onClick={nextStep} style={{flex:1,fontSize:16}}>Next</button>}
+              {step===3&&<button className="btn-y" onClick={completeSale} disabled={saving} style={{flex:1,fontSize:16}}>Complete</button>}
             </div>
-            {confirmSale&&(()=>{ const pl=salePlan(); const row=(l,v,c)=><div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0",color:c||"#E8E2D4"}}><span style={{color:"#8A97A8"}}>{l}</span><span>{v}</span></div>; return (
+            {confirmSale&&(()=>{ const pl=salePlan(); const row=(l,v,c)=><div style={{display:"flex",justifyContent:"space-between",fontSize:15,padding:"3px 0",color:c||"#E8E2D4"}}><span style={{color:"#8A97A8"}}>{l}</span><span>{v}</span></div>; return (
               <div onClick={()=>{ if(!saving) setConfirmSale(false); }} style={{position:"fixed",inset:0,background:"rgba(5,10,31,0.88)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
                 <div onClick={e=>e.stopPropagation()} style={{background:"#0A1128",border:"1px solid #2E4472",borderTop:"3px solid #F5C000",borderRadius:12,width:"100%",maxWidth:420,maxHeight:"90vh",overflowY:"auto",padding:18}}>
-                  <div style={{fontSize:16,fontWeight:600,color:"#FFFFFF",marginBottom:2}}>Confirm sale</div>
-                  <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>Check everything before recording. Stock and money update when you confirm.</div>
-                  <div style={{fontSize:14,fontWeight:600,marginBottom:6}}>{cName}{cPhone?<span style={{color:"#8A97A8",fontWeight:400}}> · {cPhone}</span>:null}</div>
+                  <div style={{fontSize:18,fontWeight:600,color:"#FFFFFF",marginBottom:2}}>Confirm sale</div>
+                  <div style={{fontSize:14,color:"#8A97A8",marginBottom:12}}>Check everything before recording. Stock and money update when you confirm.</div>
+                  <div style={{fontSize:16,fontWeight:600,marginBottom:6}}>{cName}{cPhone?<span style={{color:"#8A97A8",fontWeight:400}}> · {cPhone}</span>:null}</div>
                   <div style={{borderTop:"1px solid #1A2A4A",borderBottom:"1px solid #1A2A4A",padding:"6px 0",marginBottom:8}}>
-                    {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"3px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
+                    {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:15,padding:"3px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
                   </div>
                   {row("Total",fmtK(total),"#F5C000")}
                   {pl.creditToUse>0&&row("Store credit applied","- "+fmtK(pl.creditToUse),"#4CAF50")}
@@ -1382,9 +1382,9 @@ function SaleTab({user,onMoney}){
                   {row("Served by",staff)}
                   {notes&&row("Notes",notes)}
                   <div style={{display:"flex",gap:8,marginTop:16}}>
-                    <button className="btn-g" onClick={()=>setConfirmSale(false)} disabled={saving} style={{fontSize:13}}>Edit</button>
-                    <button className="btn-g" onClick={()=>genReceipt(false)} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Record Sale"}</button>
-                    <button className="btn-y" onClick={()=>genReceipt(true)} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Record + Receipt"}</button>
+                    <button className="btn-g" onClick={()=>setConfirmSale(false)} disabled={saving} style={{fontSize:15}}>Edit</button>
+                    <button className="btn-g" onClick={()=>genReceipt(false)} disabled={saving} style={{flex:1,fontSize:15}}>{saving?"Saving...":"Record Sale"}</button>
+                    <button className="btn-y" onClick={()=>genReceipt(true)} disabled={saving} style={{flex:1,fontSize:15}}>{saving?"Saving...":"Record + Receipt"}</button>
                   </div>
                 </div>
               </div>
@@ -1600,14 +1600,14 @@ function StockTab({user,onMoney}){
     <div>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
         <button className="btn-g" onClick={()=>{setAdjItem(null);setAdjNotes("");}}>Cancel</button>
-        <div style={{fontSize:15,fontWeight:600}}>Stock Adjustment</div>
+        <div style={{fontSize:17,fontWeight:600}}>Stock Adjustment</div>
       </div>
-      <div style={{background:"#0A1128",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12,marginBottom:14,fontSize:12,color:"#8899AA"}}>
+      <div style={{background:"#0A1128",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12,marginBottom:14,fontSize:14,color:"#8899AA"}}>
         <strong style={{color:"#E8E2D4"}}>{adjItem.name}</strong> · {adjItem.trip_no} · {adjItem.qty_in-adjItem.qty_sold-(adjItem.qty_adjusted||0)} available
       </div>
-      <div className="field"><label>Reason</label><div className="tog">{["Damaged","Display","Personal use","Theft","Other"].map(r=><button key={r} className={`tog-btn${adjReason===r?" on":""}`} onClick={()=>setAdjReason(r)} style={{fontSize:12}}>{r}</button>)}</div></div>
+      <div className="field"><label>Reason</label><div className="tog">{["Damaged","Display","Personal use","Theft","Other"].map(r=><button key={r} className={`tog-btn${adjReason===r?" on":""}`} onClick={()=>setAdjReason(r)} style={{fontSize:14}}>{r}</button>)}</div></div>
       <div className="field"><label>Quantity</label><input type="number" value={adjQty} min={1} onChange={e=>setAdjQty(e.target.value)}/></div>
-      {["Theft","Damaged"].includes(adjReason)&&<div style={{background:"rgba(232,91,91,0.08)",border:"1px solid rgba(232,91,91,0.3)",borderRadius:8,padding:10,marginBottom:12,fontSize:12,color:"#E85B5B"}}>Recorded as a loss · Cost: {fmtK(Number(adjQty||1)*Number(adjItem.unit_cost||0))} · Retail: {fmtK(Number(adjQty||1)*Number(adjItem.selling_price||0))}</div>}
+      {["Theft","Damaged"].includes(adjReason)&&<div style={{background:"rgba(232,91,91,0.08)",border:"1px solid rgba(232,91,91,0.3)",borderRadius:8,padding:10,marginBottom:12,fontSize:14,color:"#E85B5B"}}>Recorded as a loss · Cost: {fmtK(Number(adjQty||1)*Number(adjItem.unit_cost||0))} · Retail: {fmtK(Number(adjQty||1)*Number(adjItem.selling_price||0))}</div>}
       <div className="field"><label>Notes (optional)</label><input value={adjNotes} onChange={e=>setAdjNotes(e.target.value)} placeholder="e.g. Customer walked out, CCTV checked"/></div>
       <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${adjStaff===s?" on":""}`} onClick={()=>setAdjStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
       <button className="btn-y" onClick={doAdjust} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":["Theft","Damaged"].includes(adjReason)?"Record Loss":"Remove from Stock"}</button>
@@ -1618,9 +1618,9 @@ function StockTab({user,onMoney}){
     <div>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
         <button className="btn-g" onClick={()=>{setEditItem(null);setErr("");}}>Cancel</button>
-        <div style={{fontSize:15,fontWeight:600}}>Edit Item</div>
+        <div style={{fontSize:17,fontWeight:600}}>Edit Item</div>
       </div>
-      <div style={{background:"#0A1128",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:12,marginBottom:14,fontSize:12,color:"#8899AA"}}>
+      <div style={{background:"#0A1128",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:12,marginBottom:14,fontSize:14,color:"#8899AA"}}>
         Editing <strong style={{color:"#E8E2D4"}}>{editItem.name}</strong> from {editItem.trip_no}. All changes are timestamped and logged.
       </div>
       <div className="field"><label>Name</label><input value={editVals.name} onChange={e=>setEditVals(x=>({...x,name:e.target.value}))}/></div>
@@ -1632,7 +1632,7 @@ function StockTab({user,onMoney}){
       </div>
       <div className="field"><label>Who is editing</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${editStaff===s?" on":""}`} onClick={()=>setEditStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
       <div className="field"><label>Reason for edit (required)</label><textarea value={editReason} onChange={e=>setEditReason(e.target.value)} placeholder="Explain what is being corrected and why..."/></div>
-      {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
+      {err&&<div style={{color:"#E85B5B",fontSize:15,marginBottom:12}}>{err}</div>}
       <button className="btn-y" onClick={saveEdit} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":"Save Changes"}</button>
     </div>
   );
@@ -1644,39 +1644,39 @@ function StockTab({user,onMoney}){
         <div className="title">New Sourcing Trip</div>
         <div className="badge b-y" style={{marginLeft:"auto"}}>KARU-TRIP-{String(trips.length+1).padStart(3,"0")}</div>
       </div>
-      {importingOrder&&<div style={{background:"rgba(245,192,0,0.08)",border:"1px solid rgba(245,192,0,0.3)",borderRadius:8,padding:10,marginBottom:14,fontSize:12,color:"#8899AA"}}>Imported from <strong style={{color:"#E8E2D4"}}>{importingOrder.order_no}</strong>. Confirm each item's actual cost and set selling prices before saving. Remember any deposit already paid.</div>}
+      {importingOrder&&<div style={{background:"rgba(245,192,0,0.08)",border:"1px solid rgba(245,192,0,0.3)",borderRadius:8,padding:10,marginBottom:14,fontSize:14,color:"#8899AA"}}>Imported from <strong style={{color:"#E8E2D4"}}>{importingOrder.order_no}</strong>. Confirm each item's actual cost and set selling prices before saving. Remember any deposit already paid.</div>}
       <div className="field"><label>Date</label><input type="date" value={trip.date} onChange={e=>setTrip(x=>({...x,date:e.target.value}))}/></div>
       {can(user,"users")?(
         <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${trip.created_by===s?" on":""}`} onClick={()=>setTrip(x=>({...x,created_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
       ):(
-        <div className="field"><label>Recorded by</label><div style={{fontSize:14,color:"#E8E2D4",padding:"9px 0"}}>{trip.created_by}</div></div>
+        <div className="field"><label>Recorded by</label><div style={{fontSize:16,color:"#E8E2D4",padding:"9px 0"}}>{trip.created_by}</div></div>
       )}
       <div className="field"><label>Notes</label><input value={trip.notes} onChange={e=>setTrip(x=>({...x,notes:e.target.value}))} placeholder="e.g. Gachie sourcing run"/></div>
       <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${trip.paid_from==="cash"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${trip.paid_from==="sacco"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${trip.paid_from==="personal"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
-      {trip.paid_from==="personal"&&<div style={{fontSize:11,color:"#E8A45B",marginTop:5}}>Business will owe {trip.created_by.split(" ")[0]} this amount</div>}</div>
+      {trip.paid_from==="personal"&&<div style={{fontSize:13,color:"#E8A45B",marginTop:5}}>Business will owe {trip.created_by.split(" ")[0]} this amount</div>}</div>
       <div className="field">
         <label>Items purchased</label>
         {tripItems.map(i=>(
           <div key={i.id} style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:10,marginBottom:8}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
               <ProductSearch user={user} value={i.name} onChange={v=>upTI(i.id,"name",v)} onPick={p=>setTripItems(x=>x.map(it=>it.id===i.id?{...it,name:p.name,category:p.category,unit_cost:p.default_cost>0?String(p.default_cost):it.unit_cost,selling_price:p.default_price>0?String(p.default_price):it.selling_price}:it))} placeholder="Search product..."/>
-              <button onClick={()=>rmTI(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16}}>x</button>
+              <button onClick={()=>rmTI(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:18}}>x</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:6}}>
-              <select value={i.category} onChange={e=>upTI(i.id,"category",e.target.value)} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#E8E2D4",fontSize:12}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
-              <input type="number" value={i.qty_in} min={1} onChange={e=>upTI(i.id,"qty_in",e.target.value)} placeholder="Qty" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#E8E2D4",fontSize:13,textAlign:"center"}}/>
+              <select value={i.category} onChange={e=>upTI(i.id,"category",e.target.value)} style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+              <input type="number" value={i.qty_in} min={1} onChange={e=>upTI(i.id,"qty_in",e.target.value)} placeholder="Qty" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-              <input type="number" value={i.unit_cost} onChange={e=>upTI(i.id,"unit_cost",e.target.value)} placeholder="Cost each (KSh)" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#FFFFFF",fontSize:13}}/>
-              <input type="number" value={i.selling_price} onChange={e=>upTI(i.id,"selling_price",e.target.value)} placeholder="Sell at (KSh)" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"9px 10px",color:"#FFFFFF",fontSize:13}}/>
+              <input type="number" value={i.unit_cost} onChange={e=>upTI(i.id,"unit_cost",e.target.value)} placeholder="Cost each (KSh)" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
+              <input type="number" value={i.selling_price} onChange={e=>upTI(i.id,"selling_price",e.target.value)} placeholder="Sell at (KSh)" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
             </div>
-            {i.unit_cost&&i.selling_price&&<div style={{fontSize:11,color:"#8899AA",marginTop:5}}>Margin: {Math.round((1-i.unit_cost/i.selling_price)*100)}% | Cost: KSh {(Number(i.qty_in||1)*Number(i.unit_cost)).toLocaleString()}</div>}
+            {i.unit_cost&&i.selling_price&&<div style={{fontSize:13,color:"#8899AA",marginTop:5}}>Margin: {Math.round((1-i.unit_cost/i.selling_price)*100)}% | Cost: KSh {(Number(i.qty_in||1)*Number(i.unit_cost)).toLocaleString()}</div>}
           </div>
         ))}
         <button className="btn-g" onClick={addTI} style={{width:"100%",marginTop:4}}>+ Add item</button>
-        {tripItems.some(i=>i.unit_cost&&i.qty_in)&&<div style={{textAlign:"right",marginTop:8,fontSize:14,fontWeight:600,color:"#F5C000"}}>Total: KSh {tripItems.reduce((s,i)=>s+(Number(i.qty_in||0)*Number(i.unit_cost||0)),0).toLocaleString()}</div>}
+        {tripItems.some(i=>i.unit_cost&&i.qty_in)&&<div style={{textAlign:"right",marginTop:8,fontSize:16,fontWeight:600,color:"#F5C000"}}>Total: KSh {tripItems.reduce((s,i)=>s+(Number(i.qty_in||0)*Number(i.unit_cost||0)),0).toLocaleString()}</div>}
       </div>
-      {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
+      {err&&<div style={{color:"#E85B5B",fontSize:15,marginBottom:12}}>{err}</div>}
       <button className="btn-y" onClick={saveTrip} disabled={saving} style={{width:"100%",padding:14}}>{saving?"Saving...":"Save Sourcing Trip"}</button>
     </div>
   );
@@ -1685,9 +1685,9 @@ function StockTab({user,onMoney}){
     <div>
       {can(user,"orders")&&(
         <div style={{display:"flex",gap:6,marginBottom:14}}>
-          <button onClick={()=>setSection("stock")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${section==="stock"?"#F5C000":"#1A2A4A"}`,background:section==="stock"?"rgba(245,192,0,0.1)":"transparent",color:section==="stock"?"#F5C000":"#8899AA",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Stock</button>
-          <button onClick={()=>setSection("orders")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${section==="orders"?"#F5C000":"#1A2A4A"}`,background:section==="orders"?"rgba(245,192,0,0.1)":"transparent",color:section==="orders"?"#F5C000":"#8899AA",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Orders</button>
-          {can(user,"users")&&<button onClick={()=>setSection("count")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${section==="count"?"#F5C000":"#1A2A4A"}`,background:section==="count"?"rgba(245,192,0,0.1)":"transparent",color:section==="count"?"#F5C000":"#8899AA",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Count</button>}
+          <button onClick={()=>setSection("stock")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${section==="stock"?"#F5C000":"#1A2A4A"}`,background:section==="stock"?"rgba(245,192,0,0.1)":"transparent",color:section==="stock"?"#F5C000":"#8899AA",fontSize:15,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Stock</button>
+          <button onClick={()=>setSection("orders")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${section==="orders"?"#F5C000":"#1A2A4A"}`,background:section==="orders"?"rgba(245,192,0,0.1)":"transparent",color:section==="orders"?"#F5C000":"#8899AA",fontSize:15,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Orders</button>
+          {can(user,"users")&&<button onClick={()=>setSection("count")} style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${section==="count"?"#F5C000":"#1A2A4A"}`,background:section==="count"?"rgba(245,192,0,0.1)":"transparent",color:section==="count"?"#F5C000":"#8899AA",fontSize:15,fontWeight:600,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Count</button>}
         </div>
       )}
       {section==="count"?(()=>{
@@ -1696,11 +1696,11 @@ function StockTab({user,onMoney}){
         return (
         <div className="subscreen">
           <div className="subscreen-hd"><div className="title">Stock Take</div></div>
-          <div style={{fontSize:12,color:"#AEB9C7",marginBottom:14,lineHeight:1.5}}>Count what's physically on the shelf. Leave a row blank if it matches. Where your count differs, give a reason — the app adjusts stock to match reality and logs it.</div>
+          <div style={{fontSize:14,color:"#AEB9C7",marginBottom:14,lineHeight:1.5}}>Count what's physically on the shelf. Leave a row blank if it matches. Where your count differs, give a reason — the app adjusts stock to match reality and logs it.</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
-            <div className="stat"><div className="stat-n" style={{fontSize:16,color:"#8899AA"}}>{fmtK(sysVal)}</div><div className="stat-l">System</div></div>
-            <div className="stat"><div className="stat-n" style={{fontSize:16,color:"#F5C000"}}>{fmtK(cntVal)}</div><div className="stat-l">Counted</div></div>
-            <div className="stat" style={cntVal!==sysVal?{border:"1px solid rgba(232,91,91,0.4)"}:{}}><div className="stat-n" style={{fontSize:16,color:cntVal===sysVal?"#4CAF50":"#E85B5B"}}>{cntVal-sysVal<0?"-":""}{fmtK(Math.abs(cntVal-sysVal))}</div><div className="stat-l">Variance</div></div>
+            <div className="stat"><div className="stat-n" style={{fontSize:18,color:"#8899AA"}}>{fmtK(sysVal)}</div><div className="stat-l">System</div></div>
+            <div className="stat"><div className="stat-n" style={{fontSize:18,color:"#F5C000"}}>{fmtK(cntVal)}</div><div className="stat-l">Counted</div></div>
+            <div className="stat" style={cntVal!==sysVal?{border:"1px solid rgba(232,91,91,0.4)"}:{}}><div className="stat-n" style={{fontSize:18,color:cntVal===sysVal?"#4CAF50":"#E85B5B"}}>{cntVal-sysVal<0?"-":""}{fmtK(Math.abs(cntVal-sysVal))}</div><div className="stat-l">Variance</div></div>
           </div>
           {liveStock.length===0?<div style={{textAlign:"center",color:"#8899AA",padding:"20px 0"}}>No stock to count.</div>:(()=>{
             // Group batches by item name, sort names alphabetically
@@ -1715,21 +1715,21 @@ function StockTab({user,onMoney}){
               return (
                 <div key={g.name} className="card" style={{padding:"12px",marginBottom:10,borderLeft:gDiff!==0?`3px solid ${gDiff<0?"#E85B5B":"#4CAF50"}`:"3px solid #24365C"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
-                    <div style={{fontSize:15,fontWeight:700}}>{g.name}</div>
-                    <div style={{fontSize:12,color:"#8A97A8"}}>{catLabel(g.batches[0].category)} · {fmtK(valTotal)}</div>
+                    <div style={{fontSize:17,fontWeight:700}}>{g.name}</div>
+                    <div style={{fontSize:14,color:"#8A97A8"}}>{catLabel(g.batches[0].category)} · {fmtK(valTotal)}</div>
                   </div>
-                  {g.batches.length>1&&<div style={{fontSize:11,color:"#8A97A8",marginBottom:8}}>{g.batches.length} batches · system total {sysTotal}{gDiff!==0?` · counted ${cntTotal}`:""}</div>}
+                  {g.batches.length>1&&<div style={{fontSize:13,color:"#8A97A8",marginBottom:8}}>{g.batches.length} batches · system total {sysTotal}{gDiff!==0?` · counted ${cntTotal}`:""}</div>}
                   {g.batches.slice().sort((a,b)=>(a.trip_no||"").localeCompare(b.trip_no||"")).map(s=>{
                     const c=takeCounts[s.id]===undefined||takeCounts[s.id]===""?s.available:Number(takeCounts[s.id]);
                     const diff=c-s.available;
                     return (
                       <div key={s.id} style={{padding:"8px 0",borderTop:"1px solid #101B36"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,color:"#AEB9C7"}}>{s.trip_no}</div><div style={{fontSize:11,color:"#8A97A8"}}>KSh {Number(s.unit_cost).toLocaleString()} each · in {s.date_in?.slice(5)||""}</div></div>
-                          <div style={{textAlign:"center",minWidth:48}}><div style={{fontSize:10,color:"#8A97A8"}}>SYSTEM</div><div style={{fontSize:15,fontWeight:700}}>{s.available}</div></div>
-                          <div style={{minWidth:66,marginLeft:8}}><div style={{fontSize:10,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"#12203C",border:`1px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#1A2A4A"}`,borderRadius:6,padding:"6px 8px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/></div>
+                          <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,color:"#AEB9C7"}}>{s.trip_no}</div><div style={{fontSize:13,color:"#8A97A8"}}>KSh {Number(s.unit_cost).toLocaleString()} each · in {s.date_in?.slice(5)||""}</div></div>
+                          <div style={{textAlign:"center",minWidth:48}}><div style={{fontSize:12,color:"#8A97A8"}}>SYSTEM</div><div style={{fontSize:17,fontWeight:700}}>{s.available}</div></div>
+                          <div style={{minWidth:66,marginLeft:8}}><div style={{fontSize:12,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"#12203C",border:`1px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#1A2A4A"}`,borderRadius:6,padding:"6px 8px",color:"#E8E2D4",fontSize:17,textAlign:"center"}}/></div>
                         </div>
-                        {diff!==0&&<div style={{marginTop:6}}><div style={{fontSize:11,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"#0A1128",border:"1px solid #24365C",borderRadius:6,padding:"7px 9px",color:"#FFFFFF",fontSize:13}}/></div>}
+                        {diff!==0&&<div style={{marginTop:6}}><div style={{fontSize:13,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"#0A1128",border:"1px solid #24365C",borderRadius:6,padding:"7px 9px",color:"#FFFFFF",fontSize:15}}/></div>}
                       </div>
                     );
                   })}
@@ -1751,11 +1751,11 @@ function StockTab({user,onMoney}){
             return (
               <div key={o.id} style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.35)",borderRadius:10,padding:12,marginBottom:8}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <div style={{fontSize:13,fontWeight:600,color:"#4CAF50"}}>{o.order_no} received</div>
+                  <div style={{fontSize:15,fontWeight:600,color:"#4CAF50"}}>{o.order_no} received</div>
                   <span className="badge b-g">{itemCount} item{itemCount!==1?"s":""}</span>
                 </div>
-                <div style={{fontSize:12,color:"#8899AA",marginBottom:10}}>{recvSuppliers.flatMap(su=>(su.items||[]).map(i=>`${i.name} x${i.qty}`)).join(", ")}</div>
-                <button className="btn-y" onClick={()=>receiveOrderIntoTrip(o)} style={{width:"100%",fontSize:13}}>Receive into New Trip</button>
+                <div style={{fontSize:14,color:"#8899AA",marginBottom:10}}>{recvSuppliers.flatMap(su=>(su.items||[]).map(i=>`${i.name} x${i.qty}`)).join(", ")}</div>
+                <button className="btn-y" onClick={()=>receiveOrderIntoTrip(o)} style={{width:"100%",fontSize:15}}>Receive into New Trip</button>
               </div>
             );
           })}
@@ -1766,7 +1766,7 @@ function StockTab({user,onMoney}){
         <div className="stat"><div className="stat-n" style={{color:"#4CAF50"}}>{totalU}</div><div className="stat-l">Units available</div></div>
       </div>
       <div style={{display:"flex",justifyContent:"flex-end",marginBottom:14}}>
-        <button className="btn-y" onClick={()=>setView("new")} style={{fontSize:13,padding:"9px 16px"}}>+ New Trip</button>
+        <button className="btn-y" onClick={()=>setView("new")} style={{fontSize:15,padding:"9px 16px"}}>+ New Trip</button>
       </div>
       {loading?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading...</div>:trips.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>No trips yet.</div>:(()=>{
         const renderTrip=(t)=>{
@@ -1779,11 +1779,11 @@ function StockTab({user,onMoney}){
             <div className="trip-hdr" onClick={()=>toggleExpand(t.id)}>
               <div>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                  <span style={{fontSize:14,fontWeight:600,color:"#F5C000"}}>{t.trip_no}</span>
+                  <span style={{fontSize:16,fontWeight:600,color:"#F5C000"}}>{t.trip_no}</span>
                   <span className={`badge ${locked?"b-g":"b-y"}`}>{locked?"Locked":"Open"}</span>
                 </div>
-                <div style={{fontSize:12,color:"#8899AA"}}>{t.date} · {t.created_by?.split(" ")[0]} · KSh {Number(t.total_cost).toLocaleString()} · {tItems.length} item{tItems.length!==1?"s":""}</div>
-                {locked&&<div style={{fontSize:11,color:"#4CAF50",marginTop:2}}>Locked by {t.locked_by?.split(" ")[0]} on {t.locked_at?new Date(t.locked_at).toLocaleDateString("en-KE"):""}</div>}
+                <div style={{fontSize:14,color:"#8899AA"}}>{t.date} · {t.created_by?.split(" ")[0]} · KSh {Number(t.total_cost).toLocaleString()} · {tItems.length} item{tItems.length!==1?"s":""}</div>
+                {locked&&<div style={{fontSize:13,color:"#4CAF50",marginTop:2}}>Locked by {t.locked_by?.split(" ")[0]} on {t.locked_at?new Date(t.locked_at).toLocaleDateString("en-KE"):""}</div>}
               </div>
               <span style={{color:"#8A97A8",fontSize:18}}>{isOpen?"▲":"▼"}</span>
             </div>
@@ -1794,15 +1794,15 @@ function StockTab({user,onMoney}){
                   return (
                     <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"8px 0",borderBottom:"1px solid #0F1A3A"}}>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:500}}>{s.name}</div>
-                        <div style={{fontSize:11,color:"#8899AA",marginTop:2}}>{catLabel(s.category)} · Cost KSh {Number(s.unit_cost).toLocaleString()} · {Number(s.selling_price)>0?`Sell KSh ${Number(s.selling_price).toLocaleString()}`:<span style={{color:"#E8A45B"}}>No price set</span>}</div>
-                        {(Number(s.qty_sold)>0||adj>0)&&<div style={{fontSize:11,color:"#8A97A8",marginTop:1}}>In {s.qty_in} · Sold {s.qty_sold}{adj>0?` · Adjusted ${adj}`:""}</div>}
+                        <div style={{fontSize:15,fontWeight:500}}>{s.name}</div>
+                        <div style={{fontSize:13,color:"#8899AA",marginTop:2}}>{catLabel(s.category)} · Cost KSh {Number(s.unit_cost).toLocaleString()} · {Number(s.selling_price)>0?`Sell KSh ${Number(s.selling_price).toLocaleString()}`:<span style={{color:"#E8A45B"}}>No price set</span>}</div>
+                        {(Number(s.qty_sold)>0||adj>0)&&<div style={{fontSize:13,color:"#8A97A8",marginTop:1}}>In {s.qty_in} · Sold {s.qty_sold}{adj>0?` · Adjusted ${adj}`:""}</div>}
                       </div>
                       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
                         <span className={`badge ${avail>0?"b-g":"b-r"}`}>{avail>0?`${avail} left`:"None left"}</span>
                         <div style={{display:"flex",gap:4}}>
-                          {avail>0&&can(user,"adjust")&&<button onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{background:"none",border:"none",color:"#C2CBD6",fontSize:12,padding:"6px 8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Adjust</button>}
-                          {!locked&&can(user,"edit")&&withinWindow(s.created_at)&&<button onClick={()=>startEdit(s,t)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:12,padding:"6px 8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Edit</button>}
+                          {avail>0&&can(user,"adjust")&&<button onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{background:"none",border:"none",color:"#C2CBD6",fontSize:14,padding:"6px 8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Adjust</button>}
+                          {!locked&&can(user,"edit")&&withinWindow(s.created_at)&&<button onClick={()=>startEdit(s,t)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:14,padding:"6px 8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Edit</button>}
                         </div>
                       </div>
                     </div>
@@ -1812,46 +1812,46 @@ function StockTab({user,onMoney}){
                   <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #0F1A3A"}}>
                     {addingToTrip?.id===t.id?(
                       <div>
-                        <div style={{fontSize:13,fontWeight:600,marginBottom:10,color:"#F5C000"}}>Add items to {t.trip_no}</div>
+                        <div style={{fontSize:15,fontWeight:600,marginBottom:10,color:"#F5C000"}}>Add items to {t.trip_no}</div>
                         {addExtraItems.map(i=>(
-                          <div key={i.id} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:8,marginBottom:7}}>
+                          <div key={i.id} style={{borderBottom:"1px solid #1A2A4A",padding:"6px 0 14px",marginBottom:12}}>
                             <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:5,marginBottom:5}}>
                               <ProductSearch user={user} value={i.name} onChange={v=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,name:v}:a))} onPick={p=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,name:p.name,category:p.category,unit_cost:p.default_cost>0?String(p.default_cost):a.unit_cost,selling_price:p.default_price>0?String(p.default_price):a.selling_price}:a))} placeholder="Search product..."/>
-                              <button onClick={()=>setAddExtraItems(x=>x.filter(a=>a.id!==i.id))} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:14}}>x</button>
+                              <button onClick={()=>setAddExtraItems(x=>x.filter(a=>a.id!==i.id))} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16}}>x</button>
                             </div>
                             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5}}>
-                              <select value={i.category} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,category:e.target.value}:a))} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"7px 8px",color:"#E8E2D4",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
-                              <input type="number" value={i.qty_in} min={1} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,qty_in:e.target.value}:a))} placeholder="Qty" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"7px 8px",color:"#E8E2D4",fontSize:11,textAlign:"center",width:"100%"}}/>
-                              <input type="number" value={i.unit_cost} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,unit_cost:e.target.value}:a))} placeholder="Cost (KSh)" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"7px 8px",color:"#E8E2D4",fontSize:11,width:"100%"}}/>
+                              <select value={i.category} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,category:e.target.value}:a))} style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
+                              <input type="number" value={i.qty_in} min={1} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,qty_in:e.target.value}:a))} placeholder="Qty" style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,textAlign:"center",width:"100%"}}/>
+                              <input type="number" value={i.unit_cost} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,unit_cost:e.target.value}:a))} placeholder="Cost (KSh)" style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,width:"100%"}}/>
                             </div>
                           </div>
                         ))}
-                        <button className="btn-g" onClick={()=>setAddExtraItems(x=>[...x,{id:Date.now(),name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}])} style={{width:"100%",fontSize:12,marginBottom:8}}>+ Add another</button>
+                        <button className="btn-g" onClick={()=>setAddExtraItems(x=>[...x,{id:Date.now(),name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}])} style={{width:"100%",fontSize:14,marginBottom:8}}>+ Add another</button>
                         <div style={{display:"flex",gap:8}}>
-                          <button className="btn-y" onClick={()=>saveAddItems(t)} disabled={saving} style={{flex:1,fontSize:12}}>{saving?"Saving...":"Save Items"}</button>
-                          <button className="btn-g" onClick={()=>{setAddingToTrip(null);setAddExtraItems([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);}} style={{fontSize:12}}>Cancel</button>
+                          <button className="btn-y" onClick={()=>saveAddItems(t)} disabled={saving} style={{flex:1,fontSize:14}}>{saving?"Saving...":"Save Items"}</button>
+                          <button className="btn-g" onClick={()=>{setAddingToTrip(null);setAddExtraItems([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);}} style={{fontSize:14}}>Cancel</button>
                         </div>
                       </div>
                     ):(
-                      <button onClick={()=>setAddingToTrip(t)} style={{background:"none",border:"none",color:"#F5C000",fontSize:13,padding:"8px 0",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Add forgotten items</button>
+                      <button onClick={()=>setAddingToTrip(t)} style={{background:"none",border:"none",color:"#F5C000",fontSize:15,padding:"8px 0",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Add forgotten items</button>
                     )}
                   </div>
                 )}
                 {!locked&&can(user,"lock")&&(
                   <div style={{marginTop:12}}>
                     <details className="dtl">
-                      <summary style={{textAlign:"center",background:"rgba(76,175,80,0.1)",border:"1px solid rgba(76,175,80,0.3)",color:"#4CAF50",padding:"11px",borderRadius:8,fontSize:14,fontWeight:600}}>Lock trip</summary>
+                      <summary style={{textAlign:"center",background:"rgba(76,175,80,0.1)",border:"1px solid rgba(76,175,80,0.3)",color:"#4CAF50",padding:"11px",borderRadius:8,fontSize:16,fontWeight:600}}>Lock trip</summary>
                       <div style={{paddingTop:12}}>
-                        <div style={{fontSize:12,color:"#A9B5C6",marginBottom:8}}>Who is confirming? No one can edit this trip after it is locked.</div>
+                        <div style={{fontSize:14,color:"#A9B5C6",marginBottom:8}}>Who is confirming? No one can edit this trip after it is locked.</div>
                         <div className="tog" style={{marginBottom:10}}>{STAFF.map(s=><button key={s} className={`tog-btn${lockStaff===s?" on":""}`} onClick={()=>setLockStaff(s)}>{s.split(" ")[0]}</button>)}</div>
-                        <button className="btn-y" onClick={()=>lockTrip(t)} disabled={saving} style={{width:"100%",fontSize:14}}>{saving?"Locking...":"Confirm lock"}</button>
+                        <button className="btn-y" onClick={()=>lockTrip(t)} disabled={saving} style={{width:"100%",fontSize:16}}>{saving?"Locking...":"Confirm lock"}</button>
                       </div>
                     </details>
                   </div>
                 )}
                 {logs.length>0&&(
                   <details className="dtl" style={{marginTop:12,paddingTop:10,borderTop:"1px solid #0F1A3A"}}>
-                    <summary style={{fontSize:12,color:"#A9B5C6",padding:"4px 0"}}>History ({logs.length})</summary>
+                    <summary style={{fontSize:14,color:"#A9B5C6",padding:"4px 0"}}>History ({logs.length})</summary>
                     <div style={{marginTop:8}}>
                     {logs.map(a=>(
                       <div key={a.id} className="audit-entry">
@@ -1883,8 +1883,8 @@ function StockTab({user,onMoney}){
           {Object.keys(mg).sort((a,b)=>b.localeCompare(a)).map(ym=>(
             <div key={ym} style={{marginBottom:10}}>
               <div onClick={()=>tg(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"9px 12px",background:"#0A1128",border:"1px solid #24365C",borderRadius:10}}>
-                <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{tripGrp[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]} · {mg[ym].length} trip{mg[ym].length!==1?"s":""}</span>
-                <span style={{fontSize:13,fontWeight:600,color:"#F5C000"}}>KSh {grpCost(mg[ym]).toLocaleString()}</span>
+                <span style={{fontSize:15,fontWeight:600,color:"#AEB9C7"}}>{tripGrp[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]} · {mg[ym].length} trip{mg[ym].length!==1?"s":""}</span>
+                <span style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>KSh {grpCost(mg[ym]).toLocaleString()}</span>
               </div>
               {tripGrp[ym]&&<div style={{marginTop:8}}>{mg[ym].map(renderTrip)}</div>}
             </div>
@@ -1892,8 +1892,8 @@ function StockTab({user,onMoney}){
           {Object.keys(yg).sort((a,b)=>b.localeCompare(a)).map(y=>(
             <div key={y} style={{marginBottom:10}}>
               <div onClick={()=>tg(y)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"9px 12px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:10}}>
-                <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{tripGrp[y]?"▾":"▸"} {y} · {yg[y].length} trip{yg[y].length!==1?"s":""}</span>
-                <span style={{fontSize:13,fontWeight:700,color:"#F5C000"}}>KSh {grpCost(yg[y]).toLocaleString()}</span>
+                <span style={{fontSize:15,fontWeight:700,color:"#E8E2D4"}}>{tripGrp[y]?"▾":"▸"} {y} · {yg[y].length} trip{yg[y].length!==1?"s":""}</span>
+                <span style={{fontSize:15,fontWeight:700,color:"#F5C000"}}>KSh {grpCost(yg[y]).toLocaleString()}</span>
               </div>
               {tripGrp[y]&&<div style={{marginTop:8}}>{yg[y].map(renderTrip)}</div>}
             </div>
@@ -2043,7 +2043,7 @@ function OrdersTab({user,onMoney}){
     return (
       <div>
         <div className="subscreen-hd" style={{margin:"0 0 14px",borderRadius:12,border:"1px solid #24365C"}}>
-          <button className="btn-g" onClick={()=>{setOpenOrder(null);load();}} style={{fontSize:13}}>Back</button>
+          <button className="btn-g" onClick={()=>{setOpenOrder(null);load();}} style={{fontSize:15}}>Back</button>
           <div className="title" style={{color:"#F5C000"}}>{openOrder.order_no}</div>
           <span className={`badge ${badge(openOrder.status)}`} style={{marginLeft:"auto"}}>{openOrder.status}</span>
         </div>
@@ -2054,16 +2054,16 @@ function OrdersTab({user,onMoney}){
           return (
             <div key={si} style={{background:"#12203C",border:`1px solid ${locked?"#1A2A4A":"rgba(245,192,0,0.35)"}`,borderRadius:10,padding:12,marginBottom:12}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                <div style={{fontSize:12,color:"#8899AA",fontWeight:600}}>Supplier {si+1}</div>
+                <div style={{fontSize:14,color:"#8899AA",fontWeight:600}}>Supplier {si+1}</div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <span className={`badge ${badge(sub.status)}`}>{sub.status}</span>
-                  {draft.length>1&&!locked&&<button onClick={()=>rmDraftSupplier(si)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:16}}>×</button>}
+                  {draft.length>1&&!locked&&<button onClick={()=>rmDraftSupplier(si)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:18}}>×</button>}
                 </div>
               </div>
 
               {!locked?(<>
                 <div style={{position:"relative",marginBottom:8}}>
-                  <input value={sub.supplier} onChange={e=>upDraft(si,{supplier:e.target.value,_sug:true})} onFocus={()=>upDraft(si,{_sug:true})} onBlur={()=>setTimeout(()=>upDraft(si,{_sug:false}),200)} placeholder="Supplier name" style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"10px 12px",color:"#FFFFFF",fontSize:14}}/>
+                  <input value={sub.supplier} onChange={e=>upDraft(si,{supplier:e.target.value,_sug:true})} onFocus={()=>upDraft(si,{_sug:true})} onBlur={()=>setTimeout(()=>upDraft(si,{_sug:false}),200)} placeholder="Supplier name" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
                   {sub._sug&&supSuggest(sub.supplier).length>0&&(
                     <div className="ac-drop">{supSuggest(sub.supplier).map(sg=><div key={sg.id} className="ac-item" onMouseDown={()=>upDraft(si,{supplier:sg.name,_sug:false})}>{sg.name}</div>)}</div>
                   )}
@@ -2072,51 +2072,51 @@ function OrdersTab({user,onMoney}){
                   <div key={ii} style={{marginBottom:10,paddingBottom:10,borderBottom:ii<sub.items.length-1?"1px solid #101B36":"none"}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 24px",gap:6,marginBottom:6,alignItems:"center"}}>
                       <ProductSearch user={user} value={it.name} onChange={v=>upDraftItem(si,ii,"name",v)} onPick={p=>{upDraftItem(si,ii,"name",p.name);upDraftItem(si,ii,"category",p.category);if(p.default_cost>0)upDraftItem(si,ii,"est_cost",p.default_cost);}} placeholder="Search product..."/>
-                      {sub.items.length>1&&<button onClick={()=>rmDraftItem(si,ii)} style={{background:"none",border:"none",color:"#8A97A8",cursor:"pointer",fontSize:16}}>×</button>}
+                      {sub.items.length>1&&<button onClick={()=>rmDraftItem(si,ii)} style={{background:"none",border:"none",color:"#8A97A8",cursor:"pointer",fontSize:18}}>×</button>}
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr 1fr",gap:6}}>
-                      <select value={it.category} onChange={e=>upDraftItem(si,ii,"category",e.target.value)} style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#8899AA",fontSize:11}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id} style={{background:"#0A1128"}}>{c.label}</option>)}</select>
-                      <input type="number" value={it.qty} min={1} onChange={e=>upDraftItem(si,ii,"qty",e.target.value)} placeholder="Qty" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#E8E2D4",fontSize:12,textAlign:"center",width:"100%"}}/>
-                      <input type="number" value={it.est_cost} onChange={e=>upDraftItem(si,ii,"est_cost",e.target.value)} placeholder="Cost" style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:7,padding:"8px 8px",color:"#E8E2D4",fontSize:12,width:"100%"}}/>
+                      <select value={it.category} onChange={e=>upDraftItem(si,ii,"category",e.target.value)} style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#8899AA",fontSize:15}}>{CAT_OPTS.map(c=><option key={c.id} value={c.id} style={{background:"#0A1128"}}>{c.label}</option>)}</select>
+                      <input type="number" value={it.qty} min={1} onChange={e=>upDraftItem(si,ii,"qty",e.target.value)} placeholder="Qty" style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,textAlign:"center",width:"100%"}}/>
+                      <input type="number" value={it.est_cost} onChange={e=>upDraftItem(si,ii,"est_cost",e.target.value)} placeholder="Cost" style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,width:"100%"}}/>
                     </div>
                   </div>
                 ))}
-                <button onClick={()=>addDraftItem(si)} style={{width:"100%",fontSize:12,marginBottom:8,background:"none",border:"1px dashed #1A2A4A",borderRadius:6,color:"#8899AA",padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Add item</button>
+                <button onClick={()=>addDraftItem(si)} style={{width:"100%",fontSize:14,marginBottom:8,background:"none",border:"1px dashed #1A2A4A",borderRadius:6,color:"#8899AA",padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Add item</button>
               </>):(
                 <div style={{marginBottom:8}}>
-                  <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>{sub.supplier}</div>
-                  <div style={{fontSize:12,color:"#8899AA"}}>{(sub.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")}</div>
+                  <div style={{fontSize:16,fontWeight:600,marginBottom:4}}>{sub.supplier}</div>
+                  <div style={{fontSize:14,color:"#8899AA"}}>{(sub.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")}</div>
                 </div>
               )}
 
               {/* Sub-summary */}
               <div style={{borderTop:"1px solid #1A2A4A",paddingTop:10,marginTop:4}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:dep>0?6:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:14,marginBottom:dep>0?6:8}}>
                   <span style={{color:"#8899AA"}}>Supplier total</span>
                   <span style={{color:"#E8E2D4",fontWeight:600}}>{fmtK(st)}</span>
                 </div>
                 {dep>0&&(
                   <div style={{background:"rgba(76,175,80,0.06)",border:"1px solid rgba(76,175,80,0.2)",borderRadius:6,padding:"8px 10px",marginBottom:8}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#4CAF50"}}>Deposit paid</span><span style={{color:"#4CAF50",fontWeight:600}}>{fmtK(dep)}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,paddingTop:4,borderTop:"1px solid rgba(76,175,80,0.15)"}}><span style={{color:"#E8E2D4",fontWeight:600}}>{bal>0?"Balance owed":"Fully paid"}</span><span style={{color:bal>0?"#E8A45B":"#4CAF50",fontWeight:700}}>{fmtK(bal)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:14,marginBottom:4}}><span style={{color:"#4CAF50"}}>Deposit paid</span><span style={{color:"#4CAF50",fontWeight:600}}>{fmtK(dep)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:15,paddingTop:4,borderTop:"1px solid rgba(76,175,80,0.15)"}}><span style={{color:"#E8E2D4",fontWeight:600}}>{bal>0?"Balance owed":"Fully paid"}</span><span style={{color:bal>0?"#E8A45B":"#4CAF50",fontWeight:700}}>{fmtK(bal)}</span></div>
                   </div>
                 )}
 
                 {/* Deposit inline form */}
                 {depSi===si?(
                   <div style={{background:"rgba(245,192,0,0.06)",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:10,marginBottom:8}}>
-                    <div style={{fontSize:12,color:"#8899AA",marginBottom:8}}>{dep>0?`Already paid ${fmtK(dep)} · `:""}Balance owed: <span style={{color:"#E8A45B",fontWeight:600}}>{fmtK(bal)}</span></div>
-                    <div className="field"><label>Amount to pay now (KSh)</label><input type="number" value={depAmt} onChange={e=>setDepAmt(e.target.value)} placeholder="0" autoFocus/>{bal>0&&<button onClick={()=>setDepAmt(String(bal))} style={{marginTop:6,background:"none",border:"1px solid #1A2A4A",borderRadius:5,color:"#8899AA",fontSize:11,padding:"5px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Pay full balance ({fmtK(bal)})</button>}</div>
+                    <div style={{fontSize:14,color:"#8899AA",marginBottom:8}}>{dep>0?`Already paid ${fmtK(dep)} · `:""}Balance owed: <span style={{color:"#E8A45B",fontWeight:600}}>{fmtK(bal)}</span></div>
+                    <div className="field"><label>Amount to pay now (KSh)</label><input type="number" value={depAmt} onChange={e=>setDepAmt(e.target.value)} placeholder="0" autoFocus/>{bal>0&&<button onClick={()=>setDepAmt(String(bal))} style={{marginTop:6,background:"none",border:"1px solid #1A2A4A",borderRadius:5,color:"#8899AA",fontSize:13,padding:"5px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Pay full balance ({fmtK(bal)})</button>}</div>
                     <div className="field"><label>From</label><div className="tog"><button className={`tog-btn${depFrom==="cash"?" on":""}`} onClick={()=>setDepFrom("cash")}>Cash</button><button className={`tog-btn${depFrom==="sacco"?" on":""}`} onClick={()=>setDepFrom("sacco")}>SACCO</button></div></div>
-                    <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={payDeposit} disabled={depSaving} style={{flex:1,fontSize:12}}>{depSaving?"...":"Confirm payment"}</button><button className="btn-g" onClick={()=>{setDepSi(null);setDepAmt("");}} style={{fontSize:12}}>Cancel</button></div>
+                    <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={payDeposit} disabled={depSaving} style={{flex:1,fontSize:14}}>{depSaving?"...":"Confirm payment"}</button><button className="btn-g" onClick={()=>{setDepSi(null);setDepAmt("");}} style={{fontSize:14}}>Cancel</button></div>
                   </div>
                 ):(
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {!locked&&<button className="btn-y" onClick={()=>saveSupplier(si)} disabled={busy} style={{fontSize:11,padding:"6px 12px"}}>Save</button>}
-                    {["pending","ordered","received"].includes(sub.status)&&can(user,"money")&&bal>0&&<button className="btn-g" onClick={()=>{setDepSi(si);setDepAmt("");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(245,192,0,0.3)",color:"#F5C000"}}>{dep>0?"Add payment":"Record payment"}</button>}
-                    {sub.status==="pending"&&<button className="btn-g" onClick={()=>markSupplier(si,"ordered")} disabled={busy} style={{fontSize:11,padding:"6px 10px"}}>Mark ordered</button>}
-                    {sub.status==="ordered"&&<button className="btn-g" onClick={()=>markSupplier(si,"received")} disabled={busy} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(76,175,80,0.3)",color:"#4CAF50"}}>Received</button>}
-                    {["pending","ordered"].includes(sub.status)&&<button className="btn-g" onClick={()=>{if(confirm(`Cancel ${sub.supplier||"this supplier"}?`))markSupplier(si,"cancelled");}} style={{fontSize:11,padding:"6px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Cancel</button>}
+                    {!locked&&<button className="btn-y" onClick={()=>saveSupplier(si)} disabled={busy} style={{fontSize:13,padding:"6px 12px"}}>Save</button>}
+                    {["pending","ordered","received"].includes(sub.status)&&can(user,"money")&&bal>0&&<button className="btn-g" onClick={()=>{setDepSi(si);setDepAmt("");}} style={{fontSize:13,padding:"6px 10px",borderColor:"rgba(245,192,0,0.3)",color:"#F5C000"}}>{dep>0?"Add payment":"Record payment"}</button>}
+                    {sub.status==="pending"&&<button className="btn-g" onClick={()=>markSupplier(si,"ordered")} disabled={busy} style={{fontSize:13,padding:"6px 10px"}}>Mark ordered</button>}
+                    {sub.status==="ordered"&&<button className="btn-g" onClick={()=>markSupplier(si,"received")} disabled={busy} style={{fontSize:13,padding:"6px 10px",borderColor:"rgba(76,175,80,0.3)",color:"#4CAF50"}}>Received</button>}
+                    {["pending","ordered"].includes(sub.status)&&<button className="btn-g" onClick={()=>{if(confirm(`Cancel ${sub.supplier||"this supplier"}?`))markSupplier(si,"cancelled");}} style={{fontSize:13,padding:"6px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Cancel</button>}
                   </div>
                 )}
               </div>
@@ -2124,17 +2124,17 @@ function OrdersTab({user,onMoney}){
           );
         })}
 
-        <button className="btn-g" onClick={addDraftSupplier} style={{width:"100%",marginBottom:14,fontSize:13}}>+ Add another supplier</button>
+        <button className="btn-g" onClick={addDraftSupplier} style={{width:"100%",marginBottom:14,fontSize:15}}>+ Add another supplier</button>
 
         <div className="field"><label>Trip notes</label><input defaultValue={openOrder.notes||""} onBlur={e=>saveNotes(e.target.value)} placeholder="e.g. Kiambu market run"/></div>
 
         <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:10,padding:12}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:14,fontWeight:600}}><span>Order total</span><span style={{color:"#F5C000"}}>{fmtK(orderTotal(draft))}</span></div>
-          {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#8899AA",marginTop:4}}><span>Deposits paid</span><span>{fmtK(orderDeposits(draft))}</span></div>}
-          {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#E8A45B",marginTop:2}}><span>Balance to suppliers</span><span>{fmtK(Math.max(0,orderTotal(draft)-orderDeposits(draft)))}</span></div>}
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:600}}><span>Order total</span><span style={{color:"#F5C000"}}>{fmtK(orderTotal(draft))}</span></div>
+          {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:14,color:"#8899AA",marginTop:4}}><span>Deposits paid</span><span>{fmtK(orderDeposits(draft))}</span></div>}
+          {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:14,color:"#E8A45B",marginTop:2}}><span>Balance to suppliers</span><span>{fmtK(Math.max(0,orderTotal(draft)-orderDeposits(draft)))}</span></div>}
         </div>
         {draft.some(s=>s.status==="received")&&(()=>{ const depOnReceived=draft.filter(s=>s.status==="received").reduce((t,s)=>t+Number(s.deposit_paid||0),0); return (
-          <div style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:10,marginTop:10,fontSize:12,color:"#8899AA"}}>
+          <div style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:10,marginTop:10,fontSize:14,color:"#8899AA"}}>
             <div style={{color:"#4CAF50",fontWeight:600,marginBottom:4}}>✓ Received items — log them as a sourcing trip in Stock</div>
             {depOnReceived>0&&<div>Deposits of {fmtK(depOnReceived)} were already paid and recorded as money out. When you create the sourcing trip, record it as paid from the same account for the <strong>balance only</strong> ({fmtK(depOnReceived)} is already accounted), so you don't double-count.</div>}
           </div>
@@ -2146,10 +2146,10 @@ function OrdersTab({user,onMoney}){
   // ── LIST ──
   return (
     <div>
-      <div style={{fontSize:12,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Plan a buying trip. Open an order and add each supplier as its own block — items, deposit, and status handled right there. Each supplier acts on its own.</div>
-      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}><button className="btn-y" onClick={startNew} disabled={busy} style={{fontSize:13,padding:"9px 16px"}}>{busy?"...":"+ New Order"}</button></div>
+      <div style={{fontSize:14,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Plan a buying trip. Open an order and add each supplier as its own block — items, deposit, and status handled right there. Each supplier acts on its own.</div>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}><button className="btn-y" onClick={startNew} disabled={busy} style={{fontSize:15,padding:"9px 16px"}}>{busy?"...":"+ New Order"}</button></div>
       <div style={{display:"flex",gap:6,marginBottom:14}}>
-        {[["open","Open"],["done","Completed"],["all","All"]].map(([id,l])=><button key={id} onClick={()=>setFilter(id)} style={{padding:"5px 12px",borderRadius:100,border:`1px solid ${filter===id?"#F5C000":"#1A2A4A"}`,background:filter===id?"rgba(245,192,0,0.1)":"transparent",color:filter===id?"#F5C000":"#8899AA",fontSize:12,cursor:"pointer"}}>{l}</button>)}
+        {[["open","Open"],["done","Completed"],["all","All"]].map(([id,l])=><button key={id} onClick={()=>setFilter(id)} style={{padding:"5px 12px",borderRadius:100,border:`1px solid ${filter===id?"#F5C000":"#1A2A4A"}`,background:filter===id?"rgba(245,192,0,0.1)":"transparent",color:filter===id?"#F5C000":"#8899AA",fontSize:14,cursor:"pointer"}}>{l}</button>)}
       </div>
       {loading?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading...</div>:shown.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>No orders here.</div>:(()=>{
         const orderCard=(o)=>{
@@ -2157,12 +2157,12 @@ function OrdersTab({user,onMoney}){
           return (
           <div key={o.id} className="card" onClick={()=>setOpenOrder(o)} style={{cursor:"pointer"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-              <div><span style={{fontSize:14,fontWeight:600,color:"#F5C000"}}>{o.order_no}</span><div style={{fontSize:11,color:"#8A97A8",marginTop:2}}>{o.date} · {o.created_by?.split(" ")[0]} · {subs.length} supplier{subs.length!==1?"s":""} · est {fmtK(orderTotal(subs))}</div></div>
+              <div><span style={{fontSize:16,fontWeight:600,color:"#F5C000"}}>{o.order_no}</span><div style={{fontSize:13,color:"#8A97A8",marginTop:2}}>{o.date} · {o.created_by?.split(" ")[0]} · {subs.length} supplier{subs.length!==1?"s":""} · est {fmtK(orderTotal(subs))}</div></div>
               <span className={`badge ${badge(o.status)}`}>{o.status}</span>
             </div>
-            <div style={{fontSize:11,color:"#8A97A8"}}>{subs.map(s=>s.supplier).filter(Boolean).join(" · ")||"No suppliers yet"}</div>
-            {orderDeposits(subs)>0&&<div style={{fontSize:11,color:"#4CAF50",marginTop:4}}>Deposits {fmtK(orderDeposits(subs))} · Balance {fmtK(Math.max(0,orderTotal(subs)-orderDeposits(subs)))}</div>}
-            <div style={{fontSize:11,color:"#8A97A8",marginTop:6}}>Tap to open</div>
+            <div style={{fontSize:13,color:"#8A97A8"}}>{subs.map(s=>s.supplier).filter(Boolean).join(" · ")||"No suppliers yet"}</div>
+            {orderDeposits(subs)>0&&<div style={{fontSize:13,color:"#4CAF50",marginTop:4}}>Deposits {fmtK(orderDeposits(subs))} · Balance {fmtK(Math.max(0,orderTotal(subs)-orderDeposits(subs)))}</div>}
+            <div style={{fontSize:13,color:"#8A97A8",marginTop:6}}>Tap to open</div>
           </div>
           );
         };
@@ -2182,8 +2182,8 @@ function OrdersTab({user,onMoney}){
             {Object.keys(monthGroups).sort((a,b)=>b.localeCompare(a)).map(ym=>(
               <div key={ym} style={{marginBottom:8}}>
                 <div onClick={()=>toggle(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
-                  <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{ordOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]} · {monthGroups[ym].length} order{monthGroups[ym].length!==1?"s":""}</span>
-                  <span style={{fontSize:13,fontWeight:600,color:"#F5C000"}}>{fmtK(gTotal(monthGroups[ym]))}</span>
+                  <span style={{fontSize:15,fontWeight:600,color:"#AEB9C7"}}>{ordOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]} · {monthGroups[ym].length} order{monthGroups[ym].length!==1?"s":""}</span>
+                  <span style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>{fmtK(gTotal(monthGroups[ym]))}</span>
                 </div>
                 {ordOpen[ym]&&<div style={{padding:"8px 0 0"}}>{monthGroups[ym].map(orderCard)}</div>}
               </div>
@@ -2191,8 +2191,8 @@ function OrdersTab({user,onMoney}){
             {Object.keys(yearGroups).sort((a,b)=>b.localeCompare(a)).map(y=>(
               <div key={y} style={{marginBottom:8}}>
                 <div onClick={()=>toggle(y)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
-                  <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{ordOpen[y]?"▾":"▸"} {y} · {yearGroups[y].length} order{yearGroups[y].length!==1?"s":""}</span>
-                  <span style={{fontSize:13,fontWeight:700,color:"#F5C000"}}>{fmtK(gTotal(yearGroups[y]))}</span>
+                  <span style={{fontSize:15,fontWeight:700,color:"#E8E2D4"}}>{ordOpen[y]?"▾":"▸"} {y} · {yearGroups[y].length} order{yearGroups[y].length!==1?"s":""}</span>
+                  <span style={{fontSize:15,fontWeight:700,color:"#F5C000"}}>{fmtK(gTotal(yearGroups[y]))}</span>
                 </div>
                 {ordOpen[y]&&<div style={{padding:"8px 0 0"}}>{yearGroups[y].map(orderCard)}</div>}
               </div>
@@ -2838,8 +2838,8 @@ function ExpensesTab({user,onMoney}){
       </div>
       {showRange&&(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#FFFFFF",fontSize:14}}/></div>
-          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{width:"100%",background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",color:"#FFFFFF",fontSize:14}}/></div>
+          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/></div>
+          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/></div>
         </div>
       )}
 
