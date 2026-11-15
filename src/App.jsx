@@ -89,8 +89,9 @@ const GS = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
     *{box-sizing:border-box;margin:0;padding:0} body{font-family:'DM Sans',sans-serif;background:#050A1F;color:#E8E2D4} input,select,textarea{outline:none;font-family:'DM Sans',sans-serif;color-scheme:dark}
-    .field{margin-bottom:13px} .field label{display:block;font-size:12px;color:#FFFFFF;font-weight:600;margin-bottom:5px;letter-spacing:0.04em;text-transform:uppercase}
-    .field input,.field select,.field textarea{width:100%;background:#12203C;border:1px solid #2E4472;border-radius:8px;padding:11px 13px;color:#FFFFFF;font-size:14px} .field textarea{resize:vertical;min-height:56px} .field input::placeholder,.field textarea::placeholder{color:#8A97A8;font-size:13px}
+    .field{margin-bottom:20px} .field label{display:block;font-size:13px;color:#A9B5C6;font-weight:500;margin-bottom:2px;letter-spacing:0;text-transform:none}
+    .field input,.field select,.field textarea{width:100%;background:transparent;border:none;border-bottom:1px solid #5B73A3;border-radius:0;padding:10px 2px;min-height:44px;color:#FFFFFF;font-size:15px} .field input:focus,.field select:focus,.field textarea:focus{border-bottom-color:#F5C000;box-shadow:0 1px 0 0 #F5C000} .field textarea{resize:vertical;min-height:64px} .field input::placeholder,.field textarea::placeholder{color:#8A97A8;font-size:13px}
+    .dtl>summary{list-style:none;cursor:pointer} .dtl>summary::-webkit-details-marker{display:none}
     .tog{display:flex;gap:6px} .tog-btn{flex:1;padding:9px 6px;font-size:14px;font-weight:600;border:1px solid #24365C;border-radius:8px;background:#111C34;color:#AEB9C7;cursor:pointer;text-align:center;transition:all 0.15s}
     .tog-btn.on{background:rgba(245,192,0,0.18);border-color:#F5C000;color:#F5C000;font-weight:700}
     .card{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:14px;margin-bottom:10px}
@@ -1794,14 +1795,14 @@ function StockTab({user,onMoney}){
                     <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"8px 0",borderBottom:"1px solid #0F1A3A"}}>
                       <div style={{flex:1}}>
                         <div style={{fontSize:13,fontWeight:500}}>{s.name}</div>
-                        <div style={{fontSize:11,color:"#8899AA",marginTop:2}}>{catLabel(s.category)} · Cost: KSh {Number(s.unit_cost).toLocaleString()} · Sell: KSh {Number(s.selling_price).toLocaleString()}</div>
-                        <div style={{fontSize:11,color:"#8A97A8",marginTop:1}}>In: {s.qty_in} · Sold: {s.qty_sold}{adj>0?` · Adjusted: ${adj}`:""} · Left: {avail}</div>
+                        <div style={{fontSize:11,color:"#8899AA",marginTop:2}}>{catLabel(s.category)} · Cost KSh {Number(s.unit_cost).toLocaleString()} · {Number(s.selling_price)>0?`Sell KSh ${Number(s.selling_price).toLocaleString()}`:<span style={{color:"#E8A45B"}}>No price set</span>}</div>
+                        {(Number(s.qty_sold)>0||adj>0)&&<div style={{fontSize:11,color:"#8A97A8",marginTop:1}}>In {s.qty_in} · Sold {s.qty_sold}{adj>0?` · Adjusted ${adj}`:""}</div>}
                       </div>
                       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
                         <span className={`badge ${avail>0?"b-g":"b-r"}`}>{avail>0?`${avail} left`:"None left"}</span>
                         <div style={{display:"flex",gap:4}}>
-                          {avail>0&&can(user,"adjust")&&<button className="btn-g" onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{fontSize:11,padding:"4px 8px"}}>Adjust</button>}
-                          {!locked&&can(user,"edit")&&withinWindow(s.created_at)&&<button className="btn-r" onClick={()=>startEdit(s,t)} style={{fontSize:11,padding:"4px 8px"}}>Edit</button>}
+                          {avail>0&&can(user,"adjust")&&<button onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{background:"none",border:"none",color:"#C2CBD6",fontSize:12,padding:"6px 8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Adjust</button>}
+                          {!locked&&can(user,"edit")&&withinWindow(s.created_at)&&<button onClick={()=>startEdit(s,t)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:12,padding:"6px 8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Edit</button>}
                         </div>
                       </div>
                     </div>
@@ -1832,20 +1833,26 @@ function StockTab({user,onMoney}){
                         </div>
                       </div>
                     ):(
-                      <button className="btn-g" onClick={()=>setAddingToTrip(t)} style={{width:"100%",fontSize:12,marginBottom:10}}>+ Add forgotten items to this trip</button>
+                      <button onClick={()=>setAddingToTrip(t)} style={{background:"none",border:"none",color:"#F5C000",fontSize:13,padding:"8px 0",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>+ Add forgotten items</button>
                     )}
                   </div>
                 )}
                 {!locked&&can(user,"lock")&&(
                   <div style={{marginTop:12}}>
-                    <div style={{fontSize:11,color:"#8899AA",marginBottom:6}}>Lock confirmed by</div>
-                    <div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${lockStaff===s?" on":""}`} onClick={()=>setLockStaff(s)}>{s.split(" ")[0]}</button>)}</div>
-                    <button onClick={()=>lockTrip(t)} disabled={saving} style={{width:"100%",background:"rgba(76,175,80,0.1)",border:"1px solid rgba(76,175,80,0.3)",color:"#4CAF50",padding:"9px",borderRadius:6,cursor:"pointer",fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Lock Trip — No further edits</button>
+                    <details className="dtl">
+                      <summary style={{textAlign:"center",background:"rgba(76,175,80,0.1)",border:"1px solid rgba(76,175,80,0.3)",color:"#4CAF50",padding:"11px",borderRadius:8,fontSize:14,fontWeight:600}}>Lock trip</summary>
+                      <div style={{paddingTop:12}}>
+                        <div style={{fontSize:12,color:"#A9B5C6",marginBottom:8}}>Who is confirming? No one can edit this trip after it is locked.</div>
+                        <div className="tog" style={{marginBottom:10}}>{STAFF.map(s=><button key={s} className={`tog-btn${lockStaff===s?" on":""}`} onClick={()=>setLockStaff(s)}>{s.split(" ")[0]}</button>)}</div>
+                        <button className="btn-y" onClick={()=>lockTrip(t)} disabled={saving} style={{width:"100%",fontSize:14}}>{saving?"Locking...":"Confirm lock"}</button>
+                      </div>
+                    </details>
                   </div>
                 )}
                 {logs.length>0&&(
-                  <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #0F1A3A"}}>
-                    <div style={{fontSize:11,color:"#8A97A8",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>Audit trail</div>
+                  <details className="dtl" style={{marginTop:12,paddingTop:10,borderTop:"1px solid #0F1A3A"}}>
+                    <summary style={{fontSize:12,color:"#A9B5C6",padding:"4px 0"}}>History ({logs.length})</summary>
+                    <div style={{marginTop:8}}>
                     {logs.map(a=>(
                       <div key={a.id} className="audit-entry">
                         <span style={{color:"#8899AA"}}>{new Date(a.changed_at).toLocaleDateString("en-KE",{day:"2-digit",month:"short"})} {new Date(a.changed_at).toLocaleTimeString("en-KE",{hour:"2-digit",minute:"2-digit",hour12:true})}</span>
@@ -1855,7 +1862,8 @@ function StockTab({user,onMoney}){
                         {a.reason&&<div style={{color:"#8A97A8",paddingLeft:4}}>"{a.reason}"</div>}
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  </details>
                 )}
               </div>
             )}
