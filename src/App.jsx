@@ -15,7 +15,7 @@ const loadBiz = async () => {
   }catch(e){ /* keep defaults */ }
 };
 const bizPhones = () => [BIZ.phone1,BIZ.phone2].filter(Boolean).join(" · ");
-const EXP_CATS = ["Rent","Transport","Utilities","Marketing","Staff","Other"];
+const EXP_CATS = ["Rent","Transport","Utilities","Marketing","Staff","Loan interest","Other"];
 const CAT_OPTS = [{id:"living",label:"Living Room"},{id:"bedroom",label:"Bedroom"},{id:"decor",label:"Decor"},{id:"other",label:"Other"}];
 const catLabel = id => ({living:"Living Room",bedroom:"Bedroom",decor:"Decor",other:"Other"}[id]||id);
 const H = {"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"};
@@ -61,6 +61,15 @@ const ROLES = {
 };
 const can = (user, perm) => !!user && (ROLES[user.role]?.can.includes(perm));
 const fmtK = n => "KSh "+Math.round(n).toLocaleString();
+// Cost of goods: every sale line carries the real unit cost ("cost") saved when it was sold.
+// Old lines without it fall back to the average cost for that product name.
+const makeAvgCost = stock => { const m={}; (stock||[]).forEach(st=>{ const k=String(st.name||"").toLowerCase(); (m[k]=m[k]||[]).push(Number(st.unit_cost)||0); }); return n=>{ const a=m[String(n||"").toLowerCase()]; return a&&a.length?a.reduce((x,y)=>x+y,0)/a.length:0; }; };
+const saleCost = (sale,avgFn) => (sale.items||[]).reduce((t,it)=>{ const q=Number(it.qty||1); const c=(it.cost!=null&&it.cost!=="")?Number(it.cost):(avgFn?avgFn(it.name):0); return t+c*q; },0);
+// Used only when the database function is not installed or for exchanges: oldest stock first.
+const stampCosts = (items,stockRows) => { const pool={}; const all=makeAvgCost(stockRows);
+  (stockRows||[]).forEach(s=>{ const avail=s.qty_in-s.qty_sold-(s.qty_adjusted||0); if(avail>0){ const k=String(s.name||"").toLowerCase(); (pool[k]=pool[k]||[]).push({avail,cost:Number(s.unit_cost)||0,date:s.date_in}); } });
+  Object.values(pool).forEach(a=>a.sort((x,y)=>new Date(x.date)-new Date(y.date)));
+  return items.map(it=>{ const q=Number(it.qty||1); let left=q, tot=0; for(const b of (pool[String(it.name||"").toLowerCase()]||[])){ if(left<=0)break; const t=Math.min(left,b.avail); tot+=t*b.cost; b.avail-=t; left-=t; } if(left>0) tot+=left*all(it.name); return (q>0&&tot>0)?{...it,cost:Math.round(tot/q*10000)/10000}:it; }); };
 const todayStr = () => new Date().toISOString().split("T")[0];
 const initials = n => (n||"").split(" ").map(w=>w[0]||"").join("").toUpperCase();
 const EDIT_WINDOW_MS = 24*60*60*1000;
@@ -341,6 +350,7 @@ function SidePanel({user,bal,onClose,onChange,onLogout}){
           <div className="bal-row"><span style={{color:"#FFFFFF",fontSize:13,fontWeight:600}}>Total</span><span style={{fontSize:17,fontWeight:700,color:"#F5C000"}}>{fmtK(total)}</span></div>
           {bal.owed_burton>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes Burton</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.owed_burton)}</span></div>}
           {bal.owed_martin>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes Martin</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.owed_martin)}</span></div>}
+          {bal.loans>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Loans owed</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.loans)}</span></div>}
         </div>
         {!act&&<div style={{marginBottom:16}}>
           {can(user,"money")&&null}
@@ -827,7 +837,7 @@ function SaleTab({user,onMoney}){
     const last=await sb.get("karu_sales","select=receipt_no&order=created_at.desc&limit=1");
     const lastNo=last.length?parseInt(last[0].receipt_no.split("-").pop()||"0"):0;
     const receipt_no=`KARU-${now.getFullYear().toString().slice(2)}${String(now.getMonth()+1).padStart(2,"0")}-${String(lastNo+1).padStart(3,"0")}`;
-    const data={receipt_no,...base};
+    const data={receipt_no,...base,items:stampCosts(base.items,stockItems)};
     const [newSale]=await sb.post("karu_sales",data);
     if(base.credit_applied>0){ await sb.post("karu_credit",{customer_name:cName,customer_phone:cPhone,amount:-base.credit_applied,reason:`Applied to ${receipt_no}`,ref_receipt:receipt_no,recorded_by:staff,date:base.date}); }
     if(payType==="instalment"&&newSale?.id) await sb.post("karu_payments",{sale_id:newSale.id,receipt_no,customer_name:cName,amount:base.amount_paid,payment_method:base.payment_method,mpesa_code:base.mpesa_code,date:base.date,recorded_by:staff,notes:"Initial instalment payment"});
@@ -962,6 +972,7 @@ function SaleTab({user,onMoney}){
       }
       // 2. Take new items from stock (FIFO)
       const freshStock=await sb.get("karu_stock","select=*&order=date_in.asc");
+      const viCosted=stampCosts(vi,freshStock);
       for(const sold of vi){
         let q=Number(sold.qty||1);
         const matches=freshStock.filter(x=>x.name.toLowerCase()===sold.name.toLowerCase()&&(x.qty_in-x.qty_sold-(x.qty_adjusted||0))>0).sort((a,b)=>new Date(a.date_in)-new Date(b.date_in));
@@ -977,7 +988,7 @@ function SaleTab({user,onMoney}){
         await sb.post("karu_credit",{customer_name:s.customer_name,customer_phone:s.customer_phone,amount:credit,reason:`Overpayment after exchange on ${s.receipt_no}`,ref_receipt:s.receipt_no,recorded_by:exchStaff,date:todayStr()});
       }
       // 5. Update the sale in place
-      await sb.patch("karu_sales",s.id,{items:vi,total:newTotal,amount_paid:Math.min(paid,newTotal),balance_due:newBal,payment_type:newBal>0?"instalment":"full",store_credit_note:credit,exchanged_from:(s.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")});
+      await sb.patch("karu_sales",s.id,{items:viCosted,total:newTotal,amount_paid:Math.min(paid,newTotal),balance_due:newBal,payment_type:newBal>0?"instalment":"full",store_credit_note:credit,exchanged_from:(s.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")});
       // 6. Audit
       await logAudit({trip_no:null,record_id:s.id,action:"exchange",field_changed:s.receipt_no,old_value:(s.items||[]).map(i=>`${i.name} x${i.qty}`).join(", "),new_value:vi.map(i=>`${i.name} x${i.qty}`).join(", "),reason:exchReason,changed_by:exchStaff});
       const refreshed=await sb.get("karu_stock","select=*&order=date_in.asc"); setStockItems(refreshed);
@@ -2204,6 +2215,132 @@ function OrdersTab({user,onMoney}){
   );
 }
 
+function LoansTab({user,onChange}){
+  const [loans,setLoans]=useState(null); const [pays,setPays]=useState([]);
+  const [missing,setMissing]=useState(false); const [err,setErr]=useState("");
+  const [open,setOpen]=useState(null); const [saving,setSaving]=useState(false);
+  const [nf,setNf]=useState(null); const [pf,setPf]=useState(null);
+  const blank=()=>({kind:"external",lender:"",partner:STAFF[0].split(" ")[0],principal:"",received_into:"cash",interest_pct:"",start_date:todayStr(),due_date:"",notes:""});
+  const msg=e=>{ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch{ return e.message; } };
+  const load=async()=>{
+    try{ const l=await sb.get("karu_loans","select=*&order=start_date.desc,id.desc"); const p=await sb.get("karu_loan_payments","select=*&order=date.desc,id.desc"); setLoans(l); setPays(p); setMissing(false); }
+    catch(e){ if(/PGRST205|karu_loans|does not exist|relation/i.test(e.message)) setMissing(true); else setErr(msg(e)); setLoans([]); }
+  };
+  useEffect(()=>{ load(); },[]);
+  const fmtD=d=>d?new Date(d+"T00:00:00").toLocaleDateString("en-KE",{day:"numeric",month:"short",year:"numeric"}):"";
+  const daysTo=d=>d?Math.round((new Date(d+"T00:00:00")-new Date(todayStr()+"T00:00:00"))/86400000):null;
+  const calc=l=>{ const lp=pays.filter(p=>p.loan_id===l.id); const paid=lp.reduce((n,p)=>n+Number(p.amount),0); const intPaid=lp.reduce((n,p)=>n+Number(p.interest_part),0);
+    const totalInt=Number(l.principal)*Number(l.interest_pct||0)/100; const totalDue=Number(l.principal)+totalInt;
+    return {lp,paid,intPaid,totalInt,totalDue,balance:Math.max(0,totalDue-paid),intLeft:Math.max(0,totalInt-intPaid)}; };
+  const tag=(l,c)=>{ if(c.balance<1) return {t:"Cleared",c:"#4CAF50"}; const d=daysTo(l.due_date);
+    if(d==null) return {t:"No due date",c:"#A9B5C6"}; if(d<0) return {t:`Overdue by ${-d} day${-d===1?"":"s"}`,c:"#E85B5B"};
+    if(d===0) return {t:"Due today",c:"#E8A45B"}; if(d<=7) return {t:`Due in ${d} day${d===1?"":"s"}`,c:"#E8A45B"}; return {t:`Due ${fmtD(l.due_date)}`,c:"#A9B5C6"}; };
+  const saveLoan=async()=>{
+    setErr(""); const lender=nf.kind==="partner"?nf.partner:nf.lender.trim();
+    if(!lender){setErr("Enter the lender's name.");return;}
+    if(!(Number(nf.principal)>0)){setErr("Enter the loan amount.");return;}
+    setSaving(true);
+    try{ await sb.rpc("karu_create_loan",{p:{kind:nf.kind,lender,partner:nf.kind==="partner"?nf.partner:null,principal:Number(nf.principal),interest_pct:Number(nf.interest_pct||0),received_into:nf.received_into,start_date:nf.start_date,due_date:nf.due_date||"",notes:nf.notes,recorded_by:user.full_name}}); setNf(null); await load(); if(onChange) onChange(); }
+    catch(e){ setErr(msg(e)); }
+    setSaving(false);
+  };
+  const savePay=async()=>{
+    setErr(""); const a=Number(pf.amount), i=Number(pf.interest||0);
+    if(!(a>0)){setErr("Enter the amount paid.");return;} if(i<0||i>a){setErr("Interest part cannot be more than the amount paid.");return;}
+    setSaving(true);
+    try{ await sb.rpc("karu_loan_payment",{p:{loan_id:pf.loan,amount:a,interest_part:i,paid_from:pf.from,date:pf.date,note:pf.note,recorded_by:user.full_name}}); setPf(null); await load(); if(onChange) onChange(); }
+    catch(e){ setErr(msg(e)); }
+    setSaving(false);
+  };
+  if(missing) return (<div className="card"><div style={{fontSize:16,fontWeight:600,marginBottom:6}}>Loans need a one-time setup</div><div style={{fontSize:14,color:"#A9B5C6",lineHeight:1.5}}>Run the file KARU_LOANS_SETUP.sql in the Supabase SQL editor, then open this tab again.</div></div>);
+  if(!loans) return <div style={{color:"#A9B5C6",fontSize:14,padding:20,textAlign:"center"}}>Loading...</div>;
+  const withCalc=loans.map(l=>({l,c:calc(l)}));
+  const active=withCalc.filter(x=>x.c.balance>=1); const done=withCalc.filter(x=>x.c.balance<1);
+  const totalOut=active.reduce((n,x)=>n+x.c.balance,0);
+  const nextDue=[...active].filter(x=>x.l.due_date).sort((a,b)=>a.l.due_date.localeCompare(b.l.due_date))[0];
+  const overdue=active.filter(x=>x.l.due_date&&daysTo(x.l.due_date)<0).length;
+  const prev=nf?(()=>{ const p=Number(nf.principal||0), i=p*Number(nf.interest_pct||0)/100; return {i,t:p+i}; })():null;
+  const Row=(l,v,col)=><div style={{display:"flex",justifyContent:"space-between",fontSize:14,padding:"4px 0"}}><span style={{color:"#A9B5C6"}}>{l}</span><span style={{color:col||"#E8E2D4"}}>{v}</span></div>;
+  const renderLoan=({l,c})=>{ const t=tag(l,c); const isOpen=open===l.id;
+    return (
+      <div key={l.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${t.c}`}}>
+        <div onClick={()=>setOpen(isOpen?null:l.id)} style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:16,fontWeight:600}}>{l.lender}</div>
+            <div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>{l.kind==="partner"?"Partner loan":"Outside lender"} · borrowed {fmtD(l.start_date)}</div>
+            <div style={{fontSize:13,color:t.c,marginTop:4,fontWeight:500}}>{t.t}</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:17,fontWeight:700,color:c.balance>=1?"#E8A45B":"#4CAF50"}}>{fmtK(c.balance)}</div>
+            <div style={{fontSize:12,color:"#8A97A8"}}>{c.balance>=1?"still to repay":"fully repaid"}</div>
+          </div>
+        </div>
+        {isOpen&&(
+          <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid #1A2A4A"}}>
+            {Row("Amount borrowed",fmtK(l.principal))}
+            {Row(`Interest (${Number(l.interest_pct||0)}% flat)`,fmtK(c.totalInt))}
+            {Row("Total to repay",fmtK(c.totalDue),"#F5C000")}
+            {Row("Paid so far",fmtK(c.paid),"#4CAF50")}
+            {l.due_date&&Row("Due date",fmtD(l.due_date))}
+            {l.notes&&<div style={{fontSize:13,color:"#A9B5C6",marginTop:6}}>{l.notes}</div>}
+            {c.lp.length>0&&(<div style={{marginTop:10}}>
+              <div style={{fontSize:13,color:"#A9B5C6",marginBottom:4}}>Repayments</div>
+              {c.lp.map(p=><div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:14,padding:"5px 0",borderBottom:"1px solid #0F1A3A"}}><span>{fmtD(p.date)} · from {p.paid_from==="sacco"?"SACCO":"cash"}{Number(p.interest_part)>0?` (interest ${fmtK(p.interest_part)})`:""}</span><span style={{color:"#4CAF50"}}>{fmtK(p.amount)}</span></div>)}
+            </div>)}
+            {c.balance>=1&&!pf&&<button className="btn-y" onClick={()=>{setErr("");setPf({loan:l.id,amount:"",interest:"",from:"cash",date:todayStr(),note:""});}} style={{width:"100%",marginTop:12,fontSize:14}}>Record repayment</button>}
+            {pf&&pf.loan===l.id&&(
+              <div style={{marginTop:14}}>
+                <div style={{fontSize:15,fontWeight:600,marginBottom:10,color:"#F5C000"}}>Record repayment</div>
+                <div className="field"><label>Amount paid (KSh)</label><input type="number" value={pf.amount} onChange={e=>setPf(x=>({...x,amount:e.target.value}))} placeholder={String(Math.round(c.balance))}/></div>
+                {c.intLeft>0&&<div className="field"><label>Of which interest (KSh)</label><input type="number" value={pf.interest} onChange={e=>setPf(x=>({...x,interest:e.target.value}))} placeholder={`0 (up to ${Math.round(c.intLeft).toLocaleString()})`}/></div>}
+                <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${pf.from==="cash"?" on":""}`} onClick={()=>setPf(x=>({...x,from:"cash"}))}>Cash</button><button className={`tog-btn${pf.from==="sacco"?" on":""}`} onClick={()=>setPf(x=>({...x,from:"sacco"}))}>SACCO</button></div></div>
+                <div className="field"><label>Date</label><input type="date" value={pf.date} onChange={e=>setPf(x=>({...x,date:e.target.value}))}/></div>
+                <div className="field"><label>Note (optional)</label><input value={pf.note} onChange={e=>setPf(x=>({...x,note:e.target.value}))} placeholder="e.g. Part payment"/></div>
+                {err&&<div style={{color:"#E85B5B",fontSize:14,marginBottom:10}}>{err}</div>}
+                <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={savePay} disabled={saving} style={{flex:1,fontSize:14}}>{saving?"Saving...":"Save repayment"}</button><button className="btn-g" onClick={()=>{setPf(null);setErr("");}}>Cancel</button></div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    ); };
+  return (
+    <div>
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{fontSize:13,color:"#A9B5C6"}}>Total still to repay</div>
+        <div style={{fontSize:26,fontWeight:700,color:totalOut>0?"#E8A45B":"#4CAF50",margin:"2px 0 4px"}}>{fmtK(totalOut)}</div>
+        <div style={{fontSize:14,color:"#A9B5C6"}}>{active.length} active loan{active.length===1?"":"s"}{nextDue?` · next due ${fmtD(nextDue.l.due_date)} (${nextDue.l.lender})`:""}</div>
+        {overdue>0&&<div style={{fontSize:14,color:"#E85B5B",marginTop:6,fontWeight:600}}>{overdue} overdue</div>}
+      </div>
+      {!nf&&<button className="btn-y" onClick={()=>{setErr("");setNf(blank());}} style={{width:"100%",marginBottom:14,fontSize:14}}>+ New loan</button>}
+      {nf&&(
+        <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
+          <div style={{fontSize:16,fontWeight:600,marginBottom:14}}>New loan</div>
+          <div className="field"><label>Who lent the money</label><div className="tog"><button className={`tog-btn${nf.kind==="partner"?" on":""}`} onClick={()=>setNf(x=>({...x,kind:"partner"}))}>A partner</button><button className={`tog-btn${nf.kind==="external"?" on":""}`} onClick={()=>setNf(x=>({...x,kind:"external"}))}>Outside lender</button></div></div>
+          {nf.kind==="partner"
+            ?<div className="field"><label>Partner</label><div className="tog">{STAFF.map(s=>{ const n=s.split(" ")[0]; return <button key={s} className={`tog-btn${nf.partner===n?" on":""}`} onClick={()=>setNf(x=>({...x,partner:n}))}>{n}</button>; })}</div></div>
+            :<div className="field"><label>Lender name</label><input value={nf.lender} onChange={e=>setNf(x=>({...x,lender:e.target.value}))} placeholder="e.g. Bank, SACCO, chama"/></div>}
+          <div className="field"><label>Amount borrowed (KSh)</label><input type="number" value={nf.principal} onChange={e=>setNf(x=>({...x,principal:e.target.value}))} placeholder="0"/></div>
+          <div className="field"><label>Money received into</label><div className="tog"><button className={`tog-btn${nf.received_into==="cash"?" on":""}`} onClick={()=>setNf(x=>({...x,received_into:"cash"}))}>Cash</button><button className={`tog-btn${nf.received_into==="sacco"?" on":""}`} onClick={()=>setNf(x=>({...x,received_into:"sacco"}))}>SACCO</button></div></div>
+          <div className="field"><label>Interest, % of the amount over the whole loan</label><input type="number" value={nf.interest_pct} onChange={e=>setNf(x=>({...x,interest_pct:e.target.value}))} placeholder="0 if none"/></div>
+          {Number(nf.principal)>0&&<div style={{fontSize:14,color:"#F5C000",marginBottom:16}}>To repay in total: {fmtK(prev.t)}{prev.i>0?` (interest ${fmtK(prev.i)})`:""}</div>}
+          <div className="field"><label>Date received</label><input type="date" value={nf.start_date} onChange={e=>setNf(x=>({...x,start_date:e.target.value}))}/></div>
+          <div className="field"><label>Due date (optional)</label><input type="date" value={nf.due_date} onChange={e=>setNf(x=>({...x,due_date:e.target.value}))}/></div>
+          <div className="field"><label>Notes (optional)</label><input value={nf.notes} onChange={e=>setNf(x=>({...x,notes:e.target.value}))} placeholder="e.g. Pay monthly"/></div>
+          {err&&<div style={{color:"#E85B5B",fontSize:14,marginBottom:10}}>{err}</div>}
+          <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={saveLoan} disabled={saving} style={{flex:1,fontSize:14}}>{saving?"Saving...":"Save loan"}</button><button className="btn-g" onClick={()=>{setNf(null);setErr("");}}>Cancel</button></div>
+        </div>
+      )}
+      {err&&!nf&&!pf&&<div style={{color:"#E85B5B",fontSize:14,marginBottom:10}}>{err}</div>}
+      {active.map(renderLoan)}
+      {done.length>0&&<div style={{fontSize:13,color:"#A9B5C6",margin:"14px 0 8px"}}>Repaid</div>}
+      {done.map(renderLoan)}
+      {loans.length===0&&!nf&&<div style={{textAlign:"center",color:"#A9B5C6",fontSize:14,padding:"24px 10px"}}>No loans recorded yet.</div>}
+      <div style={{fontSize:13,color:"#8A97A8",lineHeight:1.5,marginTop:14}}>Borrowing adds money to Cash or SACCO and records what is owed. Repayments reduce what is owed. The interest part of a repayment is saved as a "Loan interest" expense.</div>
+    </div>
+  );
+}
+
 function LedgerTab({user,onMoney,bal,onChange}){
   const [rows,setRows]=useState([]); const [loading,setLoading]=useState(true);
   const [tab,setTab]=useState("overview"); // overview | register | statement | petty | owed
@@ -2238,12 +2375,13 @@ function LedgerTab({user,onMoney,bal,onChange}){
   const refreshAll=async()=>{ await load(); if(onChange) onChange(); };
 
   const ACCTS=[["cash","Cash"],["sacco","SACCO"],["petty","Petty Cash"]];
-  const acctLabel=a=>({cash:"Cash",sacco:"SACCO",petty:"Petty Cash",owed_burton:"Owed Burton",owed_martin:"Owed Martin"}[a]||a);
+  const acctLabel=a=>({cash:"Cash",sacco:"SACCO",petty:"Petty Cash",owed_burton:"Owed Burton",owed_martin:"Owed Martin",loans:"Loans"}[a]||a);
   const total=(bal.cash||0)+(bal.sacco||0)+(bal.petty||0);
 
   // ── Capital vs Profit (live) ──
   const stockAtCost=pl.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
-  const cogsAll=pl.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
+  const avgCostFn=makeAvgCost(pl.stock);
+  const cogsAll=pl.sales.reduce((s,x)=>s+saleCost(x,avgCostFn),0);
   const salesAll=pl.sales.reduce((s,x)=>s+Number(x.total),0);
   const expAll=pl.expenses.reduce((s,x)=>s+Number(x.amount),0);
   const lossAll=(pl.losses||[]).reduce((s,l)=>s+Number(l.cost_value||0),0);
@@ -2334,7 +2472,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
   const stockCostByName={};
   pl.stock.forEach(s=>{ const k=s.name.toLowerCase(); if(!stockCostByName[k])stockCostByName[k]=[]; stockCostByName[k].push({cost:Number(s.unit_cost),date:s.date_in}); });
   const avgCost=name=>{ const arr=stockCostByName[(name||"").toLowerCase()]; if(!arr||!arr.length)return 0; return arr.reduce((s,x)=>s+x.cost,0)/arr.length; };
-  const saleSplit=ref=>{ const sale=pl.sales.find(x=>x.receipt_no===ref); if(!sale||!sale.items)return null; let cost=0; sale.items.forEach(it=>{ cost+=avgCost(it.name)*Number(it.qty||1); }); return {cost:Math.round(cost),total:Number(sale.total)}; };
+  const saleSplit=ref=>{ const sale=pl.sales.find(x=>x.receipt_no===ref); if(!sale||!sale.items)return null; const cost=saleCost(sale,avgCostFn); return {cost:Math.round(cost),total:Number(sale.total)}; };
 
   // ── Filtered register with running balance ──
   const inRange=r=>r.date>=from&&r.date<=to;
@@ -2387,7 +2525,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:2}}>
-        {[["overview","Move money"],["register","Register"],["statement","Financials"],["petty","Petty cash"]].map(([id,l])=>(
+        {[["overview","Move money"],["register","Register"],["statement","Financials"],["loans","Loans"],["petty","Petty cash"]].map(([id,l])=>(
           <button key={id} onClick={()=>setTab(id)} style={{padding:"8px 14px",borderRadius:100,border:`1px solid ${tab===id?"#F5C000":"#24365C"}`,background:tab===id?"rgba(245,192,0,0.1)":"transparent",color:tab===id?"#F5C000":"#C2CBD6",fontSize:14,fontWeight:tab===id?600:500,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'DM Sans',sans-serif"}}>{l}</button>
         ))}
       </div>
@@ -2501,14 +2639,14 @@ function LedgerTab({user,onMoney,bal,onChange}){
       )}
 
       {tab==="statement"&&(()=>{
-        const EXP_CATS_LIST=["Rent","Transport","Utilities","Marketing","Staff","Petty cash","Other"];
+        const EXP_CATS_LIST=["Rent","Transport","Utilities","Marketing","Staff","Loan interest","Petty cash","Other"];
         const costLookup={}; pl.stock.forEach(st=>{ const k=st.name.toLowerCase(); if(!costLookup[k])costLookup[k]=[]; costLookup[k].push(Number(st.unit_cost)); });
         const avgC=n=>{ const a=costLookup[(n||"").toLowerCase()]; return a&&a.length?a.reduce((x,y)=>x+y,0)/a.length:0; };
         const computePL=(f,t)=>{
           const inR=d=>d>=f&&d<=t;
           const s=pl.sales.filter(x=>inR(x.date)); const e=pl.expenses.filter(x=>inR(x.date)); const lo=(pl.losses||[]).filter(x=>inR(x.date));
           const revenue=s.reduce((a,x)=>a+Number(x.total),0);
-          const cogs=s.reduce((a,x)=>a+(x.items||[]).reduce((tt,it)=>tt+avgC(it.name)*Number(it.qty||1),0),0);
+          const cogs=s.reduce((a,x)=>a+saleCost(x,avgC),0);
           const byCat={}; EXP_CATS_LIST.forEach(c=>byCat[c]=0);
           e.forEach(x=>{ const c=EXP_CATS_LIST.includes(x.category)?x.category:"Other"; byCat[c]+=Number(x.amount); });
           const expTotal=e.reduce((a,x)=>a+Number(x.amount),0);
@@ -2520,7 +2658,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
         const nCol=results.length;
         const cashA=bal.cash||0, saccoA=bal.sacco||0, pettyA=bal.petty||0, stockA=stockAtCost;
         const totalAssets=cashA+saccoA+pettyA+stockA;
-        const owesB=bal.owed_burton||0, owesM=bal.owed_martin||0; const totalLiab=owesB+owesM;
+        const owesB=bal.owed_burton||0, owesM=bal.owed_martin||0, loansOwed=bal.loans||0; const totalLiab=owesB+owesM+loansOwed;
         const netWorth=totalAssets-totalLiab;
         const genDate=new Date().toLocaleDateString("en-KE",{day:"2-digit",month:"long",year:"numeric"});
         const fmtP=n=>Math.round(n).toLocaleString();
@@ -2590,6 +2728,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
                   {totalLiab>0&&<>
                     {owesB>0&&<Row label="Owed to Burton" vals={[owesB,...Array(nCol-1).fill(null)]} neg/>}
                     {owesM>0&&<Row label="Owed to Martin" vals={[owesM,...Array(nCol-1).fill(null)]} neg/>}
+                    {loansOwed>0&&<Row label="Loans payable" vals={[loansOwed,...Array(nCol-1).fill(null)]} neg/>}
                     <Row label="Total Liabilities" vals={[totalLiab,...Array(nCol-1).fill(null)]} bold total/>
                   </>}
                   <Row label="NET WORTH" vals={[netWorth,...Array(nCol-1).fill(null)]} bold total/>
@@ -2604,6 +2743,8 @@ function LedgerTab({user,onMoney,bal,onChange}){
         </div>
         );
       })()}
+
+      {tab==="loans"&&<LoansTab user={user} onChange={onChange}/>}
 
       {tab==="petty"&&(
         <div>
@@ -2975,7 +3116,8 @@ function ReportsTab({user,bal}){
   const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
   const stockRetail=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*(i.selling_price||0)),0);
   const stockPotentialProfit=stockRetail-stockValue;
-  const cogs=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0);
+  const avgCostR=makeAvgCost(data.stock);
+  const cogs=fSales.reduce((s,x)=>s+saleCost(x,avgCostR),0);
   const fLosses=filterDate(data.losses||[]);
   const lossCost=fLosses.reduce((s,l)=>s+Number(l.cost_value||0),0);
   const grossProfit=salesValue-cogs;
@@ -3062,7 +3204,7 @@ function ReportsTab({user,bal}){
         const mmap={};
         data.sales.forEach(s=>{const m=s.date.slice(0,7);if(!mmap[m])mmap[m]={collected:0,cogs:0,expenses:0};
           mmap[m].collected+=Number(s.amount_paid!=null?s.amount_paid:s.total);
-          (s.items||[]).forEach(it=>{ mmap[m].cogs+=avgCost(it.name)*Number(it.qty||1); });
+          mmap[m].cogs+=saleCost(s,avgCost);
         });
         data.expenses.forEach(e=>{const m=e.date.slice(0,7);if(!mmap[m])mmap[m]={collected:0,cogs:0,expenses:0};mmap[m].expenses+=Number(e.amount);});
         const rows=Object.entries(mmap).sort(([a],[b])=>b.localeCompare(a)).map(([month,d])=>({month,collected:d.collected,cogs:d.cogs,expenses:d.expenses,profit:d.collected-d.cogs-d.expenses}));
