@@ -2383,88 +2383,24 @@ function LedgerTab({user,onMoney,bal,onChange}){
         </div>
         <div style={{fontSize:11,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>{liquidProfitPortion>0?`You can take up to ${fmtK(liquidProfitPortion)} without touching capital.`:"All liquid money is capital right now — spending eats into the float."}</div>
       </div>
-      {(()=>{
-        const partners=[...new Set(STAFF.map(s=>s.split(" ")[0]))];
-        const anyActivity=partners.some(p=>{const k=p.toLowerCase();return (bal["owed_"+k]||0)||(bal["drawn_"+k]||0)||(bal["capital_"+k]||0);});
-        if(!anyActivity) return null;
-        return (
-          <div style={{marginBottom:12}}>
-            <div style={{fontSize:11,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:6}}>Partner accounts</div>
-            {partners.map(p=>{ const k=p.toLowerCase(); const owed=Number(bal["owed_"+k]||0); const drawn=Number(bal["drawn_"+k]||0); const cap=Number(bal["capital_"+k]||0);
-              if(!owed&&!drawn&&!cap) return null;
-              return (
-                <div key={p} style={{background:"#0A1128",border:"1px solid #24365C",borderRadius:8,padding:"9px 11px",marginBottom:6}}>
-                  <div style={{fontSize:13,fontWeight:600,marginBottom:4}}>{p}</div>
-                  <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12}}>
-                    {owed!==0&&<span style={{color:"#8A97A8"}}>Owed: <b style={{color:"#E8A45B"}}>{fmtK(owed)}</b></span>}
-                    {drawn!==0&&<span style={{color:"#8A97A8"}}>Drawn: <b style={{color:"#E85B5B"}}>{fmtK(drawn)}</b></span>}
-                    {cap!==0&&<span style={{color:"#8A97A8"}}>Capital in: <b style={{color:"#4CAF50"}}>{fmtK(cap)}</b></span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
-      {/* Balance check */}
-      <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,marginBottom:12,color:checkOK?"#4CAF50":"#E85B5B"}}>
-        <span>{checkOK?"✓ Books balanced — every movement reconciles":"⚠ Balance mismatch — review the register"}</span>
-      </div>
-
-      {/* Capital vs Profit */}
-      <div className="card" style={{marginBottom:14,border:"1px solid #2E4472"}}>
-        <div style={{fontSize:12,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:10}}>Capital vs Profit</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-          <div style={{background:"#0A1128",border:"1px solid #24365C",borderRadius:8,padding:"10px 12px"}}>
-            <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>CAPITAL FLOAT</div>
-            <div style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(capitalFloat)}</div>
-            <div style={{fontSize:10,color:"#8A97A8",marginTop:2}}>Cash + Current Stock Value</div>
-          </div>
-          <div style={{background:"#12203C",border:`1px solid ${netProfitAll>=0?"rgba(76,175,80,0.35)":"rgba(232,91,91,0.35)"}`,borderRadius:8,padding:"10px 12px"}}>
-            <div style={{fontSize:11,color:"#8A97A8",marginBottom:2}}>NET PROFIT EARNED</div>
-            <div style={{fontSize:18,fontWeight:700,color:netProfitAll>=0?"#4CAF50":"#E85B5B"}}>{netProfitAll<0?"-":""}{fmtK(Math.abs(netProfitAll))}</div>
-            <div style={{fontSize:10,color:"#8A97A8",marginTop:2}}>after cost, expenses, losses</div>
-          </div>
-        </div>
-        <div style={{fontSize:12,color:"#8A97A8",display:"flex",justifyContent:"space-between",padding:"8px 2px 0",borderTop:"1px solid #1A2A4A"}}>
-          <span>Gross profit (sales less cost): <b style={{color:"#4CAF50"}}>{fmtK(grossProfitAll)}</b></span>
-        </div>
-        <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #1A2A4A"}}>
-          <div style={{fontSize:11,color:"#8A97A8",marginBottom:6}}>Of everything sold so far:</div>
-          <div style={{display:"flex",gap:10}}>
-            <div style={{flex:1,background:"#0A1128",border:"1px solid #24365C",borderRadius:8,padding:"9px 11px"}}>
-              <div style={{fontSize:11,color:"#8A97A8"}}>COST RECOVERED</div>
-              <div style={{fontSize:15,fontWeight:700,color:"#E8A45B"}}>{fmtK(cogsAll)}</div>
-              <div style={{fontSize:10,color:"#8A97A8",marginTop:1}}>your capital, back</div>
-            </div>
-            <div style={{flex:1,background:"rgba(76,175,80,0.06)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:"9px 11px"}}>
-              <div style={{fontSize:11,color:"#8A97A8"}}>PROFIT EARNED</div>
-              <div style={{fontSize:15,fontWeight:700,color:"#4CAF50"}}>{fmtK(grossProfitAll)}</div>
-              <div style={{fontSize:10,color:"#8A97A8",marginTop:1}}>margin on top</div>
-            </div>
-          </div>
-          <div style={{fontSize:10,color:"#8A97A8",marginTop:6,lineHeight:1.4}}>Sales of {fmtK(salesAll)} = {fmtK(cogsAll)} recovering what the goods cost + {fmtK(grossProfitAll)} gross profit.</div>
-        </div>
-        <div style={{fontSize:11,color:"#8A97A8",marginTop:8,lineHeight:1.5}}>Worth {fmtK(totalWorth)} = {fmtK(liquidAll)} cash + {fmtK(stockAtCost)} stock (same as Stock tab). Of that, {fmtK(capitalFloat)} is capital and {fmtK(netProfitAll)} is earned profit.</div>
-      </div>
+      {!checkOK&&<div style={{fontSize:13,marginBottom:12,color:"#E85B5B"}}>⚠ Balance mismatch. Review the register.</div>}
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:2}}>
-        {[["overview","Actions"],["register","Register"],["statement","Statement"],["petty","Petty Cash"]].map(([id,l])=>(
-          <button key={id} onClick={()=>setTab(id)} style={{padding:"6px 12px",borderRadius:100,border:`1px solid ${tab===id?"#F5C000":"#1A2A4A"}`,background:tab===id?"rgba(245,192,0,0.1)":"transparent",color:tab===id?"#F5C000":"#8899AA",fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>
+        {[["overview","Move money"],["register","Register"],["statement","Financials"],["petty","Petty cash"]].map(([id,l])=>(
+          <button key={id} onClick={()=>setTab(id)} style={{padding:"8px 14px",borderRadius:100,border:`1px solid ${tab===id?"#F5C000":"#24365C"}`,background:tab===id?"rgba(245,192,0,0.1)":"transparent",color:tab===id?"#F5C000":"#C2CBD6",fontSize:14,fontWeight:tab===id?600:500,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'DM Sans',sans-serif"}}>{l}</button>
         ))}
       </div>
 
       {tab==="overview"&&(
         <div>
           {!act&&<div>
-            <div style={{fontSize:10,color:"#8A97A8",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Move money</div>
-            <div style={{display:"grid",gap:8}}>
-              <button className="btn-g" onClick={()=>setAct("bank")} style={{fontSize:13}}>Bank cash into SACCO</button>
-              <button className="btn-g" onClick={()=>setAct("withdraw")} style={{fontSize:13}}>Withdraw SACCO to cash</button>
-              <button className="btn-g" onClick={()=>setAct("partner")} style={{fontSize:13}}>Partner money in or out</button>
-              <button className="btn-g" onClick={()=>setAct("reconcile")} style={{fontSize:13}}>Reconcile a balance</button>
-              <button className="btn-g" onClick={()=>setAct("allocate")} style={{fontSize:13}}>Top up petty cash</button>
+            <div>
+              <button onClick={()=>setAct("bank")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Bank cash into SACCO</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Move cash from the till into the SACCO account</div></button>
+              <button onClick={()=>setAct("withdraw")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Withdraw SACCO to cash</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Take money out of SACCO into cash</div></button>
+              <button onClick={()=>setAct("partner")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Partner money in or out</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Loans, capital and withdrawals by a partner</div></button>
+              <button onClick={()=>setAct("allocate")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Top up petty cash</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Move money into the petty cash pocket</div></button>
+              <button onClick={()=>setAct("reconcile")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Reconcile a balance</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Fix a balance after counting what is really there</div></button>
             </div>
           </div>}
           {act==="bank"&&<ActBox title="Bank cash into SACCO"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doBank} off={rb} saving={saving}/></ActBox>}
