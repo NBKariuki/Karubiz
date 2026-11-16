@@ -121,9 +121,15 @@ const GS = () => (
     .panel{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:88vw;background:#0A1128;border-left:1px solid #1A2A4A;z-index:101;overflow-y:auto;padding:20px 18px 40px}
     .bal-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1A2A4A}
     .bal-row:last-child{border-bottom:none}
-    .qa{background:#050A1F;border:1px solid #1A2A4A;border-radius:8px;padding:12px;margin-bottom:10px}
+    .qa{background:transparent;border:none;border-bottom:1px solid #1A2A4A;border-radius:0;padding:6px 0 14px;margin-bottom:12px}
     .qa-title{font-size:13px;font-weight:600;color:#FFFFFF;margin-bottom:8px}
-    .qa input{width:100%;background:#0A1128;border:1px solid #1A2A4A;border-radius:6px;padding:9px 11px;color:#E8E2D4;font-size:14px;margin-bottom:8px}
+    .qa input{width:100%;background:transparent;border:none;border-bottom:1px solid #5B73A3;border-radius:0;padding:9px 2px;font-size:15px;margin-bottom:6px}
+    :root{--surface:#0A1128;--fill:#A8D8FF;--ph:#7C8CA6}
+    input,select,textarea{color:var(--fill) !important}
+    input::placeholder,textarea::placeholder{color:var(--ph) !important;opacity:1}
+    .subscreen{background:var(--surface);border:1px solid #1A2A4A;border-radius:12px;padding:16px;margin-bottom:12px}
+    .subscreen>.subscreen-hd{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+    .subscreen>.subscreen-hd .title{font-size:18px;font-weight:600;color:#FFFFFF}
     .mv{font-size:11px;padding:6px 0;border-bottom:1px solid #0F1A3A;display:flex;justify-content:space-between}
     .mv:last-child{border-bottom:none}
     .wiz-overlay{position:fixed;inset:0;background:rgba(5,10,31,0.94);z-index:120;overflow-y:auto;padding:12px}
@@ -1254,7 +1260,7 @@ function SaleTab({user,onMoney}){
                 <div>
                   <div style={{fontSize:15,fontWeight:600,marginBottom:6}}>{addPaySale.customer_name}</div>
                   {(addPaySale.items||[]).length>0&&(
-                    <div style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 11px",marginBottom:8}}>
+                    <div style={{background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:"8px 11px",marginBottom:8}}>
                       <div style={{fontSize:12,color:"#8A97A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Paying for</div>
                       {(addPaySale.items||[]).map((it,i)=>(
                         <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:15,padding:"3px 0",borderBottom:i<(addPaySale.items||[]).length-1?"1px solid #1A2A4A":"none"}}>
@@ -1307,7 +1313,7 @@ function SaleTab({user,onMoney}){
             <div className="wiz-body">
               {step===1&&(<>
                 <div style={{fontSize:18,fontWeight:600,color:"#FFFFFF",marginBottom:14}}>Customer</div>
-                <div style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:10,marginBottom:14}}>
+                <div style={{background:"transparent",border:"1px dashed #2E4472",borderRadius:8,padding:10,marginBottom:14}}>
                   <div style={{fontSize:13,color:"#8899AA",marginBottom:6}}>Paste M-Pesa or SACCO SMS to auto-fill (optional)</div>
                   <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste SMS here..." style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,resize:"none",minHeight:52,fontFamily:"'DM Sans',sans-serif"}}/>
                   {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:14,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"SACCO":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||"no name"}</div>}
@@ -1340,7 +1346,7 @@ function SaleTab({user,onMoney}){
                 {can(user,"users")&&(
                   <div className="field"><label>Serving as</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${staff===s?" on":""}`} onClick={()=>setStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
                 )}
-                <div style={{background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:12,marginBottom:14}}>
+                <div style={{background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:12,marginBottom:14}}>
                   <div style={{fontSize:15,fontWeight:600,marginBottom:2}}>{cName}{cPhone?<span style={{color:"#8899AA",fontWeight:400}}> · {cPhone}</span>:null}</div>
                   {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:14,color:"#8899AA",padding:"2px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:600,color:"#F5C000",marginTop:6,paddingTop:6,borderTop:"1px solid #1A2A4A"}}><span>Total</span><span>{fmtK(total)}</span></div>
@@ -1738,7 +1744,7 @@ function StockTab({user,onMoney}){
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                           <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,color:"#AEB9C7"}}>{s.trip_no}</div><div style={{fontSize:13,color:"#8A97A8"}}>KSh {Number(s.unit_cost).toLocaleString()} each · in {s.date_in?.slice(5)||""}</div></div>
                           <div style={{textAlign:"center",minWidth:48}}><div style={{fontSize:12,color:"#8A97A8"}}>SYSTEM</div><div style={{fontSize:17,fontWeight:700}}>{s.available}</div></div>
-                          <div style={{minWidth:66,marginLeft:8}}><div style={{fontSize:12,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"#12203C",border:`1px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#1A2A4A"}`,borderRadius:6,padding:"6px 8px",color:"#E8E2D4",fontSize:17,textAlign:"center"}}/></div>
+                          <div style={{minWidth:66,marginLeft:8}}><div style={{fontSize:12,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"transparent",border:"none",borderBottom:`2px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#5B73A3"}`,borderRadius:0,padding:"6px 4px",fontSize:17,textAlign:"center"}}/></div>
                         </div>
                         {diff!==0&&<div style={{marginTop:6}}><div style={{fontSize:13,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"#0A1128",border:"1px solid #24365C",borderRadius:6,padding:"7px 9px",color:"#FFFFFF",fontSize:15}}/></div>}
                       </div>
@@ -2063,7 +2069,7 @@ function OrdersTab({user,onMoney}){
           const locked=["ordered","received","cancelled"].includes(sub.status);
           const st=subTotal(sub); const dep=Number(sub.deposit_paid||0); const bal=Math.max(0,st-dep);
           return (
-            <div key={si} style={{background:"#12203C",border:`1px solid ${locked?"#1A2A4A":"rgba(245,192,0,0.35)"}`,borderRadius:10,padding:12,marginBottom:12}}>
+            <div key={si} style={{background:"transparent",border:`1px solid ${locked?"#1A2A4A":"rgba(245,192,0,0.35)"}`,borderRadius:10,padding:12,marginBottom:12}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{fontSize:14,color:"#8899AA",fontWeight:600}}>Supplier {si+1}</div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2510,7 +2516,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
           <span style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(total)}</span>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <div style={{flex:1,background:"#12203C",border:"1px solid #24365C",borderRadius:7,padding:"8px 10px"}}>
+          <div style={{flex:1,background:"transparent",border:"1px solid #24365C",borderRadius:7,padding:"8px 10px"}}>
             <div style={{fontSize:11,color:"#8A97A8"}}>CAPITAL (keep)</div>
             <div style={{fontSize:15,fontWeight:700,color:"#E8E2D4"}}>{fmtK(liquidCapitalPortion)}</div>
           </div>
@@ -2550,7 +2556,7 @@ function LedgerTab({user,onMoney,bal,onChange}){
               <div className="tog" style={{marginBottom:6}}><button className={`tog-btn${inKind==="loan"?" on":""}`} onClick={()=>setInKind("loan")}>Loan (repayable)</button><button className={`tog-btn${inKind==="capital"?" on":""}`} onClick={()=>setInKind("capital")}>Capital / gift</button></div>
               <div style={{fontSize:11,color:"#8A97A8"}}>{inKind==="loan"?"Business will owe this back to "+who.split(" ")[0]+".":"Added to "+who.split(" ")[0]+"'s capital. Not repayable."}</div>
             </div>}
-            {dir==="out"&&<div style={{fontSize:11,color:"#8A97A8",marginBottom:8,background:"#12203C",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",lineHeight:1.5}}>
+            {dir==="out"&&<div style={{fontSize:11,color:"#8A97A8",marginBottom:8,background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",lineHeight:1.5}}>
               {who.split(" ")[0]} is owed {fmtK(owedNow)}, has drawn {fmtK(drawnNow)} so far. Profit share ~{fmtK(share)}.
               {a>0&&<div style={{marginTop:4,color:a>owedNow&&(drawnNow+(a-owedNow))>share?"#E8A45B":"#4CAF50"}}>{a<=owedNow?`All ${fmtK(a)} comes off what's owed.`:`${fmtK(owedNow)} off what's owed, ${fmtK(a-owedNow)} as a drawing.${(drawnNow+(a-owedNow))>share?" ⚠ exceeds profit share — into capital.":""}`}</div>}
             </div>}
