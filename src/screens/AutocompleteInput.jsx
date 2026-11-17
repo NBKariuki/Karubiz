@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useState } from "react";
 
 export function AutocompleteInput({value,onChange,onSelect,stockItems,placeholder}){
   const [open,setOpen]=useState(false);

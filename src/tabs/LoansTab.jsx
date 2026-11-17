@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { STAFF, fmtK, sb, todayStr } from "../lib";
+import { useState, useEffect } from "react";
+import { PARTNERS, defStaff, firstName, fmtK, sb, todayStr } from "../lib";
 
 export function LoansTab({user,onChange}){
   const [loans,setLoans]=useState(null); const [pays,setPays]=useState([]);
   const [missing,setMissing]=useState(false); const [err,setErr]=useState("");
   const [open,setOpen]=useState(null); const [saving,setSaving]=useState(false);
   const [nf,setNf]=useState(null); const [pf,setPf]=useState(null);
-  const blank=()=>({kind:"external",lender:"",partner:STAFF[0].split(" ")[0],principal:"",received_into:"cash",interest_pct:"",start_date:todayStr(),due_date:"",notes:""});
+  const blank=()=>({kind:"external",lender:"",partner:firstName(defStaff(user)),principal:"",received_into:"cash",interest_pct:"",start_date:todayStr(),due_date:"",notes:""});
   const msg=e=>{ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch{ return e.message; } };
   const load=async()=>{
     try{ const l=await sb.get("karu_loans","select=*&order=start_date.desc,id.desc"); const p=await sb.get("karu_loan_payments","select=*&order=date.desc,id.desc"); setLoans(l); setPays(p); setMissing(false); }
@@ -105,7 +104,7 @@ export function LoansTab({user,onChange}){
           <div style={{fontSize:16,fontWeight:600,marginBottom:14}}>New loan</div>
           <div className="field"><label>Who lent the money</label><div className="tog"><button className={`tog-btn${nf.kind==="partner"?" on":""}`} onClick={()=>setNf(x=>({...x,kind:"partner"}))}>A partner</button><button className={`tog-btn${nf.kind==="external"?" on":""}`} onClick={()=>setNf(x=>({...x,kind:"external"}))}>Outside lender</button></div></div>
           {nf.kind==="partner"
-            ?<div className="field"><label>Partner</label><div className="tog">{STAFF.map(s=>{ const n=s.split(" ")[0]; return <button key={s} className={`tog-btn${nf.partner===n?" on":""}`} onClick={()=>setNf(x=>({...x,partner:n}))}>{n}</button>; })}</div></div>
+            ?<div className="field"><label>Partner</label><div className="tog">{PARTNERS.map(s=>{ const n=s.split(" ")[0]; return <button key={s} className={`tog-btn${nf.partner===n?" on":""}`} onClick={()=>setNf(x=>({...x,partner:n}))}>{n}</button>; })}</div></div>
             :<div className="field"><label>Lender name</label><input value={nf.lender} onChange={e=>setNf(x=>({...x,lender:e.target.value}))} placeholder="e.g. Bank, SACCO, chama"/></div>}
           <div className="field"><label>Amount borrowed (KSh)</label><input type="number" value={nf.principal} onChange={e=>setNf(x=>({...x,principal:e.target.value}))} placeholder="0"/></div>
           <div className="field"><label>Money received into</label><div className="tog"><button className={`tog-btn${nf.received_into==="cash"?" on":""}`} onClick={()=>setNf(x=>({...x,received_into:"cash"}))}>Cash</button><button className={`tog-btn${nf.received_into==="sacco"?" on":""}`} onClick={()=>setNf(x=>({...x,received_into:"sacco"}))}>SACCO</button></div></div>

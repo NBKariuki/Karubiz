@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useState } from "react";
 import { genSalt, hashWith, pwStrength, sb } from "../lib";
 import { GS } from "../styles";
 
@@ -68,7 +67,7 @@ export function LoginScreen({onLogin,lapsed}){
         <div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:24,fontWeight:600,color:"#F5C000",letterSpacing:"0.1em"}}>KARU</div><div style={{fontSize:13,color:"#8899AA",marginTop:4}}>Accounts System</div></div>
         {lapsed&&<div style={{background:"rgba(232,164,91,0.1)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:"9px 12px",marginBottom:14,fontSize:12,color:"#E8A45B",textAlign:"center"}}>Logged out after 5 minutes of inactivity. Please sign in again.</div>}
         {stage==="user"&&(<>
-          <div className="field"><label>Username</label><input value={username} onChange={e=>{setUsername(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&findUser()} placeholder="e.g. burton" autoFocus autoCapitalize="none"/></div>
+          <div className="field"><label>Username</label><input value={username} onChange={e=>{setUsername(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&findUser()} placeholder="Your username" autoFocus autoCapitalize="none"/></div>
           {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:12}}>{err}</div>}
           <button className="btn-y" onClick={findUser} disabled={busy} style={{width:"100%"}}>{busy?"...":"Continue"}</button>
         </>)}

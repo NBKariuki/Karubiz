@@ -3,7 +3,28 @@ export const SB_URL = "https://pdfadcnrxlojuxjqtzil.supabase.co";
 export const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZmFkY25yeGxvanV4anF0emlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMTQ0MzksImV4cCI6MjEwMjg5MDQzOX0.1gRq0MWGc6EFOtm5-rma4Fo1shVSWIW8kFDX-Np6CIM";
 export const APP_PW = "GwituMucii@22";
 export const C = { navy:"#050A1F",mid:"#0A1128",light:"#0F1A3A",yellow:"#F5C000",white:"#FFFFFF",muted:"#8899AA",dark:"#8A97A8",green:"#4CAF50",red:"#E85B5B" };
-export const STAFF = ["Burton Kariuki","Martin Ruguru"];
+// Team is loaded from karu_users after login (see loadTeam). STAFF = active owners + managers (used for "recorded by" toggles).
+// PARTNERS = active owners (used for owed balances and profit share). Both are mutated in place, like BIZ.
+export const STAFF = [];
+export const PARTNERS = [];
+export const firstName = n => String(n||"").split(" ")[0];
+export const partnerKey = n => firstName(n).toLowerCase();
+export const defStaff = u => (u&&u.full_name)||STAFF[0]||"";
+export const shareOf = profit => Math.max(0,profit)/Math.max(1,PARTNERS.length);
+export const loadTeam = async (user) => {
+  try{
+    const rows = await sb.get("karu_users","select=full_name,role&active=eq.true&role=in.(owner,manager)&order=created_at.asc");
+    const staff = rows.map(r=>r.full_name).filter(Boolean);
+    const owners = rows.filter(r=>r.role==="owner").map(r=>r.full_name).filter(Boolean);
+    if(user&&user.full_name&&(user.role==="owner"||user.role==="manager")&&!staff.includes(user.full_name)) staff.push(user.full_name);
+    if(user&&user.full_name&&user.role==="owner"&&!owners.includes(user.full_name)) owners.push(user.full_name);
+    STAFF.length=0; staff.forEach(s=>STAFF.push(s));
+    PARTNERS.length=0; (owners.length?owners:staff).forEach(s=>PARTNERS.push(s));
+  }catch(e){
+    console.error("team:",e);
+    if(!STAFF.length&&user&&user.full_name){ STAFF.push(user.full_name); PARTNERS.push(user.full_name); }
+  }
+};
 // Business identity — defaults; overridden at app start from karu_settings
 export const BIZ = { name:"KARU FURNITURE", address:"Off Kihara-Gachie-Karura Rd, Nairobi", phone1:"0720 772 866", phone2:"0792 933 413" };
 export const loadBiz = async () => {
@@ -29,10 +50,10 @@ export const recordMoney = async rows => { try { await sb.post("karu_money", Arr
 export const fetchBalances = async () => {
   try {
     const rows = await sb.get("karu_money","select=account,amount");
-    const b = {cash:0,sacco:0,petty:0,owed_burton:0,owed_martin:0};
+    const b = {cash:0,sacco:0,petty:0};
     rows.forEach(r=>{ b[r.account]=(b[r.account]||0)+Number(r.amount); });
     return {...b, hasData: rows.length>0};
-  } catch { return {cash:0,sacco:0,petty:0,owed_burton:0,owed_martin:0,hasData:false}; }
+  } catch { return {cash:0,sacco:0,petty:0,hasData:false}; }
 };
 export const LEGACY_SALT = "karu-2026-fixed-salt";
 export function genSalt(){

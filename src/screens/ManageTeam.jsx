@@ -1,12 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { ROLES, sb } from "../lib";
+import { useState, useEffect } from "react";
+import { ROLES, loadTeam, sb } from "../lib";
 
 export function ManageTeam({user,onBack}){
   const [users,setUsers]=useState([]); const [loading,setLoading]=useState(true);
   const [adding,setAdding]=useState(false); const [f,setF]=useState({full_name:"",username:"",phone:"",role:"attendant"});
   const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
-  const load=async()=>{ setLoading(true); try{ setUsers(await sb.get("karu_users","select=*&order=created_at.asc")); }catch(e){console.error(e);} setLoading(false); };
+  const load=async()=>{ setLoading(true); try{ { setUsers(await sb.get("karu_users","select=*&order=created_at.asc")); await loadTeam(user); } }catch(e){console.error(e);} setLoading(false); };
   useEffect(()=>{load();},[]);
   const addUser=async()=>{
     setErr(""); const un=f.username.trim().toLowerCase().replace(/\s+/g,"");

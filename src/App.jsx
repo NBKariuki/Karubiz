@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { ROLES, can, fetchBalances, loadBiz } from "./lib";
+import { useState, useEffect, useCallback } from "react";
+import { ROLES, can, fetchBalances, loadBiz, loadTeam } from "./lib";
 import { GS } from "./styles";
 import { LoginScreen } from "./screens/LoginScreen";
 import { SidePanel } from "./screens/SidePanel";
@@ -12,9 +11,10 @@ import { ReportsTab } from "./tabs/ReportsTab";
 
 export default function App() {
   const [user,setUser]=useState(null); const [tab,setTab]=useState("sale");
-  const [bal,setBal]=useState({cash:0,sacco:0,owed_burton:0,owed_martin:0,hasData:false});
+  const [bal,setBal]=useState({cash:0,sacco:0,hasData:false});
   const [panel,setPanel]=useState(false);
   const [lapsed,setLapsed]=useState(false);
+  const [teamReady,setTeamReady]=useState(false);
   const IDLE_MS=5*60*1000; // 5 minutes
   useEffect(()=>{ loadBiz(); },[]);
   // Restore a saved session if it's still within the idle window
@@ -40,7 +40,9 @@ export default function App() {
   const doLogout=useCallback(()=>{ try{ localStorage.removeItem("karu_session"); }catch{} setUser(null); setPanel(false); },[]);
   const refreshBal=useCallback(async()=>{ setBal(await fetchBalances()); },[]);
   useEffect(()=>{ if(user) refreshBal(); },[user,refreshBal]);
+  useEffect(()=>{ if(!user){ setTeamReady(false); return; } let live=true; loadTeam(user).then(()=>{ if(live) setTeamReady(true); }); return ()=>{ live=false; }; },[user]);
   if(!user) return <LoginScreen onLogin={u=>{setUser(u);setLapsed(false);}} lapsed={lapsed}/>;
+  if(!teamReady) return <><GS/><div style={{padding:40,textAlign:"center",color:"#8A97A8",fontSize:14}}>Loading...</div></>;
   // Attendants only see the Sale tab; others see tabs they have perms for
   const tabs=[["sale","Sale","💰","sale"],["stock","Stock","📦","stock"],["expenses","Expenses","🧾","expenses"],["ledger","Ledger","📒","money"],["reports","Reports","📊","reports"]].filter(([,,,perm])=>can(user,perm));
   const activeTab = tabs.some(t=>t[0]===tab)?tab:tabs[0][0];

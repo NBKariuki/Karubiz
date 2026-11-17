@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useState, useEffect } from "react";
 import { fmtK, logAudit, sb, todayStr } from "../lib";
 
 export function CloseDay({user,onBack,onDone}){

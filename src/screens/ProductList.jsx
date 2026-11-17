@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useState, useEffect } from "react";
 import { CAT_OPTS, catLabel, fmtK, sb } from "../lib";
 
 export function ProductList({user,onBack}){

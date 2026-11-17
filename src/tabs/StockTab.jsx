@@ -1,23 +1,22 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { CAT_OPTS, STAFF, can, catLabel, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
+import { useState, useEffect } from "react";
+import { CAT_OPTS, STAFF, can, catLabel, defStaff, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
 import { ProductSearch } from "../screens/ProductSearch";
 import { OrdersTab } from "../tabs/OrdersTab";
 
 export function StockTab({user,onMoney}){
   const [section,setSection]=useState("stock"); // stock | orders | count
-  const [takeCounts,setTakeCounts]=useState({}); const [takeReasons,setTakeReasons]=useState({}); const [takeNotes,setTakeNotes]=useState(""); const [takeSaving,setTakeSaving]=useState(false); const [takeStaff,setTakeStaff]=useState(user?.full_name||"Burton Kariuki");
+  const [takeCounts,setTakeCounts]=useState({}); const [takeReasons,setTakeReasons]=useState({}); const [takeNotes,setTakeNotes]=useState(""); const [takeSaving,setTakeSaving]=useState(false); const [takeStaff,setTakeStaff]=useState(defStaff(user));
   const [trips,setTrips]=useState([]); const [stock,setStock]=useState([]); const [audit,setAudit]=useState([]);
   const [loading,setLoading]=useState(true); const [view,setView]=useState("list");
   const [expanded,setExpanded]=useState({}); const [editItem,setEditItem]=useState(null);
   const [tripGrp,setTripGrp]=useState({});
   const [editVals,setEditVals]=useState({}); const [editReason,setEditReason]=useState("");
-  const [editStaff,setEditStaff]=useState("Burton Kariuki"); const [lockStaff,setLockStaff]=useState("Burton Kariuki");
+  const [editStaff,setEditStaff]=useState(defStaff(user)); const [lockStaff,setLockStaff]=useState(defStaff(user));
   const [saving,setSaving]=useState(false); const [err,setErr]=useState("");
   const [addingToTrip,setAddingToTrip]=useState(null);
-  const [adjItem,setAdjItem]=useState(null); const [adjQty,setAdjQty]=useState(1); const [adjReason,setAdjReason]=useState("Damaged"); const [adjNotes,setAdjNotes]=useState(""); const [adjStaff,setAdjStaff]=useState("Burton Kariuki");
+  const [adjItem,setAdjItem]=useState(null); const [adjQty,setAdjQty]=useState(1); const [adjReason,setAdjReason]=useState("Damaged"); const [adjNotes,setAdjNotes]=useState(""); const [adjStaff,setAdjStaff]=useState(defStaff(user));
   const [addExtraItems,setAddExtraItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
-  const [trip,setTrip]=useState({date:new Date().toISOString().split("T")[0],notes:"",created_by:user?.full_name||"Burton Kariuki",paid_from:"sacco"});
+  const [trip,setTrip]=useState({date:new Date().toISOString().split("T")[0],notes:"",created_by:defStaff(user),paid_from:"sacco"});
   const [tripItems,setTripItems]=useState([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
   const [pendingReceived,setPendingReceived]=useState([]); // orders with received items not yet imported
 
@@ -196,7 +195,7 @@ export function StockTab({user,onMoney}){
       await loadAll();
       setView("list");
       setTripItems([{id:1,name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}]);
-      setTrip({date:new Date().toISOString().split("T")[0],notes:"",created_by:user?.full_name||"Burton Kariuki",paid_from:"sacco"});
+      setTrip({date:new Date().toISOString().split("T")[0],notes:"",created_by:defStaff(user),paid_from:"sacco"});
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
   };

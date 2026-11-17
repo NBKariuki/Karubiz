@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { EXP_CATS, STAFF, can, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
+import { useState, useEffect } from "react";
+import { EXP_CATS, STAFF, can, defStaff, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
 
 export function ExpensesTab({user,onMoney}){
   const [exp,setExp]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [form,setForm]=useState({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:user?.full_name||"Burton Kariuki",paid_from:"sacco"});
+  const [form,setForm]=useState({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:defStaff(user),paid_from:"sacco"});
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
   const [showForm,setShowForm]=useState(false);
@@ -47,7 +46,7 @@ export function ExpensesTab({user,onMoney}){
       else await recordMoney({account:form.paid_from,amount:-a,type:"expense",description:lbl,date:form.date,recorded_by:form.recorded_by});
       if(onMoney) onMoney();
       setShowForm(false);
-      setForm({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:user?.full_name||"Burton Kariuki",paid_from:"sacco"});
+      setForm({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:defStaff(user),paid_from:"sacco"});
       await loadExp();
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);

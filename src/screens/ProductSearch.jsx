@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useState, useEffect } from "react";
 import { CAT_OPTS, can, catLabel, sb } from "../lib";
 
 export function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, noAdd}){

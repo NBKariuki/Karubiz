@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { STAFF, can, fmtK, recordMoney, sb, todayStr } from "../lib";
+import { useState, useEffect } from "react";
+import { PARTNERS, STAFF, can, firstName, fmtK, partnerKey, recordMoney, sb, todayStr } from "../lib";
 import { CloseDay } from "../screens/CloseDay";
 import { StoreCredit } from "../screens/StoreCredit";
 import { BusinessSettings } from "../screens/BusinessSettings";
@@ -62,8 +61,7 @@ export function SidePanel({user,bal,onClose,onChange,onLogout}){
           <div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>Cash at hand</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(bal.cash)}</span></div>
           <div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>SACCO</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(bal.sacco)}</span></div>
           <div className="bal-row"><span style={{color:"#FFFFFF",fontSize:13,fontWeight:600}}>Total</span><span style={{fontSize:17,fontWeight:700,color:"#F5C000"}}>{fmtK(total)}</span></div>
-          {bal.owed_burton>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes Burton</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.owed_burton)}</span></div>}
-          {bal.owed_martin>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes Martin</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.owed_martin)}</span></div>}
+          {PARTNERS.map(p=>{ const k="owed_"+partnerKey(p); return bal[k]>0&&<div key={k} className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes {firstName(p)}</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal[k])}</span></div>; })}
           {bal.loans>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Loans owed</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.loans)}</span></div>}
         </div>
         {!act&&<div style={{marginBottom:16}}>

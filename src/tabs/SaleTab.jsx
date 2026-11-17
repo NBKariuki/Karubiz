@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { BIZ, H, STAFF, bizPhones, can, fmtK, initials, logAudit, parseMpesa, recordMoney, sb, stampCosts, todayStr, withinWindow } from "../lib";
+import { useState, useEffect } from "react";
+import { BIZ, H, STAFF, bizPhones, can, defStaff, fmtK, initials, logAudit, parseMpesa, recordMoney, sb, stampCosts, todayStr, withinWindow } from "../lib";
 import { ProductSearch } from "../screens/ProductSearch";
 
 export function SaleTab({user,onMoney}){
   const [stockItems,setStockItems]=useState([]);
   const [wiz,setWiz]=useState(false); const [step,setStep]=useState(1);
   const [sms,setSms]=useState(""); const [parsed,setParsed]=useState(null);
-  const [staff,setStaff]=useState(user?.full_name||"Burton Kariuki");
+  const [staff,setStaff]=useState(defStaff(user));
   const [cName,setCName]=useState(""); const [cPhone,setCPhone]=useState("");
   const [items,setItems]=useState([{id:1,name:"",qty:1,price:""}]);
   const [pay,setPay]=useState("mpesa"); const [mpesaCode,setMpesaCode]=useState("");
@@ -24,15 +23,15 @@ export function SaleTab({user,onMoney}){
   const [pendingSales,setPendingSales]=useState([]); const [addPaySale,setAddPaySale]=useState(null);
   const [addPayAmt,setAddPayAmt]=useState(""); const [addPayMethod,setAddPayMethod]=useState("mpesa");
   const [addPayCode,setAddPayCode]=useState(""); const [addPayNotes,setAddPayNotes]=useState("");
-  const [addPayStaff,setAddPayStaff]=useState("Burton Kariuki"); const [addPaySaving,setAddPaySaving]=useState(false);
+  const [addPayStaff,setAddPayStaff]=useState(defStaff(user)); const [addPaySaving,setAddPaySaving]=useState(false);
   const [addPayAdj,setAddPayAdj]=useState(""); const [showAdj,setShowAdj]=useState(false);
   const [showPending,setShowPending]=useState(false);
   const [todaySales,setTodaySales]=useState([]); const [showHistory,setShowHistory]=useState(false);
   const [histSales,setHistSales]=useState([]); const [voidSale,setVoidSale]=useState(null);
   const [histOpen,setHistOpen]=useState({}); // keys: day/month/year expansion
-  const [voidReason,setVoidReason]=useState(""); const [voidStaff,setVoidStaff]=useState("Burton Kariuki"); const [voiding,setVoiding]=useState(false);
+  const [voidReason,setVoidReason]=useState(""); const [voidStaff,setVoidStaff]=useState(defStaff(user)); const [voiding,setVoiding]=useState(false);
   const [custCredit,setCustCredit]=useState(0); const [useCredit,setUseCredit]=useState(false);
-  const [exchSale,setExchSale]=useState(null); const [exchItems,setExchItems]=useState([]); const [exchStaff,setExchStaff]=useState("Burton Kariuki"); const [exchReason,setExchReason]=useState(""); const [exchSaving,setExchSaving]=useState(false); const [exchErr,setExchErr]=useState("");
+  const [exchSale,setExchSale]=useState(null); const [exchItems,setExchItems]=useState([]); const [exchStaff,setExchStaff]=useState(defStaff(user)); const [exchReason,setExchReason]=useState(""); const [exchSaving,setExchSaving]=useState(false); const [exchErr,setExchErr]=useState("");
 
   const loadPendingSales=async()=>{ try{ setPendingSales(await sb.get("karu_sales","select=*&balance_due=gt.0&voided=eq.false&order=created_at.desc")); }catch(e){console.error(e);} };
   const loadToday=async()=>{ try{ setTodaySales(await sb.get("karu_sales",`select=*&date=eq.${todayStr()}&order=created_at.desc`)); }catch(e){console.error(e);} };

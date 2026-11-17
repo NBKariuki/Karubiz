@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { BIZ, bizPhones, can, fmtK, logAudit, makeAvgCost, recordMoney, saleCost, sb, todayStr } from "../lib";
+import { useState, useEffect } from "react";
+import { BIZ, PARTNERS, bizPhones, can, firstName, fmtK, logAudit, makeAvgCost, partnerKey, recordMoney, saleCost, sb, shareOf, todayStr } from "../lib";
 import { LoansTab } from "../tabs/LoansTab";
 import { ActBox } from "../screens/ActBox";
 import { Whobar } from "../screens/Whobar";
@@ -40,7 +39,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
   const refreshAll=async()=>{ await load(); if(onChange) onChange(); };
 
   const ACCTS=[["cash","Cash"],["sacco","SACCO"],["petty","Petty Cash"]];
-  const acctLabel=a=>({cash:"Cash",sacco:"SACCO",petty:"Petty Cash",owed_burton:"Owed Burton",owed_martin:"Owed Martin",loans:"Loans"}[a]||a);
+  const acctLabel=a=>({cash:"Cash",sacco:"SACCO",petty:"Petty Cash",loans:"Loans"}[a]||(String(a).startsWith("owed_")?"Owed "+String(a).slice(5).replace(/^./,c=>c.toUpperCase()):a));
   const total=(bal.cash||0)+(bal.sacco||0)+(bal.petty||0);
 
   // ── Capital vs Profit (live) ──
@@ -101,7 +100,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
       const drawing=a-fromOwed;
       // Warn if drawing into capital beyond their profit share
       if(drawing>0){
-        const share=Math.max(0,netProfitAll/2); // 50/50 assumption for now
+        const share=shareOf(netProfitAll); // equal split between active owners
         const alreadyDrawn=Number(bal["drawn_"+sk]||0);
         if(alreadyDrawn+drawing>share){
           const over=alreadyDrawn+drawing-share;
@@ -208,7 +207,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
           </div>}
           {act==="bank"&&<ActBox title="Bank cash into SACCO"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doBank} off={rb} saving={saving}/></ActBox>}
           {act==="withdraw"&&<ActBox title="Withdraw SACCO to cash"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doWithdraw} off={rb} saving={saving}/></ActBox>}
-          {act==="partner"&&(()=>{ const sk=who.split(" ")[0].toLowerCase(); const owedNow=Number(bal["owed_"+sk]||0); const drawnNow=Number(bal["drawn_"+sk]||0); const share=Math.max(0,netProfitAll/2); const a=Number(amt||0);
+          {act==="partner"&&(()=>{ const sk=who.split(" ")[0].toLowerCase(); const owedNow=Number(bal["owed_"+sk]||0); const drawnNow=Number(bal["drawn_"+sk]||0); const share=shareOf(netProfitAll); const a=Number(amt||0);
             return (<ActBox title="Partner money"><Whobar who={who} setWho={setWho}/>
             <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${dir==="in"?" on":""}`} onClick={()=>setDir("in")}>Puts in</button><button className={`tog-btn${dir==="out"?" on":""}`} onClick={()=>setDir("out")}>Takes out</button></div>
             {dir==="in"&&<div style={{marginBottom:8}}>
@@ -323,7 +322,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
         const nCol=results.length;
         const cashA=bal.cash||0, saccoA=bal.sacco||0, pettyA=bal.petty||0, stockA=stockAtCost;
         const totalAssets=cashA+saccoA+pettyA+stockA;
-        const owesB=bal.owed_burton||0, owesM=bal.owed_martin||0, loansOwed=bal.loans||0; const totalLiab=owesB+owesM+loansOwed;
+        const owedRows=PARTNERS.map(p=>({name:firstName(p),amt:bal["owed_"+partnerKey(p)]||0})); const owesTotal=owedRows.reduce((s,r)=>s+r.amt,0), loansOwed=bal.loans||0; const totalLiab=owesTotal+loansOwed;
         const netWorth=totalAssets-totalLiab;
         const genDate=new Date().toLocaleDateString("en-KE",{day:"2-digit",month:"long",year:"numeric"});
         const fmtP=n=>Math.round(n).toLocaleString();
@@ -391,8 +390,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
                   <Row label="Stock (at cost)" vals={[stockA,...Array(nCol-1).fill(null)]}/>
                   <Row label="Total Assets" vals={[totalAssets,...Array(nCol-1).fill(null)]} bold total/>
                   {totalLiab>0&&<>
-                    {owesB>0&&<Row label="Owed to Burton" vals={[owesB,...Array(nCol-1).fill(null)]} neg/>}
-                    {owesM>0&&<Row label="Owed to Martin" vals={[owesM,...Array(nCol-1).fill(null)]} neg/>}
+                    {owedRows.map(r=>r.amt>0&&<Row key={r.name} label={"Owed to "+r.name} vals={[r.amt,...Array(nCol-1).fill(null)]} neg/>)}
                     {loansOwed>0&&<Row label="Loans payable" vals={[loansOwed,...Array(nCol-1).fill(null)]} neg/>}
                     <Row label="Total Liabilities" vals={[totalLiab,...Array(nCol-1).fill(null)]} bold total/>
                   </>}

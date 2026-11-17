@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useState, useEffect } from "react";
 import { CAT_OPTS, can, fmtK, logAudit, recordMoney, sb, todayStr } from "../lib";
 import { ProductSearch } from "../screens/ProductSearch";
 
