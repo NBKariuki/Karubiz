@@ -1,7 +1,6 @@
 import { useState } from "react";
 export const SB_URL = "https://pdfadcnrxlojuxjqtzil.supabase.co";
 export const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZmFkY25yeGxvanV4anF0emlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMTQ0MzksImV4cCI6MjEwMjg5MDQzOX0.1gRq0MWGc6EFOtm5-rma4Fo1shVSWIW8kFDX-Np6CIM";
-export const APP_PW = "GwituMucii@22";
 export const C = { navy:"#050A1F",mid:"#0A1128",light:"#0F1A3A",yellow:"#F5C000",white:"#FFFFFF",muted:"#8899AA",dark:"#8A97A8",green:"#4CAF50",red:"#E85B5B" };
 // Team is loaded from karu_users after login (see loadTeam). STAFF = active owners + managers (used for "recorded by" toggles).
 // PARTNERS = active owners (used for owed balances and profit share). Both are mutated in place, like BIZ.
@@ -13,7 +12,7 @@ export const defStaff = u => (u&&u.full_name)||STAFF[0]||"";
 export const shareOf = profit => Math.max(0,profit)/Math.max(1,PARTNERS.length);
 export const loadTeam = async (user) => {
   try{
-    const rows = await sb.get("karu_users","select=full_name,role&active=eq.true&role=in.(owner,manager)&order=created_at.asc");
+    const rows = (await sb.rpc("karu_staff",{}))||[];
     const staff = rows.map(r=>r.full_name).filter(Boolean);
     const owners = rows.filter(r=>r.role==="owner").map(r=>r.full_name).filter(Boolean);
     if(user&&user.full_name&&(user.role==="owner"||user.role==="manager")&&!staff.includes(user.full_name)) staff.push(user.full_name);
@@ -38,15 +37,68 @@ export const EXP_CATS = ["Rent","Transport","Utilities","Marketing","Staff","Loa
 export const CAT_OPTS = [{id:"living",label:"Living Room"},{id:"bedroom",label:"Bedroom"},{id:"decor",label:"Decor"},{id:"other",label:"Other"}];
 export const catLabel = id => ({living:"Living Room",bedroom:"Bedroom",decor:"Decor",other:"Other"}[id]||id);
 export const H = {"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"};
-export const sb = {
-  get: async (t,p="") => { const r=await fetch(`${SB_URL}/rest/v1/${t}?${p}`,{headers:H}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
-  post: async (t,d) => { const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:"POST",headers:H,body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
-  patch: async (t,id,d) => { const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",headers:H,body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
-  rpc: async (fn,args) => { const r=await fetch(`${SB_URL}/rest/v1/rpc/${fn}`,{method:"POST",headers:H,body:JSON.stringify(args)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
-  del: async (t,id) => { const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:"DELETE",headers:H}); if(!r.ok) throw new Error("Delete failed"); },
+// ---- Supabase Auth (email+password; the email is username@AUTH_DOMAIN, never used for real mail) ----
+export const AUTH_DOMAIN = "karu.app";
+const AUTH_KEY = "karu_auth";
+const AH = {"apikey":SB_KEY,"Content-Type":"application/json"};
+let authSess = null; // {access, refresh, exp}
+export const authEmail = u => String(u||"").trim().toLowerCase()+"@"+AUTH_DOMAIN;
+const applySession = j => {
+  authSess = {access:j.access_token, refresh:j.refresh_token, exp:Date.now()+(Number(j.expires_in)||3600)*1000};
+  H.Authorization = "Bearer "+authSess.access;
+  try{ localStorage.setItem(AUTH_KEY,JSON.stringify(authSess)); }catch{}
 };
-export const logAudit = async d => { try { await sb.post("karu_audit",d); } catch(e){ console.error(e); } };
-export const recordMoney = async rows => { try { await sb.post("karu_money", Array.isArray(rows)?rows:[rows]); } catch(e){ console.error("money:",e); } };
+export const authSignIn = async (username, secret) => {
+  const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`,{method:"POST",headers:AH,body:JSON.stringify({email:authEmail(username),password:secret})});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(/invalid login/i.test(j.msg||j.error_description||"")?"Wrong username or password.":(j.msg||j.error_description||"Sign in failed."));
+  applySession(j); return j;
+};
+export const authRefresh = async () => {
+  if(!authSess||!authSess.refresh) return false;
+  try{
+    const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=refresh_token`,{method:"POST",headers:AH,body:JSON.stringify({refresh_token:authSess.refresh})});
+    if(!r.ok) return false;
+    applySession(await r.json()); return true;
+  }catch{ return false; }
+};
+export const authRestore = async () => {
+  try{
+    const s = JSON.parse(localStorage.getItem(AUTH_KEY)||"null");
+    if(!s||!s.refresh) return false;
+    authSess = s;
+    if(Date.now()>s.exp-60000) return await authRefresh();
+    H.Authorization = "Bearer "+s.access; return true;
+  }catch{ return false; }
+};
+export const authIfNeeded = async () => { if(authSess&&Date.now()>authSess.exp-120000) await authRefresh(); };
+export const authSetPassword = async pw => {
+  if(!authSess) throw new Error("Not signed in.");
+  const r = await fetch(`${SB_URL}/auth/v1/user`,{method:"PUT",headers:{...AH,Authorization:"Bearer "+authSess.access},body:JSON.stringify({password:pw})});
+  if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.msg||j.error_description||"Could not change password."); }
+};
+export const authSignOut = async () => {
+  try{ if(authSess) await fetch(`${SB_URL}/auth/v1/logout`,{method:"POST",headers:{...AH,Authorization:"Bearer "+authSess.access}}); }catch{}
+  authSess = null; H.Authorization = `Bearer ${SB_KEY}`;
+  try{ localStorage.removeItem(AUTH_KEY); }catch{}
+};
+// One request helper: retries once after refreshing an expired token.
+const call = async (url, opt) => {
+  let r = await fetch(url,{...opt,headers:{...H,...(opt.headers||{})}});
+  if(r.status===401 && await authRefresh()) r = await fetch(url,{...opt,headers:{...H,...(opt.headers||{})}});
+  return r;
+};
+export const sb = {
+  get: async (t,p="") => { const r=await call(`${SB_URL}/rest/v1/${t}?${p}`,{}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  post: async (t,d) => { const r=await call(`${SB_URL}/rest/v1/${t}`,{method:"POST",body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  // Insert without reading the row back (for tables a role may write but not read, e.g. attendants and the money log).
+  postQuiet: async (t,d) => { const r=await call(`${SB_URL}/rest/v1/${t}`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); },
+  patch: async (t,id,d) => { const r=await call(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:"PATCH",body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); },
+  rpc: async (fn,args) => { const r=await call(`${SB_URL}/rest/v1/rpc/${fn}`,{method:"POST",body:JSON.stringify(args||{})}); if(!r.ok) throw new Error(await r.text()); const x=await r.text(); return x?JSON.parse(x):null; },
+  del: async (t,id) => { const r=await call(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:"DELETE"}); if(!r.ok) throw new Error("Delete failed"); },
+};
+export const logAudit = async d => { try { await sb.postQuiet("karu_audit",d); } catch(e){ console.error(e); } };
+export const recordMoney = async rows => { try { await sb.postQuiet("karu_money", Array.isArray(rows)?rows:[rows]); } catch(e){ console.error("money:",e); } };
 export const fetchBalances = async () => {
   try {
     const rows = await sb.get("karu_money","select=account,amount");
@@ -55,18 +107,6 @@ export const fetchBalances = async () => {
     return {...b, hasData: rows.length>0};
   } catch { return {cash:0,sacco:0,petty:0,hasData:false}; }
 };
-export const LEGACY_SALT = "karu-2026-fixed-salt";
-export function genSalt(){
-  const a=new Uint8Array(16); crypto.getRandomValues(a);
-  return Array.from(a).map(b=>b.toString(16).padStart(2,"0")).join("");
-}
-export async function hashWith(secret, salt){
-  const data = new TextEncoder().encode(secret + (salt||LEGACY_SALT));
-  const buf = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-}
-// Back-compat: old accounts used the fixed salt with no per-user salt
-export async function hashPin(pin){ return hashWith(pin, null); }
 export function pwStrength(pw){
   if(pw.length<8) return "At least 8 characters.";
   if(!/[a-zA-Z]/.test(pw)) return "Include at least one letter.";

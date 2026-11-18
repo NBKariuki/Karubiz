@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ROLES, loadTeam, sb } from "../lib";
+import { ROLES, authEmail, loadTeam, sb } from "../lib";
 
 export function ManageTeam({user,onBack}){
   const [users,setUsers]=useState([]); const [loading,setLoading]=useState(true);
@@ -15,14 +15,15 @@ export function ManageTeam({user,onBack}){
     try{
       const exists=await sb.get("karu_users",`select=id&username=eq.${un}`);
       if(exists.length){setErr("That username is taken.");setSaving(false);return;}
-      await sb.post("karu_users",{username:un,full_name:f.full_name.trim(),phone:f.phone.trim(),role:f.role,pin_hash:null,salt:null,must_set_pin:true,auth_type:f.role==="attendant"?"pin":"password",active:true,created_by:user.full_name});
+      await sb.post("karu_users",{username:un,full_name:f.full_name.trim(),phone:f.phone.trim(),role:f.role,must_set_pin:true,auth_type:f.role==="attendant"?"pin":"password",active:true,created_by:user.full_name});
       setAdding(false); setF({full_name:"",username:"",phone:"",role:"attendant"});
       await load();
+      alert(`Profile created. Last step: in Supabase go to Authentication, Users, Add user. Email: ${authEmail(un)}  Password: a temporary ${f.role==="attendant"?"6-digit PIN":"password"} you give them. Tick Auto Confirm User. They set their own at first login.`);
     }catch(e){setErr("Failed: "+e.message);}
     setSaving(false);
   };
   const toggleActive=async(u)=>{ if(u.role==="owner"){alert("Owners cannot be deactivated here.");return;} await sb.patch("karu_users",u.id,{active:!u.active}); await load(); };
-  const resetCred=async(u)=>{ const w=u.role==="attendant"?"PIN":"password"; if(!confirm(`Reset ${u.full_name.split(" ")[0]}'s ${w}? They will set a new one at next login.`))return; await sb.patch("karu_users",u.id,{pin_hash:null,salt:null,must_set_pin:true}); await load(); alert(w+" reset. They set a new one at next login."); };
+  const resetCred=async(u)=>{ const w=u.role==="attendant"?"PIN":"password"; if(!confirm(`Reset ${u.full_name.split(" ")[0]}'s ${w}? You will set a temporary one in Supabase.`))return; await sb.patch("karu_users",u.id,{must_set_pin:true}); await load(); alert(`Marked for reset. Now in Supabase go to Authentication, Users, open ${authEmail(u.username)} and set a new temporary ${w}. Give it to them; they choose their own at next login.`); };
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><button className="btn-g" onClick={onBack} style={{fontSize:13}}>Back</button><div style={{fontSize:15,fontWeight:600}}>Manage Team</div></div>
@@ -34,7 +35,7 @@ export function ManageTeam({user,onBack}){
           <div className="field"><label>Username (they log in with this)</label><input value={f.username} onChange={e=>setF(x=>({...x,username:e.target.value}))} placeholder="e.g. jane" autoCapitalize="none"/></div>
           <div className="field"><label>Phone (optional)</label><input value={f.phone} onChange={e=>setF(x=>({...x,phone:e.target.value}))} placeholder="07XX XXX XXX" type="tel"/></div>
           <div className="field"><label>Role</label><div className="tog"><button className={`tog-btn${f.role==="attendant"?" on":""}`} onClick={()=>setF(x=>({...x,role:"attendant"}))} style={{fontSize:12}}>Attendant</button><button className={`tog-btn${f.role==="manager"?" on":""}`} onClick={()=>setF(x=>({...x,role:"manager"}))} style={{fontSize:12}}>Manager</button><button className={`tog-btn${f.role==="owner"?" on":""}`} onClick={()=>setF(x=>({...x,role:"owner"}))} style={{fontSize:12}}>Owner</button></div></div>
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:10}}>{f.role==="attendant"?"They'll set a 4-digit PIN at first login.":"They'll set a password at first login (owners and managers use passwords)."}</div>
+          <div style={{fontSize:11,color:"#8899AA",marginBottom:10}}>{f.role==="attendant"?"They'll set a 6-digit PIN at first login.":"They'll set a password at first login (owners and managers use passwords)."}</div>
           {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={addUser} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"Saving...":"Add"}</button><button className="btn-g" onClick={()=>{setAdding(false);setErr("");}} style={{fontSize:13}}>Cancel</button></div>
         </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ROLES, can, fetchBalances, loadBiz, loadTeam } from "./lib";
+import { ROLES, authIfNeeded, authRestore, authSignOut, can, fetchBalances, loadBiz, loadTeam } from "./lib";
 import { GS } from "./styles";
 import { LoginScreen } from "./screens/LoginScreen";
 import { SidePanel } from "./screens/SidePanel";
@@ -16,12 +16,12 @@ export default function App() {
   const [lapsed,setLapsed]=useState(false);
   const [teamReady,setTeamReady]=useState(false);
   const IDLE_MS=5*60*1000; // 5 minutes
-  useEffect(()=>{ loadBiz(); },[]);
+  
   // Restore a saved session if it's still within the idle window
   useEffect(()=>{
     try{
       const raw=localStorage.getItem("karu_session");
-      if(raw){ const s=JSON.parse(raw); if(s&&s.user&&s.last&&(Date.now()-s.last)<IDLE_MS){ setUser(s.user); } else { localStorage.removeItem("karu_session"); } }
+      if(raw){ const s=JSON.parse(raw); if(s&&s.user&&s.last&&(Date.now()-s.last)<IDLE_MS){ authRestore().then(ok=>{ if(ok) setUser(s.user); else localStorage.removeItem("karu_session"); }); } else { localStorage.removeItem("karu_session"); } }
     }catch{}
   },[]);
   // Persist session + reset idle timer on activity
@@ -33,14 +33,15 @@ export default function App() {
     const onAct=()=>touch();
     events.forEach(e=>window.addEventListener(e,onAct,{passive:true}));
     const iv=setInterval(()=>{
-      try{ const raw=localStorage.getItem("karu_session"); if(raw){ const s=JSON.parse(raw); if(Date.now()-s.last>=IDLE_MS){ localStorage.removeItem("karu_session"); setUser(null); setPanel(false); setLapsed(true); } } }catch{}
+      authIfNeeded();
+      try{ const raw=localStorage.getItem("karu_session"); if(raw){ const s=JSON.parse(raw); if(Date.now()-s.last>=IDLE_MS){ localStorage.removeItem("karu_session"); authSignOut(); setUser(null); setPanel(false); setLapsed(true); } } }catch{}
     },15000);
     return ()=>{ events.forEach(e=>window.removeEventListener(e,onAct)); clearInterval(iv); };
   },[user,touch]);
-  const doLogout=useCallback(()=>{ try{ localStorage.removeItem("karu_session"); }catch{} setUser(null); setPanel(false); },[]);
+  const doLogout=useCallback(()=>{ try{ localStorage.removeItem("karu_session"); }catch{} authSignOut(); setUser(null); setPanel(false); },[]);
   const refreshBal=useCallback(async()=>{ setBal(await fetchBalances()); },[]);
   useEffect(()=>{ if(user) refreshBal(); },[user,refreshBal]);
-  useEffect(()=>{ if(!user){ setTeamReady(false); return; } let live=true; loadTeam(user).then(()=>{ if(live) setTeamReady(true); }); return ()=>{ live=false; }; },[user]);
+  useEffect(()=>{ if(!user){ setTeamReady(false); return; } let live=true; Promise.all([loadTeam(user),loadBiz()]).then(()=>{ if(live) setTeamReady(true); }); return ()=>{ live=false; }; },[user]);
   if(!user) return <LoginScreen onLogin={u=>{setUser(u);setLapsed(false);}} lapsed={lapsed}/>;
   if(!teamReady) return <><GS/><div style={{padding:40,textAlign:"center",color:"#8A97A8",fontSize:14}}>Loading...</div></>;
   // Attendants only see the Sale tab; others see tabs they have perms for
