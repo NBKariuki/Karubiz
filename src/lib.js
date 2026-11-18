@@ -119,6 +119,8 @@ export const ROLES = {
   attendant:{ label:"Attendant", can:["sale"] },
 };
 export const can = (user, perm) => !!user && (ROLES[user.role]?.can.includes(perm));
+// Readable message from a Supabase/PostgREST error.
+export const errMsg = e => { try{ const j=JSON.parse(e.message); return j.message||e.message; }catch{ return (e&&e.message)||String(e); } };
 export const fmtK = n => "KSh "+Math.round(n).toLocaleString();
 // Cost of goods: every sale line carries the real unit cost ("cost") saved when it was sold.
 // Old lines without it fall back to the average cost for that product name.

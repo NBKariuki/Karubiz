@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BIZ, H, STAFF, bizPhones, can, defStaff, fmtK, initials, logAudit, parseMpesa, recordMoney, sb, stampCosts, todayStr, withinWindow } from "../lib";
+import { BIZ, H, STAFF, bizPhones, can, defStaff, errMsg, fmtK, initials, parseMpesa, recordMoney, sb, stampCosts, todayStr, withinWindow } from "../lib";
 import { ProductSearch } from "../screens/ProductSearch";
 
 export function SaleTab({user,onMoney}){
@@ -153,24 +153,19 @@ export function SaleTab({user,onMoney}){
   const addPaymentToSale=async()=>{
     if(!addPayAmt||Number(addPayAmt)<=0){alert("Enter a valid amount.");return;}
     const adj=Number(addPayAdj||0); // price adjustment: negative reduces total (discount), positive raises it
-    const newTotal=Number(addPaySale.total)+adj; // adjust the sale total
+    const newTotal=Number(addPaySale.total)+adj;
     const balNow=Math.max(0,newTotal-Number(addPaySale.amount_paid||0));
     if(Number(addPayAmt)>balNow+0.5){alert(`That's more than the balance owed (${fmtK(balNow)}).`);return;}
     if(addPayMethod==="mpesa"&&!addPayCode.trim()){alert("M-Pesa code required.");return;}
     setAddPaySaving(true);
     try{
-      const date=todayStr(); const newPaid=Number(addPaySale.amount_paid||0)+Number(addPayAmt); const newBal=Math.max(0,newTotal-newPaid);
-      await sb.post("karu_payments",{sale_id:addPaySale.id,receipt_no:addPaySale.receipt_no,customer_name:addPaySale.customer_name,amount:Number(addPayAmt),payment_method:addPayMethod==="mpesa"?"M-Pesa":"Cash",mpesa_code:addPayCode.toUpperCase(),date,recorded_by:addPayStaff,notes:addPayNotes||"Instalment payment"});
-      const patch={amount_paid:newPaid,balance_due:newBal,payment_type:newBal<=0.5?"full":"instalment"};
-      if(adj!==0){ patch.total=newTotal; patch.price_adjustment=(Number(addPaySale.price_adjustment||0)+adj); }
-      await sb.patch("karu_sales",addPaySale.id,patch);
-      await recordMoney({account:addPayMethod==="mpesa"?"sacco":"cash",amount:Number(addPayAmt),type:"sale",ref:addPaySale.receipt_no,description:`Instalment ${addPaySale.receipt_no} · ${addPaySale.customer_name}`,date,recorded_by:addPayStaff});
-      if(adj!==0) await logAudit({trip_no:null,record_id:addPaySale.id,action:"price_adjustment",field_changed:addPaySale.receipt_no,old_value:String(addPaySale.total),new_value:String(newTotal),reason:`Price adjustment ${adj>0?"+":""}${adj} on settlement`,changed_by:addPayStaff});
+      // One database call: payment, sale update, money entry and audit succeed or fail together.
+      const r=await sb.rpc("karu_add_payment",{p:{id:addPaySale.id,amount:Number(addPayAmt),method:addPayMethod,code:addPayCode,by:addPayStaff,notes:addPayNotes,adj}});
       if(onMoney) onMoney();
       setAddPaySale(null);setAddPayAmt("");setAddPayCode("");setAddPayNotes("");setAddPayAdj("");setShowAdj(false);
       await loadPendingSales();
-      alert(newBal<=0.5?"Fully paid. Account cleared.":"Payment recorded. Balance: "+fmtK(newBal));
-    }catch(e){alert("Failed: "+e.message);}
+      alert(r&&r.cleared?"Fully paid. Account cleared.":"Payment recorded. Balance: "+fmtK(Number(r&&r.balance||0)));
+    }catch(e){alert(/PGRST202|Could not find the function/.test(e.message)?"Update needed: run KARU_SALE_FLOW_V2.sql in Supabase.":"Failed: "+errMsg(e));}
     setAddPaySaving(false);
   };
 
@@ -178,39 +173,12 @@ export function SaleTab({user,onMoney}){
     if(!voidReason.trim()){alert("Reason required.");return;}
     setVoiding(true);
     try{
-      const s=voidSale;
-      await sb.patch("karu_sales",s.id,{voided:true,void_reason:voidReason,voided_by:voidStaff,voided_at:new Date().toISOString()});
-      if(s.items){ for(const it of s.items){
-        const matches=stockItems.filter(x=>x.name.toLowerCase()===String(it.name).toLowerCase()&&x.qty_sold>0).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
-        let q=Number(it.qty||1); for(const m of matches){ if(q<=0)break; const r=Math.min(q,m.qty_sold); await sb.patch("karu_stock",m.id,{qty_sold:m.qty_sold-r}); q-=r; }
-      }}
-      // Reverse the money actually collected, to the correct account(s).
-      const paid=Number(s.amount_paid!=null?s.amount_paid:s.total);
-      const cashPaid=Number(s.cash_part||0), mpesaPaid=Number(s.mpesa_part||0);
-      if(s.payment_method==="Split" && (cashPaid+mpesaPaid)>0){
-        // Reverse each leg proportionally to what was collected vs invoiced
-        const invoiced=Number(s.total)||1; const ratio=paid/invoiced;
-        const cashBack=Math.round(cashPaid*ratio), mpesaBack=Math.round(mpesaPaid*ratio);
-        if(cashBack>0) await recordMoney({account:"cash",amount:-cashBack,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name} (cash)`,date:todayStr(),recorded_by:voidStaff});
-        if(mpesaBack>0) await recordMoney({account:"sacco",amount:-mpesaBack,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name} (mpesa)`,date:todayStr(),recorded_by:voidStaff});
-      } else if(paid>0){
-        await recordMoney({account:s.payment_method==="M-Pesa"?"sacco":"cash",amount:-paid,type:"void",ref:s.receipt_no,description:`Voided ${s.receipt_no} · ${s.customer_name}`,date:todayStr(),recorded_by:voidStaff});
-      }
-      // Return any store credit that was applied to this sale (re-credit the customer)
-      const creditUsed=Number(s.credit_applied||0);
-      if(creditUsed>0 && (s.customer_phone||"").trim()){
-        await sb.post("karu_credit",{customer_name:s.customer_name,customer_phone:s.customer_phone,amount:creditUsed,reason:`Reinstated — voided ${s.receipt_no}`,ref_receipt:s.receipt_no,recorded_by:voidStaff,date:todayStr()});
-      }
-      // Reverse any store credit this sale CREATED (e.g. via prior exchange) so it isn't double-held
-      const creditMade=Number(s.store_credit_note||0);
-      if(creditMade>0 && (s.customer_phone||"").trim()){
-        await sb.post("karu_credit",{customer_name:s.customer_name,customer_phone:s.customer_phone,amount:-creditMade,reason:`Cancelled — voided ${s.receipt_no}`,ref_receipt:s.receipt_no,recorded_by:voidStaff,date:todayStr()});
-      }
-      await logAudit({trip_no:null,record_id:s.id,action:"void_sale",field_changed:s.receipt_no,old_value:String(s.total),new_value:"0",reason:voidReason,changed_by:voidStaff});
+      // One database call: sale, stock, money, credit and audit all change together or not at all.
+      await sb.rpc("karu_void_sale",{p:{id:voidSale.id,reason:voidReason,by:voidStaff}});
       if(onMoney) onMoney();
       setVoidSale(null); setVoidReason("");
       await loadStock(); await Promise.all([loadToday(),loadHistory(),loadPendingSales()]);
-    }catch(e){alert("Void failed: "+e.message);}
+    }catch(e){alert(/PGRST202|Could not find the function/.test(e.message)?"Update needed: run KARU_SALE_FLOW_V2.sql in Supabase.":"Void failed: "+errMsg(e));}
     setVoiding(false);
   };
 
@@ -239,39 +207,15 @@ export function SaleTab({user,onMoney}){
     if(!exchReason.trim()){setExchErr("Reason for the change is required.");return;}
     setExchSaving(true);
     try{
-      const s=exchSale; const paid=Number(s.amount_paid!=null?s.amount_paid:s.total);
-      const newTotal=vi.reduce((a,i)=>a+(Number(i.qty)*Number(i.price)),0);
-      // 1. Return old items to stock (add back qty_sold)
-      for(const it of (s.items||[])){
-        const matches=stockItems.filter(x=>x.name.toLowerCase()===String(it.name).toLowerCase()&&x.qty_sold>0).sort((a,b)=>new Date(b.date_in)-new Date(a.date_in));
-        let q=Number(it.qty||1); for(const m of matches){ if(q<=0)break; const r=Math.min(q,m.qty_sold); await sb.patch("karu_stock",m.id,{qty_sold:m.qty_sold-r}); q-=r; }
-      }
-      // 2. Take new items from stock (FIFO)
-      const freshStock=await sb.get("karu_stock","select=*&order=date_in.asc");
-      const viCosted=stampCosts(vi,freshStock);
-      for(const sold of vi){
-        let q=Number(sold.qty||1);
-        const matches=freshStock.filter(x=>x.name.toLowerCase()===sold.name.toLowerCase()&&(x.qty_in-x.qty_sold-(x.qty_adjusted||0))>0).sort((a,b)=>new Date(a.date_in)-new Date(b.date_in));
-        for(const m of matches){ if(q<=0)break; const avail=m.qty_in-m.qty_sold-(m.qty_adjusted||0); const r=Math.min(q,avail); await sb.patch("karu_stock",m.id,{qty_sold:m.qty_sold+r}); q-=r; m.qty_sold+=r; }
-      }
-      // 3. Money already paid is NEVER refunded. Compute new balance / store credit.
-      let newBal=0, credit=0;
-      if(paid>=newTotal){ credit=paid-newTotal; newBal=0; }
-      else { newBal=newTotal-paid; credit=0; }
-      // 4. Record store credit if any (requires phone)
-      if(credit>0){
-        if(!(s.customer_phone||"").trim()){ setExchErr("This change creates store credit, but the sale has no customer phone. Add a phone to the customer first."); setExchSaving(false); return; }
-        await sb.post("karu_credit",{customer_name:s.customer_name,customer_phone:s.customer_phone,amount:credit,reason:`Overpayment after exchange on ${s.receipt_no}`,ref_receipt:s.receipt_no,recorded_by:exchStaff,date:todayStr()});
-      }
-      // 5. Update the sale in place
-      await sb.patch("karu_sales",s.id,{items:viCosted,total:newTotal,amount_paid:Math.min(paid,newTotal),balance_due:newBal,payment_type:newBal>0?"instalment":"full",store_credit_note:credit,exchanged_from:(s.items||[]).map(i=>`${i.name} x${i.qty}`).join(", ")});
-      // 6. Audit
-      await logAudit({trip_no:null,record_id:s.id,action:"exchange",field_changed:s.receipt_no,old_value:(s.items||[]).map(i=>`${i.name} x${i.qty}`).join(", "),new_value:vi.map(i=>`${i.name} x${i.qty}`).join(", "),reason:exchReason,changed_by:exchStaff});
-      const refreshed=await sb.get("karu_stock","select=*&order=date_in.asc"); setStockItems(refreshed);
-      await loadToday(); await loadPendingSales();
+      const s=exchSale;
+      // One database call: old items back to stock, new items out, credit, sale update and audit succeed or fail together.
+      const r=await sb.rpc("karu_exchange_sale",{p:{id:s.id,reason:exchReason,by:exchStaff,items:vi.map(i=>({name:i.name,qty:Number(i.qty)||1,price:Number(i.price)}))}});
+      await loadStock(); await loadToday(); await loadPendingSales();
       setExchSale(null);
+      if(r&&r.short&&r.short.length) alert("Stock was short for: "+r.short.map(x=>`${x.name} (${x.missing})`).join(", ")+". Check the Stock tab.");
+      const credit=Number(r&&r.credit||0), newBal=Number(r&&r.balance||0);
       alert(credit>0?`Exchange done. Store credit of ${fmtK(credit)} recorded for ${s.customer_name}.`:newBal>0?`Exchange done. New balance: ${fmtK(newBal)}.`:"Exchange done. Fully settled.");
-    }catch(e){setExchErr("Failed: "+e.message);}
+    }catch(e){setExchErr(/PGRST202|Could not find the function/.test(e.message)?"Update needed: run KARU_SALE_FLOW_V2.sql in Supabase.":"Failed: "+errMsg(e));}
     setExchSaving(false);
   };
 
@@ -544,7 +488,7 @@ export function SaleTab({user,onMoney}){
                   <div style={{fontSize:14,color:"#8899AA",marginBottom:10}}>Total {fmtK(effTotal)}{adj!==0?` (adj ${adj>0?"+":""}${adj})`:""} · Paid {fmtK(Number(addPaySale.amount_paid||0))} · <span style={{color:"#E8A45B",fontWeight:600}}>Balance {fmtK(effBal)}</span></div>
                   );})()}
                   <div className="field"><label>Amount received now (KSh)</label><input type="number" value={addPayAmt} onChange={e=>setAddPayAmt(e.target.value)} placeholder="0"/><button onClick={()=>{const adj=Number(addPayAdj||0);const effBal=Math.max(0,Number(addPaySale.total)+adj-Number(addPaySale.amount_paid||0));setAddPayAmt(String(effBal));}} style={{marginTop:6,background:"none",border:"1px solid #1A2A4A",borderRadius:5,color:"#8899AA",fontSize:13,padding:"5px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Pay full balance</button></div>
-                  {!showAdj?<button onClick={()=>setShowAdj(true)} style={{background:"none",border:"1px dashed #24365C",borderRadius:6,color:"#8A97A8",fontSize:14,padding:"7px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:12,width:"100%"}}>+ Price adjustment</button>:(
+                  {!can(user,"adjust")?null:!showAdj?<button onClick={()=>setShowAdj(true)} style={{background:"none",border:"1px dashed #24365C",borderRadius:6,color:"#8A97A8",fontSize:14,padding:"7px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:12,width:"100%"}}>+ Price adjustment</button>:(
                     <div className="field" style={{background:"rgba(232,164,91,0.06)",border:"1px solid rgba(232,164,91,0.25)",borderRadius:8,padding:10}}>
                       <label>Price adjustment (KSh)</label>
                       <div style={{fontSize:13,color:"#8A97A8",marginBottom:6}}>Negative to knock off (goodwill), positive to add. Changes the sale total so the balance settles correctly.</div>
