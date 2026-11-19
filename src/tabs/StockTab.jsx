@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { CAT_OPTS, STAFF, can, catLabel, defStaff, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
+import { CAT_OPTS, STAFF, can, catLabel, defStaff, errMsg, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
 import { ProductSearch } from "../screens/ProductSearch";
 import { OrdersTab } from "../tabs/OrdersTab";
 
 export function StockTab({user,onMoney}){
   const [section,setSection]=useState("stock"); // stock | orders | count
+  const [priceDraft,setPriceDraft]=useState({}); const [priceSaving,setPriceSaving]=useState(false);
   const [stockView,setStockView]=useState("items"); const [stockQ,setStockQ]=useState(""); const [itemOpen,setItemOpen]=useState({}); const [noPriceOnly,setNoPriceOnly]=useState(false);
   const [takeCounts,setTakeCounts]=useState({}); const [takeReasons,setTakeReasons]=useState({}); const [takeNotes,setTakeNotes]=useState(""); const [takeSaving,setTakeSaving]=useState(false); const [takeStaff,setTakeStaff]=useState(defStaff(user));
   const [trips,setTrips]=useState([]); const [stock,setStock]=useState([]); const [audit,setAudit]=useState([]);
@@ -63,6 +64,7 @@ export function StockTab({user,onMoney}){
 
   const saveEdit=async()=>{
     if(!editReason.trim()){setErr("Reason required.");return;}
+    if(!(Number(editVals.selling_price)>0)){setErr("A selling price is required.");return;}
     setSaving(true); setErr("");
     try{
       const changes=Object.keys(editVals).filter(f=>String(editVals[f])!==String(editItem[f]));
@@ -98,6 +100,8 @@ export function StockTab({user,onMoney}){
   const saveAddItems=async(t)=>{
     const vi=addExtraItems.filter(i=>i.name&&Number(i.unit_cost)>0);
     if(!vi.length){alert("Add at least one item with name and cost.");return;}
+    const noP=vi.find(i=>!(Number(i.selling_price)>0));
+    if(noP){alert(`Set a selling price for ${noP.name}.`);return;}
     setSaving(true);
     try{
       await sb.post("karu_stock",vi.map(i=>({trip_id:t.id,trip_no:t.trip_no,name:i.name,category:i.category,qty_in:Number(i.qty_in),qty_sold:0,unit_cost:Number(i.unit_cost),selling_price:Number(i.selling_price||0),date_in:t.date})));
@@ -131,6 +135,26 @@ export function StockTab({user,onMoney}){
 
   // Live stock rows with computed available qty for counting
   const liveStock=stock.filter(s=>(s.qty_in-s.qty_sold-(s.qty_adjusted||0))>0 || Number(s.qty_in)>0).map(s=>({...s,available:s.qty_in-s.qty_sold-(s.qty_adjusted||0)})).filter(s=>s.available>0);
+  // Set the selling price on one or more batches (any signed-in owner or manager, even on a locked trip) and log it.
+  const setPrices=async(batches,raw,key)=>{
+    const p=Number(raw);
+    if(!(p>0)){alert("Enter a selling price above zero.");return;}
+    setPriceSaving(true);
+    try{
+      for(const b of batches){
+        if(Number(b.selling_price)===p) continue;
+        await sb.patch("karu_stock",b.id,{selling_price:p});
+        await logAudit({trip_no:b.trip_no,record_id:b.id,action:"set_price",field_changed:"selling_price",old_value:String(b.selling_price||0),new_value:String(p),reason:"Selling price set",changed_by:user.full_name});
+      }
+      setPriceDraft(x=>{ const n={...x}; delete n[key]; return n; });
+      await loadAll();
+    }catch(e){alert("Could not save the price: "+errMsg(e));}
+    setPriceSaving(false);
+  };
+  const priceEditor=(batches,key,current,focus,label)=>(can(user,"adjust")&&<div style={{display:"flex",gap:10,alignItems:"flex-end",padding:"6px 0 10px"}}>
+    <div className="field" style={{flex:1,marginBottom:0}}><label>{label}</label><input type="number" inputMode="decimal" autoFocus={focus} value={priceDraft[key]!==undefined?priceDraft[key]:(current>0?current:"")} onChange={e=>setPriceDraft(x=>({...x,[key]:e.target.value}))} placeholder="e.g. 1500"/></div>
+    <button className="btn-y" disabled={priceSaving} onClick={()=>setPrices(batches,priceDraft[key]!==undefined?priceDraft[key]:current,key)} style={{padding:"10px 18px"}}>{priceSaving?"...":"Save"}</button>
+  </div>);
   const renderItems=()=>{
     if(loading) return <div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading...</div>;
     const groups={};
@@ -166,6 +190,7 @@ export function StockTab({user,onMoney}){
             </div>
             {open&&<div className="tbl-x">
               <div style={{fontSize:13,color:"#8A97A8",padding:"6px 0"}}>Stock value {fmtK(r.val)}{r.noPrice&&!r.allNoPrice?" · * some batches have no price":""}</div>
+              {priceEditor(r.batches,r.key,r.price,r.allNoPrice,"Selling price for all batches (KSh)")}
               {r.batches.slice().sort((a,b)=>(a.trip_no||"").localeCompare(b.trip_no||"")).map(b=>{
                 const tr=trips.find(x=>x.trip_no===b.trip_no); const locked=tr?tr.status==="locked":true;
                 return (<div key={b.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 0",borderTop:"1px solid #101B36"}}>
@@ -226,6 +251,8 @@ export function StockTab({user,onMoney}){
   const saveTrip=async()=>{
     const vi=tripItems.filter(i=>i.name&&Number(i.unit_cost)>0);
     if(!vi.length){setErr("Add at least one item.");return;}
+    const noP=vi.find(i=>!(Number(i.selling_price)>0));
+    if(noP){setErr(`Set a selling price for ${noP.name}.`);return;}
     setSaving(true); setErr("");
     try{
       const tripNo=`KARU-TRIP-${String(trips.length+1).padStart(3,"0")}`;
@@ -330,7 +357,7 @@ export function StockTab({user,onMoney}){
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
               <input type="number" value={i.unit_cost} onChange={e=>upTI(i.id,"unit_cost",e.target.value)} placeholder="Cost each (KSh)" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
-              <input type="number" value={i.selling_price} onChange={e=>upTI(i.id,"selling_price",e.target.value)} placeholder="Sell at (KSh)" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
+              <input type="number" value={i.selling_price} onChange={e=>upTI(i.id,"selling_price",e.target.value)} placeholder="Sell at (KSh) - required" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
             </div>
             {i.unit_cost&&i.selling_price&&<div style={{fontSize:13,color:"#8899AA",marginTop:5}}>Margin: {Math.round((1-i.unit_cost/i.selling_price)*100)}% | Cost: KSh {(Number(i.qty_in||1)*Number(i.unit_cost)).toLocaleString()}</div>}
           </div>
@@ -427,39 +454,44 @@ export function StockTab({user,onMoney}){
         const logs=auditForTrip(t.trip_no);
         const locked=t.status==="locked";
         return (
-          <div key={t.id} className="card" style={{borderLeft:`3px solid ${locked?"#4CAF50":"#F5C000"}`}}>
-            <div className="trip-hdr" onClick={()=>toggleExpand(t.id)}>
-              <div>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                  <span style={{fontSize:16,fontWeight:600,color:"#F5C000"}}>{t.trip_no}</span>
-                  <span className={`badge ${locked?"b-g":"b-y"}`}>{locked?"Locked":"Open"}</span>
+          <div key={t.id} className={`tbl-row${isOpen?" open":""}`}>
+            <div className="tbl-r" onClick={()=>toggleExpand(t.id)} style={{gridTemplateColumns:"minmax(0,1fr) 92px 78px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
+                <span className="chev"/>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>{t.trip_no}</div>
+                  <div className="tbl-sub">{t.date} · {t.created_by?.split(" ")[0]} · {tItems.length} item{tItems.length!==1?"s":""}</div>
+                  {locked&&<div className="tbl-sub" style={{color:"#4CAF50"}}>Locked by {t.locked_by?.split(" ")[0]} on {t.locked_at?new Date(t.locked_at).toLocaleDateString("en-KE"):""}</div>}
                 </div>
-                <div style={{fontSize:14,color:"#8899AA"}}>{t.date} · {t.created_by?.split(" ")[0]} · KSh {Number(t.total_cost).toLocaleString()} · {tItems.length} item{tItems.length!==1?"s":""}</div>
-                {locked&&<div style={{fontSize:13,color:"#4CAF50",marginTop:2}}>Locked by {t.locked_by?.split(" ")[0]} on {t.locked_at?new Date(t.locked_at).toLocaleDateString("en-KE"):""}</div>}
               </div>
-              <span style={{color:"#8A97A8",fontSize:18}}>{isOpen?"▲":"▼"}</span>
+              <div className="num" style={{fontWeight:600,fontSize:15}}>{Number(t.total_cost).toLocaleString()}</div>
+              <div style={{textAlign:"right"}}><span className={`badge ${locked?"b-g":"b-y"}`}>{locked?"Locked":"Open"}</span></div>
             </div>
             {isOpen&&(
-              <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #1A2A4A"}}>
-                {tItems.map(s=>{
-                  const adj=s.qty_adjusted||0; const avail=s.qty_in-s.qty_sold-adj;
-                  return (
-                    <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"8px 0",borderBottom:"1px solid #0F1A3A"}}>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:15,fontWeight:500}}>{s.name}</div>
-                        <div style={{fontSize:13,color:"#8899AA",marginTop:2}}>{catLabel(s.category)} · Cost KSh {Number(s.unit_cost).toLocaleString()} · {Number(s.selling_price)>0?`Sell KSh ${Number(s.selling_price).toLocaleString()}`:<span style={{color:"#E8A45B"}}>No price set</span>}</div>
-                        {(Number(s.qty_sold)>0||adj>0)&&<div style={{fontSize:13,color:"#8A97A8",marginTop:1}}>In {s.qty_in} · Sold {s.qty_sold}{adj>0?` · Adjusted ${adj}`:""}</div>}
-                      </div>
-                      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-                        <span className={`badge ${avail>0?"b-g":"b-r"}`}>{avail>0?`${avail} left`:"None left"}</span>
-                        <div style={{display:"flex",gap:4}}>
-                          {avail>0&&can(user,"adjust")&&<button onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{background:"none",border:"none",color:"#C2CBD6",fontSize:14,padding:"6px 8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Adjust</button>}
-                          {!locked&&can(user,"edit")&&withinWindow(s.created_at)&&<button onClick={()=>startEdit(s,t)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:14,padding:"6px 8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Edit</button>}
+              <div className="tbl-x" style={{paddingTop:10}}>
+                <div className="tbl" style={{margin:"0 0 8px"}}>
+                  <div className="tbl-h" style={{gridTemplateColumns:"minmax(0,1fr) 52px 70px 84px"}}><span>Item</span><span className="num">Left</span><span className="num">Cost</span><span className="num">Price</span></div>
+                  {tItems.map(s=>{
+                    const adj=s.qty_adjusted||0; const avail=s.qty_in-s.qty_sold-adj; const op=!!itemOpen["t"+s.id]; const has=Number(s.selling_price)>0;
+                    return (
+                      <div key={s.id} className={`tbl-row${op?" open":""}`}>
+                        <div className="tbl-r" onClick={()=>setItemOpen(x=>({...x,["t"+s.id]:!x["t"+s.id]}))} style={{gridTemplateColumns:"minmax(0,1fr) 52px 70px 84px"}}>
+                          <div style={{minWidth:0}}><div style={{fontSize:15,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div><div className="tbl-sub">{catLabel(s.category)} · In {s.qty_in}{Number(s.qty_sold)>0?` · Sold ${s.qty_sold}`:""}{adj>0?` · Adj ${adj}`:""}</div></div>
+                          <div className="num" style={{fontSize:15,fontWeight:600,color:avail>0?"#4CAF50":"#E85B5B"}}>{avail}</div>
+                          <div className="num" style={{fontSize:14,color:"#C2CBD6"}}>{Number(s.unit_cost).toLocaleString()}</div>
+                          <div className="num" style={{fontSize:14,fontWeight:600,color:has?"#FFFFFF":"#E8A45B"}}>{has?Number(s.selling_price).toLocaleString():"No price"}</div>
                         </div>
+                        {op&&<div className="tbl-x" style={{background:"#050A1F"}}>
+                          {priceEditor([s],"b"+s.id,Number(s.selling_price),!has,"Selling price (KSh)")}
+                          <div style={{display:"flex",gap:2}}>
+                            {avail>0&&can(user,"adjust")&&<button onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{background:"none",border:"none",color:"#C2CBD6",fontSize:14,padding:"8px 8px 8px 0",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Adjust stock</button>}
+                            {!locked&&can(user,"edit")&&withinWindow(s.created_at)&&<button onClick={()=>startEdit(s,t)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:14,padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Edit item</button>}
+                          </div>
+                        </div>}
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
                 {!locked&&(
                   <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #0F1A3A"}}>
                     {addingToTrip?.id===t.id?(
@@ -476,6 +508,7 @@ export function StockTab({user,onMoney}){
                               <input type="number" value={i.qty_in} min={1} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,qty_in:e.target.value}:a))} placeholder="Qty" style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,textAlign:"center",width:"100%"}}/>
                               <input type="number" value={i.unit_cost} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,unit_cost:e.target.value}:a))} placeholder="Cost (KSh)" style={{background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,width:"100%"}}/>
                             </div>
+                            <input type="number" value={i.selling_price} onChange={e=>setAddExtraItems(x=>x.map(a=>a.id===i.id?{...a,selling_price:e.target.value}:a))} placeholder="Sell at (KSh) - required" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"8px 2px",fontSize:15,color:"#FFFFFF",marginTop:8}}/>
                           </div>
                         ))}
                         <button className="btn-g" onClick={()=>setAddExtraItems(x=>[...x,{id:Date.now(),name:"",category:"living",qty_in:1,unit_cost:"",selling_price:""}])} style={{width:"100%",fontSize:14,marginBottom:8}}>+ Add another</button>
@@ -522,7 +555,8 @@ export function StockTab({user,onMoney}){
           </div>
         );
         };
-        // Group trips: current month as full cards, older months/years collapsed
+        const tripTable=arr=>(<div className="tbl"><div className="tbl-h" style={{gridTemplateColumns:"minmax(0,1fr) 92px 78px"}}><span>Trip</span><span className="num">Cost</span><span className="num">Status</span></div>{arr.map(renderTrip)}</div>);
+        // Group trips: current month as rows, older months/years collapsed
         const tg=k=>setTripGrp(x=>({...x,[k]:!x[k]}));
         const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
         const now=new Date(); const cm=now.toISOString().slice(0,7); const cy=String(now.getFullYear());
@@ -531,14 +565,14 @@ export function StockTab({user,onMoney}){
         sorted.forEach(t=>{ const ym=(t.date||"").slice(0,7),y=(t.date||"").slice(0,4); if(ym===cm)cur.push(t); else if(y===cy){(mg[ym]=mg[ym]||[]).push(t);} else {(yg[y]=yg[y]||[]).push(t);} });
         const grpCost=arr=>arr.reduce((n,t)=>n+Number(t.total_cost||0),0);
         return (<div>
-          {cur.map(renderTrip)}
+          {cur.length>0&&tripTable(cur)}
           {Object.keys(mg).sort((a,b)=>b.localeCompare(a)).map(ym=>(
             <div key={ym} style={{marginBottom:10}}>
               <div onClick={()=>tg(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"9px 12px",background:"#0A1128",border:"1px solid #24365C",borderRadius:10}}>
                 <span style={{fontSize:15,fontWeight:600,color:"#AEB9C7"}}>{tripGrp[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]} · {mg[ym].length} trip{mg[ym].length!==1?"s":""}</span>
                 <span style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>KSh {grpCost(mg[ym]).toLocaleString()}</span>
               </div>
-              {tripGrp[ym]&&<div style={{marginTop:8}}>{mg[ym].map(renderTrip)}</div>}
+              {tripGrp[ym]&&<div style={{marginTop:8}}>{tripTable(mg[ym])}</div>}
             </div>
           ))}
           {Object.keys(yg).sort((a,b)=>b.localeCompare(a)).map(y=>(
@@ -547,7 +581,7 @@ export function StockTab({user,onMoney}){
                 <span style={{fontSize:15,fontWeight:700,color:"#E8E2D4"}}>{tripGrp[y]?"▾":"▸"} {y} · {yg[y].length} trip{yg[y].length!==1?"s":""}</span>
                 <span style={{fontSize:15,fontWeight:700,color:"#F5C000"}}>KSh {grpCost(yg[y]).toLocaleString()}</span>
               </div>
-              {tripGrp[y]&&<div style={{marginTop:8}}>{yg[y].map(renderTrip)}</div>}
+              {tripGrp[y]&&<div style={{marginTop:8}}>{tripTable(yg[y])}</div>}
             </div>
           ))}
         </div>);

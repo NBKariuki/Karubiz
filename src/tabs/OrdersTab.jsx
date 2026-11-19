@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CAT_OPTS, can, fmtK, logAudit, recordMoney, sb, todayStr } from "../lib";
+import { CAT_OPTS, can, errMsg, fmtK, logAudit, recordMoney, sb, todayStr } from "../lib";
 import { ProductSearch } from "../screens/ProductSearch";
 
 export function OrdersTab({user,onMoney}){
@@ -44,11 +44,22 @@ export function OrdersTab({user,onMoney}){
     catch{ try{ const ex=await sb.get("karu_suppliers",`select=id&name=eq.${encodeURIComponent(nm)}`); if(ex[0]) await sb.patch("karu_suppliers",ex[0].id,{last_used:todayStr()}); }catch{} }
   };
 
+  // An order that was started and never filled in: nothing named, nothing ordered, nothing paid.
+  const orderIsEmpty=o=>!!o&&o.status==="pending"&&(o.suppliers||[]).every(s=>s.status==="pending"&&Number(s.deposit_paid||0)===0&&!(s.supplier||"").trim()&&(s.items||[]).every(i=>!(i.name||"").trim()));
+  // Safe to delete: no supplier has been ordered, received, cancelled or paid a deposit.
+  const subsDeletable=subs=>(subs||[]).every(s=>(s.status||"pending")==="pending"&&Number(s.deposit_paid||0)===0);
+  const deleteOrder=async(o,ask)=>{
+    if(ask&&!confirm(`Delete ${o.order_no}? It has not been ordered or paid. This cannot be undone.`)) return;
+    try{ await sb.del("karu_orders",o.id); }catch(e){ alert("Could not delete: "+errMsg(e)); return; }
+    setOpenOrder(null); await load();
+  };
+  const leaveOrder=async()=>{ const o=openOrder; if(o&&orderIsEmpty(o)){ try{ await sb.del("karu_orders",o.id); }catch(e){ console.error(e); } } setOpenOrder(null); load(); };
   // Create a brand-new order immediately (so everything after is live)
   const startNew=async()=>{
     setBusy(true);
     try{
-      const orderNo=`KARU-ORD-${String(orders.length+1).padStart(3,"0")}`;
+      const nextNo=Math.max(0,...orders.map(x=>parseInt(String(x.order_no||"").replace(/\D/g,""),10)||0))+1;
+      const orderNo=`KARU-ORD-${String(nextNo).padStart(3,"0")}`;
       const firstSub={supplier:"",status:"pending",deposit_paid:0,items:[{name:"",category:"living",qty:1,est_cost:0}]};
       const [created]=await sb.post("karu_orders",{order_no:orderNo,date:todayStr(),suppliers:[firstSub],est_total:0,status:"pending",notes:"",created_by:user.full_name});
       await load(created.id);
@@ -140,7 +151,7 @@ export function OrdersTab({user,onMoney}){
     return (
       <div>
         <div className="subscreen-hd" style={{margin:"0 0 14px",borderRadius:12,border:"1px solid #24365C"}}>
-          <button className="btn-g" onClick={()=>{setOpenOrder(null);load();}} style={{fontSize:15}}>Back</button>
+          <button className="btn-g" onClick={leaveOrder} style={{fontSize:15}}>Back</button>
           <div className="title" style={{color:"#F5C000"}}>{openOrder.order_no}</div>
           <span className={`badge ${badge(openOrder.status)}`} style={{marginLeft:"auto"}}>{openOrder.status}</span>
         </div>
@@ -230,6 +241,7 @@ export function OrdersTab({user,onMoney}){
           {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:14,color:"#8899AA",marginTop:4}}><span>Deposits paid</span><span>{fmtK(orderDeposits(draft))}</span></div>}
           {orderDeposits(draft)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:14,color:"#E8A45B",marginTop:2}}><span>Balance to suppliers</span><span>{fmtK(Math.max(0,orderTotal(draft)-orderDeposits(draft)))}</span></div>}
         </div>
+        {subsDeletable(draft)&&subsDeletable(openOrder.suppliers)&&<button className="btn-r" onClick={()=>deleteOrder(openOrder,true)} style={{width:"100%",marginTop:12,padding:"11px",fontSize:14}}>Delete this order</button>}
         {draft.some(s=>s.status==="received")&&(()=>{ const depOnReceived=draft.filter(s=>s.status==="received").reduce((t,s)=>t+Number(s.deposit_paid||0),0); return (
           <div style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:10,marginTop:10,fontSize:14,color:"#8899AA"}}>
             <div style={{color:"#4CAF50",fontWeight:600,marginBottom:4}}>✓ Received items — log them as a sourcing trip in Stock</div>
@@ -244,6 +256,7 @@ export function OrdersTab({user,onMoney}){
   return (
     <div>
       <div style={{fontSize:14,color:"#8899AA",marginBottom:12,lineHeight:1.5}}>Plan a buying trip. Open an order and add each supplier as its own block — items, deposit, and status handled right there. Each supplier acts on its own.</div>
+      {orders.filter(orderIsEmpty).length>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:"9px 12px",marginBottom:12,fontSize:14,color:"#E8A45B"}}><span>{orders.filter(orderIsEmpty).length} empty order{orders.filter(orderIsEmpty).length!==1?"s":""}</span><button className="btn-r" onClick={async()=>{ const em=orders.filter(orderIsEmpty); if(!confirm(`Delete ${em.length} empty order${em.length!==1?"s":""}?`)) return; for(const e of em){ try{ await sb.del("karu_orders",e.id); }catch(x){ console.error(x); } } await load(); }}>Delete empty</button></div>}
       <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}><button className="btn-y" onClick={startNew} disabled={busy} style={{fontSize:15,padding:"9px 16px"}}>{busy?"...":"+ New Order"}</button></div>
       <div style={{display:"flex",gap:6,marginBottom:14}}>
         {[["open","Open"],["done","Completed"],["all","All"]].map(([id,l])=><button key={id} onClick={()=>setFilter(id)} style={{padding:"5px 12px",borderRadius:100,border:`1px solid ${filter===id?"#F5C000":"#1A2A4A"}`,background:filter===id?"rgba(245,192,0,0.1)":"transparent",color:filter===id?"#F5C000":"#8899AA",fontSize:14,cursor:"pointer"}}>{l}</button>)}
