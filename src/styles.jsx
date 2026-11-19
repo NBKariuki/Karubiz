@@ -13,7 +13,17 @@ export const GS = () => (
     .btn-r{background:rgba(232,91,91,0.12);color:#E85B5B;border:1px solid rgba(232,91,91,0.3);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
     .badge{display:inline-block;font-size:13px;font-weight:600;padding:3px 9px;border-radius:100px} .b-y{background:rgba(245,192,0,0.12);color:#F5C000} .b-g{background:rgba(76,175,80,0.12);color:#4CAF50} .b-r{background:rgba(232,91,91,0.12);color:#E85B5B}
     .stat{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:14px;text-align:center} .stat-n{font-size:22px;font-weight:600;margin-bottom:2px} .stat-l{font-size:12px;color:#AEB9C7;text-transform:uppercase;letter-spacing:0.06em}
-    .nav{display:flex;background:#0A1128;border-top:1px solid #1A2A4A;position:fixed;bottom:0;left:0;right:0;z-index:50}
+    .shell{max-width:500px;margin:0 auto;padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+    .nav{display:flex;background:#0A1128;border-top:1px solid #1A2A4A;position:fixed;bottom:0;left:0;right:0;z-index:50;padding-bottom:env(safe-area-inset-bottom,0px)}
+    @media (min-width:600px) and (max-width:899px){ .shell{max-width:660px} }
+    @media (min-width:900px){
+      .shell{max-width:none;margin:0;padding:0 0 32px 88px}
+      .shell>div{max-width:800px;margin-left:auto;margin-right:auto}
+      .nav{top:0;right:auto;bottom:0;width:88px;flex-direction:column;justify-content:flex-start;gap:6px;padding:18px 0;border-top:none;border-right:1px solid #1A2A4A}
+      .nav-btn{flex:none;padding:14px 4px;font-size:13px;border-left:3px solid transparent}
+      .nav-btn.on{border-left-color:#F5C000;background:rgba(245,192,0,0.08)}
+      .nav-btn:hover{color:#E8E2D4}
+    }
     .nav-btn{flex:1;padding:10px 4px 8px;background:none;border:none;color:#8A97A8;cursor:pointer;font-size:12px;font-weight:500;letter-spacing:0.03em;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:'DM Sans',sans-serif} .nav-btn .ni{font-size:20px} .nav-btn.on{color:#F5C000}
     .ac-drop{position:absolute;top:100%;left:0;right:0;background:#0A1128;border:1px solid #F5C000;border-top:none;border-radius:0 0 6px 6px;z-index:200;max-height:200px;overflow-y:auto}
     .ac-item{padding:9px 12px;cursor:pointer;border-bottom:1px solid #1A2A4A} .ac-item:hover{background:#0F1A3A} .ac-item:last-child{border-bottom:none}

@@ -101,13 +101,13 @@ export function ExpensesTab({user,onMoney}){
       </div>
 
       <div style={{display:"flex",gap:8,marginBottom:12}}>
-        <button className="btn-g" onClick={()=>{setFrom(monthStart);setTo(todayStr());setShowRange(false);}} style={{flex:1,fontSize:12,...(isThisMonth?{borderColor:"#F5C000",color:"#F5C000"}:{})}}>This month</button>
-        <button className="btn-g" onClick={()=>setShowRange(x=>!x)} style={{flex:1,fontSize:12,...(!isThisMonth?{borderColor:"#F5C000",color:"#F5C000"}:{})}}>Date range</button>
+        <button className="btn-g" onClick={()=>{setFrom(monthStart);setTo(todayStr());setShowRange(false);}} style={{flex:1,fontSize:14,...(isThisMonth?{borderColor:"#F5C000",color:"#F5C000"}:{})}}>This month</button>
+        <button className="btn-g" onClick={()=>setShowRange(x=>!x)} style={{flex:1,fontSize:14,...(!isThisMonth?{borderColor:"#F5C000",color:"#F5C000"}:{})}}>Date range</button>
       </div>
       {showRange&&(
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/></div>
-          <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/></div>
+          <div><div style={{fontSize:13,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/></div>
+          <div><div style={{fontSize:13,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/></div>
         </div>
       )}
 
@@ -118,8 +118,8 @@ export function ExpensesTab({user,onMoney}){
       {showPetty&&(
         <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
           <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Record Petty Cash Spend</div>
-          <div style={{fontSize:11,color:"#8A97A8",marginBottom:12}}>Comes out of the petty cash pocket and logs here as an expense.</div>
-          <div className="field"><label>Category</label><div className="tog" style={{flexWrap:"wrap"}}>{PETTY_CATS.map(c=><button key={c} className={`tog-btn${pcCat===c?" on":""}`} onClick={()=>setPcCat(c)} style={{flex:"1 0 30%",fontSize:12}}>{c}</button>)}</div></div>
+          <div style={{fontSize:13,color:"#8A97A8",marginBottom:12}}>Comes out of the petty cash pocket and logs here as an expense.</div>
+          <div className="field"><label>Category</label><div className="tog" style={{flexWrap:"wrap"}}>{PETTY_CATS.map(c=><button key={c} className={`tog-btn${pcCat===c?" on":""}`} onClick={()=>setPcCat(c)} style={{flex:"1 0 30%",fontSize:14}}>{c}</button>)}</div></div>
           <div className="field"><label>Note (what for)</label><input value={pcNote} onChange={e=>setPcNote(e.target.value)} placeholder="e.g. Tea for the shop"/></div>
           <div className="field"><label>Amount (KSh)</label><input type="number" value={pcAmt} onChange={e=>setPcAmt(e.target.value)} placeholder="0"/></div>
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={doPettySpend} disabled={pcSaving} style={{flex:1}}>{pcSaving?"Saving...":"Record Spend"}</button><button className="btn-g" onClick={()=>{setShowPetty(false);setPcAmt("");setPcNote("");}}>Cancel</button></div>
@@ -134,15 +134,15 @@ export function ExpensesTab({user,onMoney}){
           <div className="field"><label>Amount (KSh)</label><input type="number" value={form.amount} onChange={e=>setForm(x=>({...x,amount:e.target.value}))} placeholder="0"/></div>
           <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${form.recorded_by===s?" on":""}`} onClick={()=>setForm(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
           <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${form.paid_from==="cash"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${form.paid_from==="sacco"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${form.paid_from==="personal"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
-          {form.paid_from==="personal"&&<div style={{fontSize:11,color:"#E8A45B",marginTop:5}}>Business will owe {form.recorded_by.split(" ")[0]} this amount</div>}</div>
-          {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
+          {form.paid_from==="personal"&&<div style={{fontSize:13,color:"#E8A45B",marginTop:5}}>Business will owe {form.recorded_by.split(" ")[0]} this amount</div>}</div>
+          {err&&<div style={{color:"#E85B5B",fontSize:14,marginBottom:10}}>{err}</div>}
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={save} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save"}</button><button className="btn-g" onClick={()=>{setShowForm(false);setErr("");}}>Cancel</button></div>
         </div>
       )}
       {editing&&(
         <div className="card" style={{marginBottom:14,border:"1px solid rgba(232,164,91,0.4)"}}>
           <div style={{fontSize:14,fontWeight:600,marginBottom:4,color:"#E8A45B"}}>Edit Expense</div>
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:12}}>The money effect will be corrected automatically.</div>
+          <div style={{fontSize:13,color:"#8899AA",marginBottom:12}}>The money effect will be corrected automatically.</div>
           <div className="field"><label>Date</label><input type="date" value={editing.date} onChange={e=>setEditing(x=>({...x,date:e.target.value}))}/></div>
           <div className="field"><label>Category</label><select value={editing.category} onChange={e=>setEditing(x=>({...x,category:e.target.value}))}>{EXP_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
           <div className="field"><label>Description</label><input value={editing.description||""} onChange={e=>setEditing(x=>({...x,description:e.target.value}))}/></div>
@@ -150,7 +150,7 @@ export function ExpensesTab({user,onMoney}){
           <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${editing.recorded_by===s?" on":""}`} onClick={()=>setEditing(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
           <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${editing.paid_from==="cash"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${editing.paid_from==="sacco"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${editing.paid_from==="personal"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"personal"}))}>Personal</button></div></div>
           <div className="field"><label>Reason for change (required)</label><textarea value={editReason} onChange={e=>setEditReason(e.target.value)} placeholder="e.g. Wrong amount entered, corrected"/></div>
-          {err&&<div style={{color:"#E85B5B",fontSize:13,marginBottom:10}}>{err}</div>}
+          {err&&<div style={{color:"#E85B5B",fontSize:14,marginBottom:10}}>{err}</div>}
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={saveEdit} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save Changes"}</button><button className="btn-g" onClick={()=>{setEditing(null);setErr("");}}>Cancel</button></div>
         </div>
       )}
@@ -159,15 +159,15 @@ export function ExpensesTab({user,onMoney}){
           <div key={e.id} style={{padding:"9px 0",borderBottom:last?"none":"1px solid #101B36"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.description||e.category}</div>
-                <div style={{fontSize:11,color:"#8A97A8"}}>{e.category} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+e.paid_from:""}</div>
+                <div style={{fontSize:14,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.description||e.category}</div>
+                <div style={{fontSize:13,color:"#8A97A8"}}>{e.category} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+e.paid_from:""}</div>
               </div>
               <span style={{fontSize:14,fontWeight:600,color:"#E85B5B",marginLeft:10,whiteSpace:"nowrap"}}>{fmtK(Number(e.amount))}</span>
             </div>
             {can(user,"edit_expense")&&(withinWindow(e.created_at)?<div style={{display:"flex",gap:6,marginTop:6}}>
-              <button className="btn-g" onClick={()=>startEdit(e)} style={{fontSize:11,padding:"4px 10px"}}>Edit</button>
-              {can(user,"void")&&<button className="btn-g" onClick={()=>delExpense(e)} style={{fontSize:11,padding:"4px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Delete</button>}
-            </div>:<div style={{fontSize:10,color:"#8A97A8",marginTop:6}}>🔒 Locked (over 24h)</div>)}
+              <button className="btn-g" onClick={()=>startEdit(e)} style={{fontSize:13,padding:"4px 10px"}}>Edit</button>
+              {can(user,"void")&&<button className="btn-g" onClick={()=>delExpense(e)} style={{fontSize:13,padding:"4px 10px",borderColor:"rgba(232,91,91,0.3)",color:"#E85B5B"}}>Delete</button>}
+            </div>:<div style={{fontSize:12,color:"#8A97A8",marginTop:6}}>🔒 Locked (over 24h)</div>)}
           </div>
         );
         const dayTotal=arr=>arr.reduce((n,e)=>n+Number(e.amount),0);
@@ -188,8 +188,8 @@ export function ExpensesTab({user,onMoney}){
             {currentMonthDays.map(date=>(
               <div key={date} style={{marginBottom:8}}>
                 <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8}}>
-                  <span style={{fontSize:13,fontWeight:600,color:"#E8E2D4"}}>{expOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
-                  <span style={{fontSize:13,fontWeight:600,color:"#E85B5B"}}>{fmtK(dayTotal(days[date]))}</span>
+                  <span style={{fontSize:14,fontWeight:600,color:"#E8E2D4"}}>{expOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                  <span style={{fontSize:14,fontWeight:600,color:"#E85B5B"}}>{fmtK(dayTotal(days[date]))}</span>
                 </div>
                 {expOpen[date]&&<div style={{padding:"0 10px"}}>{days[date].map((e,i)=>expRow(e,i===days[date].length-1))}</div>}
               </div>
@@ -199,14 +199,14 @@ export function ExpensesTab({user,onMoney}){
               return (
                 <div key={ym} style={{marginBottom:8}}>
                   <div onClick={()=>toggle(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
-                    <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{expOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
-                    <span style={{fontSize:13,fontWeight:600,color:"#E85B5B"}}>{fmtK(mTotal)}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:"#AEB9C7"}}>{expOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:"#E85B5B"}}>{fmtK(mTotal)}</span>
                   </div>
                   {expOpen[ym]&&<div style={{padding:"4px 10px 0"}}>{dates.map(date=>(
                     <div key={date} style={{marginBottom:6}}>
                       <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid #101B36"}}>
-                        <span style={{fontSize:12,color:"#AEB9C7"}}>{expOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
-                        <span style={{fontSize:12,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
+                        <span style={{fontSize:14,color:"#AEB9C7"}}>{expOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                        <span style={{fontSize:14,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
                       </div>
                       {expOpen[date]&&<div>{days[date].map((e,i)=>expRow(e,i===days[date].length-1))}</div>}
                     </div>
@@ -219,14 +219,14 @@ export function ExpensesTab({user,onMoney}){
               return (
                 <div key={y} style={{marginBottom:8}}>
                   <div onClick={()=>toggle(y)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
-                    <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{expOpen[y]?"▾":"▸"} {y}</span>
-                    <span style={{fontSize:13,fontWeight:700,color:"#E85B5B"}}>{fmtK(yTotal)}</span>
+                    <span style={{fontSize:14,fontWeight:700,color:"#E8E2D4"}}>{expOpen[y]?"▾":"▸"} {y}</span>
+                    <span style={{fontSize:14,fontWeight:700,color:"#E85B5B"}}>{fmtK(yTotal)}</span>
                   </div>
                   {expOpen[y]&&<div style={{padding:"4px 10px 0"}}>{dates.map(date=>(
                     <div key={date} style={{marginBottom:6}}>
                       <div onClick={()=>toggle(date)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"6px 0",borderBottom:"1px solid #101B36"}}>
-                        <span style={{fontSize:12,color:"#AEB9C7"}}>{expOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
-                        <span style={{fontSize:12,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
+                        <span style={{fontSize:14,color:"#AEB9C7"}}>{expOpen[date]?"▾":"▸"} {fmtDay(date)}</span>
+                        <span style={{fontSize:14,color:"#8A97A8"}}>{fmtK(dayTotal(days[date]))}</span>
                       </div>
                       {expOpen[date]&&<div>{days[date].map((e,i)=>expRow(e,i===days[date].length-1))}</div>}
                     </div>

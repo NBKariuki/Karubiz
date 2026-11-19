@@ -53,12 +53,12 @@ export function LoansTab({user,onChange}){
         <div onClick={()=>setOpen(isOpen?null:l.id)} style={{cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
           <div style={{flex:1}}>
             <div style={{fontSize:16,fontWeight:600}}>{l.lender}</div>
-            <div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>{l.kind==="partner"?"Partner loan":"Outside lender"} · borrowed {fmtD(l.start_date)}</div>
-            <div style={{fontSize:13,color:t.c,marginTop:4,fontWeight:500}}>{t.t}</div>
+            <div style={{fontSize:14,color:"#A9B5C6",marginTop:2}}>{l.kind==="partner"?"Partner loan":"Outside lender"} · borrowed {fmtD(l.start_date)}</div>
+            <div style={{fontSize:14,color:t.c,marginTop:4,fontWeight:500}}>{t.t}</div>
           </div>
           <div style={{textAlign:"right"}}>
             <div style={{fontSize:17,fontWeight:700,color:c.balance>=1?"#E8A45B":"#4CAF50"}}>{fmtK(c.balance)}</div>
-            <div style={{fontSize:12,color:"#8A97A8"}}>{c.balance>=1?"still to repay":"fully repaid"}</div>
+            <div style={{fontSize:14,color:"#8A97A8"}}>{c.balance>=1?"still to repay":"fully repaid"}</div>
           </div>
         </div>
         {isOpen&&(
@@ -68,9 +68,9 @@ export function LoansTab({user,onChange}){
             {Row("Total to repay",fmtK(c.totalDue),"#F5C000")}
             {Row("Paid so far",fmtK(c.paid),"#4CAF50")}
             {l.due_date&&Row("Due date",fmtD(l.due_date))}
-            {l.notes&&<div style={{fontSize:13,color:"#A9B5C6",marginTop:6}}>{l.notes}</div>}
+            {l.notes&&<div style={{fontSize:14,color:"#A9B5C6",marginTop:6}}>{l.notes}</div>}
             {c.lp.length>0&&(<div style={{marginTop:10}}>
-              <div style={{fontSize:13,color:"#A9B5C6",marginBottom:4}}>Repayments</div>
+              <div style={{fontSize:14,color:"#A9B5C6",marginBottom:4}}>Repayments</div>
               {c.lp.map(p=><div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:14,padding:"5px 0",borderBottom:"1px solid #0F1A3A"}}><span>{fmtD(p.date)} · from {p.paid_from==="sacco"?"SACCO":"cash"}{Number(p.interest_part)>0?` (interest ${fmtK(p.interest_part)})`:""}</span><span style={{color:"#4CAF50"}}>{fmtK(p.amount)}</span></div>)}
             </div>)}
             {c.balance>=1&&!pf&&<button className="btn-y" onClick={()=>{setErr("");setPf({loan:l.id,amount:"",interest:"",from:"cash",date:todayStr(),note:""});}} style={{width:"100%",marginTop:12,fontSize:14}}>Record repayment</button>}
@@ -93,7 +93,7 @@ export function LoansTab({user,onChange}){
   return (
     <div>
       <div className="card" style={{marginBottom:14}}>
-        <div style={{fontSize:13,color:"#A9B5C6"}}>Total still to repay</div>
+        <div style={{fontSize:14,color:"#A9B5C6"}}>Total still to repay</div>
         <div style={{fontSize:26,fontWeight:700,color:totalOut>0?"#E8A45B":"#4CAF50",margin:"2px 0 4px"}}>{fmtK(totalOut)}</div>
         <div style={{fontSize:14,color:"#A9B5C6"}}>{active.length} active loan{active.length===1?"":"s"}{nextDue?` · next due ${fmtD(nextDue.l.due_date)} (${nextDue.l.lender})`:""}</div>
         {overdue>0&&<div style={{fontSize:14,color:"#E85B5B",marginTop:6,fontWeight:600}}>{overdue} overdue</div>}
@@ -119,10 +119,10 @@ export function LoansTab({user,onChange}){
       )}
       {err&&!nf&&!pf&&<div style={{color:"#E85B5B",fontSize:14,marginBottom:10}}>{err}</div>}
       {active.map(renderLoan)}
-      {done.length>0&&<div style={{fontSize:13,color:"#A9B5C6",margin:"14px 0 8px"}}>Repaid</div>}
+      {done.length>0&&<div style={{fontSize:14,color:"#A9B5C6",margin:"14px 0 8px"}}>Repaid</div>}
       {done.map(renderLoan)}
       {loans.length===0&&!nf&&<div style={{textAlign:"center",color:"#A9B5C6",fontSize:14,padding:"24px 10px"}}>No loans recorded yet.</div>}
-      <div style={{fontSize:13,color:"#8A97A8",lineHeight:1.5,marginTop:14}}>Borrowing adds money to Cash or SACCO and records what is owed. Repayments reduce what is owed. The interest part of a repayment is saved as a "Loan interest" expense.</div>
+      <div style={{fontSize:14,color:"#8A97A8",lineHeight:1.5,marginTop:14}}>Borrowing adds money to Cash or SACCO and records what is owed. Repayments reduce what is owed. The interest part of a repayment is saved as a "Loan interest" expense.</div>
     </div>
   );
 }

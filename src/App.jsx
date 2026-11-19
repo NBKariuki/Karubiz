@@ -48,7 +48,7 @@ export default function App() {
   const tabs=[["sale","Sale","💰","sale"],["stock","Stock","📦","stock"],["expenses","Expenses","🧾","expenses"],["ledger","Ledger","📒","money"],["reports","Reports","📊","reports"]].filter(([,,,perm])=>can(user,perm));
   const activeTab = tabs.some(t=>t[0]===tab)?tab:tabs[0][0];
   return (<><GS/>
-    <div style={{maxWidth:500,margin:"0 auto",paddingBottom:72}}>
+    <div className="shell">
       <div style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#050A1F",position:"sticky",top:0,zIndex:40,borderBottom:"1px solid #0A1128"}}>
         <span style={{fontSize:16,fontWeight:600,color:"#F5C000",letterSpacing:"0.08em"}}>KARU</span>
         <span style={{fontSize:12,color:"#8A97A8"}}>{user.full_name.split(" ")[0]} · {ROLES[user.role].label}</span>

@@ -170,22 +170,22 @@ export function LedgerTab({user,onMoney,bal,onChange}){
       </div>
       <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"12px 14px",marginBottom:12}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <span style={{fontSize:13,color:"#AEB9C7"}}>Total on hand</span>
+          <span style={{fontSize:14,color:"#AEB9C7"}}>Total on hand</span>
           <span style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(total)}</span>
         </div>
         <div style={{display:"flex",gap:8}}>
           <div style={{flex:1,background:"transparent",border:"1px solid #24365C",borderRadius:7,padding:"8px 10px"}}>
-            <div style={{fontSize:11,color:"#8A97A8"}}>CAPITAL (keep)</div>
+            <div style={{fontSize:13,color:"#8A97A8"}}>CAPITAL (keep)</div>
             <div style={{fontSize:15,fontWeight:700,color:"#E8E2D4"}}>{fmtK(liquidCapitalPortion)}</div>
           </div>
           <div style={{flex:1,background:liquidProfitPortion>0?"rgba(76,175,80,0.08)":"#12203C",border:`1px solid ${liquidProfitPortion>0?"rgba(76,175,80,0.35)":"#24365C"}`,borderRadius:7,padding:"8px 10px"}}>
-            <div style={{fontSize:11,color:"#8A97A8"}}>PROFIT (spendable)</div>
+            <div style={{fontSize:13,color:"#8A97A8"}}>PROFIT (spendable)</div>
             <div style={{fontSize:15,fontWeight:700,color:liquidProfitPortion>0?"#4CAF50":"#8A97A8"}}>{fmtK(liquidProfitPortion)}</div>
           </div>
         </div>
-        <div style={{fontSize:11,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>{liquidProfitPortion>0?`You can take up to ${fmtK(liquidProfitPortion)} without touching capital.`:"All liquid money is capital right now — spending eats into the float."}</div>
+        <div style={{fontSize:13,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>{liquidProfitPortion>0?`You can take up to ${fmtK(liquidProfitPortion)} without touching capital.`:"All liquid money is capital right now — spending eats into the float."}</div>
       </div>
-      {!checkOK&&<div style={{fontSize:13,marginBottom:12,color:"#E85B5B"}}>⚠ Balance mismatch. Review the register.</div>}
+      {!checkOK&&<div style={{fontSize:14,marginBottom:12,color:"#E85B5B"}}>⚠ Balance mismatch. Review the register.</div>}
 
       {/* Sub-tabs */}
       <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:2}}>
@@ -198,11 +198,11 @@ export function LedgerTab({user,onMoney,bal,onChange}){
         <div>
           {!act&&<div>
             <div>
-              <button onClick={()=>setAct("bank")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Bank cash into SACCO</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Move cash from the till into the SACCO account</div></button>
-              <button onClick={()=>setAct("withdraw")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Withdraw SACCO to cash</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Take money out of SACCO into cash</div></button>
-              <button onClick={()=>setAct("partner")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Partner money in or out</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Loans, capital and withdrawals by a partner</div></button>
-              <button onClick={()=>setAct("allocate")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Top up petty cash</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Move money into the petty cash pocket</div></button>
-              <button onClick={()=>setAct("reconcile")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Reconcile a balance</div><div style={{fontSize:13,color:"#A9B5C6",marginTop:2}}>Fix a balance after counting what is really there</div></button>
+              <button onClick={()=>setAct("bank")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Bank cash into SACCO</div><div style={{fontSize:14,color:"#A9B5C6",marginTop:2}}>Move cash from the till into the SACCO account</div></button>
+              <button onClick={()=>setAct("withdraw")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Withdraw SACCO to cash</div><div style={{fontSize:14,color:"#A9B5C6",marginTop:2}}>Take money out of SACCO into cash</div></button>
+              <button onClick={()=>setAct("partner")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Partner money in or out</div><div style={{fontSize:14,color:"#A9B5C6",marginTop:2}}>Loans, capital and withdrawals by a partner</div></button>
+              <button onClick={()=>setAct("allocate")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Top up petty cash</div><div style={{fontSize:14,color:"#A9B5C6",marginTop:2}}>Move money into the petty cash pocket</div></button>
+              <button onClick={()=>setAct("reconcile")} style={{display:"block",width:"100%",textAlign:"left",background:"transparent",border:"none",borderBottom:"1px solid #1A2A4A",padding:"14px 2px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}><div style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>Reconcile a balance</div><div style={{fontSize:14,color:"#A9B5C6",marginTop:2}}>Fix a balance after counting what is really there</div></button>
             </div>
           </div>}
           {act==="bank"&&<ActBox title="Bank cash into SACCO"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doBank} off={rb} saving={saving}/></ActBox>}
@@ -212,24 +212,24 @@ export function LedgerTab({user,onMoney,bal,onChange}){
             <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${dir==="in"?" on":""}`} onClick={()=>setDir("in")}>Puts in</button><button className={`tog-btn${dir==="out"?" on":""}`} onClick={()=>setDir("out")}>Takes out</button></div>
             {dir==="in"&&<div style={{marginBottom:8}}>
               <div className="tog" style={{marginBottom:6}}><button className={`tog-btn${inKind==="loan"?" on":""}`} onClick={()=>setInKind("loan")}>Loan (repayable)</button><button className={`tog-btn${inKind==="capital"?" on":""}`} onClick={()=>setInKind("capital")}>Capital / gift</button></div>
-              <div style={{fontSize:11,color:"#8A97A8"}}>{inKind==="loan"?"Business will owe this back to "+who.split(" ")[0]+".":"Added to "+who.split(" ")[0]+"'s capital. Not repayable."}</div>
+              <div style={{fontSize:13,color:"#8A97A8"}}>{inKind==="loan"?"Business will owe this back to "+who.split(" ")[0]+".":"Added to "+who.split(" ")[0]+"'s capital. Not repayable."}</div>
             </div>}
-            {dir==="out"&&<div style={{fontSize:11,color:"#8A97A8",marginBottom:8,background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",lineHeight:1.5}}>
+            {dir==="out"&&<div style={{fontSize:13,color:"#8A97A8",marginBottom:8,background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:"8px 10px",lineHeight:1.5}}>
               {who.split(" ")[0]} is owed {fmtK(owedNow)}, has drawn {fmtK(drawnNow)} so far. Profit share ~{fmtK(share)}.
               {a>0&&<div style={{marginTop:4,color:a>owedNow&&(drawnNow+(a-owedNow))>share?"#E8A45B":"#4CAF50"}}>{a<=owedNow?`All ${fmtK(a)} comes off what's owed.`:`${fmtK(owedNow)} off what's owed, ${fmtK(a-owedNow)} as a drawing.${(drawnNow+(a-owedNow))>share?" ⚠ exceeds profit share — into capital.":""}`}</div>}
             </div>}
             <div className="tog" style={{marginBottom:8}}>{ACCTS.map(([id,l])=><button key={id} className={`tog-btn${acc===id?" on":""}`} onClick={()=>setAcc(id)}>{l}</button>)}</div>
             <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" className="lg-in"/><Confirm on={doPartner} off={rb} saving={saving}/></ActBox>);
           })()}
-          {act==="allocate"&&<ActBox title="Top up petty cash"><div style={{fontSize:11,color:"#8899AA",marginBottom:8}}>Moves money into petty cash and records it as a Petty cash expense in reports.</div>
+          {act==="allocate"&&<ActBox title="Top up petty cash"><div style={{fontSize:13,color:"#8899AA",marginBottom:8}}>Moves money into petty cash and records it as a Petty cash expense in reports.</div>
             <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${pcFrom==="cash"?" on":""}`} onClick={()=>setPcFrom("cash")}>From Cash</button><button className={`tog-btn${pcFrom==="sacco"?" on":""}`} onClick={()=>setPcFrom("sacco")}>From SACCO</button></div>
             <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doAllocatePetty} off={rb} saving={saving}/></ActBox>}
-          {act==="spend"&&<ActBox title="Record petty spend"><div style={{fontSize:11,color:"#8899AA",marginBottom:8}}>Petty cash balance: {fmtK(bal.petty||0)}</div>
-            <div className="tog" style={{marginBottom:8,flexWrap:"wrap"}}>{PETTY_CATS.map(c=><button key={c} className={`tog-btn${pcCat===c?" on":""}`} onClick={()=>setPcCat(c)} style={{fontSize:11,flex:"none",padding:"6px 10px"}}>{c}</button>)}</div>
+          {act==="spend"&&<ActBox title="Record petty spend"><div style={{fontSize:13,color:"#8899AA",marginBottom:8}}>Petty cash balance: {fmtK(bal.petty||0)}</div>
+            <div className="tog" style={{marginBottom:8,flexWrap:"wrap"}}>{PETTY_CATS.map(c=><button key={c} className={`tog-btn${pcCat===c?" on":""}`} onClick={()=>setPcCat(c)} style={{fontSize:13,flex:"none",padding:"6px 10px"}}>{c}</button>)}</div>
             <input value={pcNote} onChange={e=>setPcNote(e.target.value)} placeholder="What for? e.g. matatu to Kiambu" className="lg-in"/>
             <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doPettySpend} off={rb} saving={saving}/></ActBox>}
           {act==="reconcile"&&<ActBox title="Reconcile a balance"><div className="tog" style={{marginBottom:8}}>{ACCTS.map(([id,l])=><button key={id} className={`tog-btn${recAcct===id?" on":""}`} onClick={()=>setRecAcct(id)}>{l}</button>)}</div>
-            <div style={{fontSize:12,color:"#8899AA",marginBottom:8}}>App shows: {fmtK(recAcct==="cash"?bal.cash:recAcct==="petty"?bal.petty:bal.sacco)}</div>
+            <div style={{fontSize:14,color:"#8899AA",marginBottom:8}}>App shows: {fmtK(recAcct==="cash"?bal.cash:recAcct==="petty"?bal.petty:bal.sacco)}</div>
             <input type="number" step="0.01" value={recActual} onChange={e=>setRecActual(e.target.value)} placeholder="Actual balance (KSh)" autoFocus className="lg-in"/>
             <input value={recReason} onChange={e=>setRecReason(e.target.value)} placeholder="Reason (e.g. SACCO interest)" className="lg-in"/><Confirm on={doReconcile} off={rb} saving={saving}/></ActBox>}
         </div>
@@ -240,27 +240,27 @@ export function LedgerTab({user,onMoney,bal,onChange}){
           <div style={{display:"flex",gap:6,marginBottom:8}}>
             {(()=>{ const y=new Date(); const m3=new Date(); m3.setMonth(m3.getMonth()-3); const yStart=y.getFullYear()+"-01-01";
               const ranges=[["This month",monthStart,todayStr()],["Last 3 months",m3.toISOString().split("T")[0],todayStr()],["This year",yStart,todayStr()],["All",(rows.length?rows.map(r=>r.date).sort()[0]:yStart),todayStr()]];
-              return ranges.map(([lbl,f,t])=><button key={lbl} onClick={()=>{setFrom(f);setTo(t);}} style={{...pill(from===f&&to===t),fontSize:11,padding:"5px 10px"}}>{lbl}</button>);
+              return ranges.map(([lbl,f,t])=><button key={lbl} onClick={()=>{setFrom(f);setTo(t);}} style={{...pill(from===f&&to===t),fontSize:13,padding:"5px 10px"}}>{lbl}</button>);
             })()}
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-            <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="lg-in" style={{margin:0}}/></div>
-            <div><div style={{fontSize:11,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} className="lg-in" style={{margin:0}}/></div>
+            <div><div style={{fontSize:13,color:"#8899AA",marginBottom:3}}>FROM</div><input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="lg-in" style={{margin:0}}/></div>
+            <div><div style={{fontSize:13,color:"#8899AA",marginBottom:3}}>TO</div><input type="date" value={to} onChange={e=>setTo(e.target.value)} className="lg-in" style={{margin:0}}/></div>
           </div>
           <div style={{display:"flex",gap:6,marginBottom:8,overflowX:"auto"}}>
             <button onClick={()=>setAcctFilter("all")} style={pill(acctFilter==="all")}>All accounts</button>
             {ACCTS.map(([id,l])=><button key={id} onClick={()=>setAcctFilter(id)} style={pill(acctFilter===id)}>{l}</button>)}
           </div>
-          <div style={{fontSize:11,color:"#8A97A8",marginBottom:8}}>{registerRows.length} movements · <button onClick={exportLedger} style={{background:"none",border:"none",color:"#AEB9C7",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Export CSV</button></div>
-          {registerRows.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0",fontSize:13}}>No movements in range.</div>:(()=>{
+          <div style={{fontSize:13,color:"#8A97A8",marginBottom:8}}>{registerRows.length} movements · <button onClick={exportLedger} style={{background:"none",border:"none",color:"#AEB9C7",fontSize:13,cursor:"pointer",textDecoration:"underline"}}>Export CSV</button></div>
+          {registerRows.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0",fontSize:14}}>No movements in range.</div>:(()=>{
             const regRow=(r)=>{ const isSale=r.type==="sale"&&r.ref; const sp=isSale?saleSplit(r.ref):null; return (
               <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #101B36"}}>
                 <div style={{flex:1,minWidth:0,paddingRight:8}}>
-                  <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.description||r.type}</div>
-                  <div style={{fontSize:10,color:"#8A97A8"}}>{acctLabel(r.account)} · {r.recorded_by?.split(" ")[0]||""}</div>
-                  {sp&&sp.cost>0&&<div style={{fontSize:10,color:"#8A97A8",marginTop:1}}>capital {fmtK(sp.cost)} · profit <span style={{color:"#4CAF50"}}>{fmtK(Math.max(0,Number(r.amount)-sp.cost))}</span></div>}
+                  <div style={{fontSize:14,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.description||r.type}</div>
+                  <div style={{fontSize:12,color:"#8A97A8"}}>{acctLabel(r.account)} · {r.recorded_by?.split(" ")[0]||""}</div>
+                  {sp&&sp.cost>0&&<div style={{fontSize:12,color:"#8A97A8",marginTop:1}}>capital {fmtK(sp.cost)} · profit <span style={{color:"#4CAF50"}}>{fmtK(Math.max(0,Number(r.amount)-sp.cost))}</span></div>}
                 </div>
-                <div style={{fontSize:13,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B",whiteSpace:"nowrap"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
+                <div style={{fontSize:14,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B",whiteSpace:"nowrap"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
               </div>
             );};
             const dayNet=arr=>arr.reduce((n,r)=>n+Number(r.amount),0);
@@ -284,16 +284,16 @@ export function LedgerTab({user,onMoney,bal,onChange}){
               {Object.keys(mg).sort((a,b)=>b.localeCompare(a)).map(ym=>{ const t=mg[ym].reduce((n,d)=>n+dayNet(days[d]),0); return (
                 <div key={ym} style={{marginBottom:8}}>
                   <div onClick={()=>tg(ym)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
-                    <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{regOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
-                    <span style={{fontSize:13,fontWeight:600,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:"#AEB9C7"}}>{regOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
                   </div>
                   {regOpen[ym]&&<div style={{padding:"4px 10px 0"}}>{mg[ym].map(d=>dayBlock(d,true))}</div>}
                 </div>);})}
               {Object.keys(yg).sort((a,b)=>b.localeCompare(a)).map(y=>{ const t=yg[y].reduce((n,d)=>n+dayNet(days[d]),0); return (
                 <div key={y} style={{marginBottom:8}}>
                   <div onClick={()=>tg(y)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
-                    <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{regOpen[y]?"▾":"▸"} {y}</span>
-                    <span style={{fontSize:13,fontWeight:700,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
+                    <span style={{fontSize:14,fontWeight:700,color:"#E8E2D4"}}>{regOpen[y]?"▾":"▸"} {y}</span>
+                    <span style={{fontSize:14,fontWeight:700,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
                   </div>
                   {regOpen[y]&&<div style={{padding:"4px 10px 0"}}>{yg[y].map(d=>dayBlock(d,true))}</div>}
                 </div>);})}
@@ -344,7 +344,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
           {results.map((p,i)=>(
             <div key={i} style={{marginBottom:8}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                <span style={{fontSize:11,color:"#8A97A8",minWidth:64}}>PERIOD {String.fromCharCode(65+i)}</span>
+                <span style={{fontSize:13,color:"#8A97A8",minWidth:64}}>PERIOD {String.fromCharCode(65+i)}</span>
                 {periods.length>1&&<button onClick={()=>rmP(i)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:14,cursor:"pointer",marginLeft:"auto"}}>×</button>}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
@@ -353,14 +353,14 @@ export function LedgerTab({user,onMoney,bal,onChange}){
               </div>
             </div>
           ))}
-          {periods.length<3&&<button onClick={addP} style={{background:"none",border:"1px dashed #24365C",borderRadius:6,color:"#8A97A8",fontSize:12,padding:"7px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:12,width:"100%"}}>+ Add a period to compare (up to 3)</button>}
+          {periods.length<3&&<button onClick={addP} style={{background:"none",border:"1px dashed #24365C",borderRadius:6,color:"#8A97A8",fontSize:14,padding:"7px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginBottom:12,width:"100%"}}>+ Add a period to compare (up to 3)</button>}
           <div id="karu-statement" style={{background:"#fff",color:"#111",borderRadius:10,padding:"18px 12px"}}>
             <div style={{textAlign:"center",borderBottom:"2px solid #050A1F",paddingBottom:10,marginBottom:12}}>
               <div style={{fontSize:19,fontWeight:800,letterSpacing:"0.06em",color:"#050A1F"}}>{BIZ.name}</div>
               <div style={{fontSize:13,color:"#555",marginTop:2}}>Income Statement &amp; Financial Position</div>
               <div style={{fontSize:10.5,color:"#888",marginTop:2}}>Snapshot as of {genDate}</div>
             </div>
-            <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead><tr>
                 <th style={{textAlign:"left",fontSize:10,color:"#888",padding:"2px 6px",fontWeight:600}}></th>
                 {results.map((p,i)=><th key={i} style={{textAlign:"right",fontSize:10,color:"#050A1F",padding:"2px 6px",fontWeight:700,whiteSpace:"nowrap"}}>{perLabel(p.from,p.to)}</th>)}
@@ -379,9 +379,9 @@ export function LedgerTab({user,onMoney,bal,onChange}){
                 <tr><td colSpan={nCol+1} style={{padding:"4px 0"}}></td></tr>
                 <Row label="NET PROFIT" vals={results.map(r=>r.pl.net)} bold total/>
               </tbody>
-            </table>
+            </table></div>
             <div style={{marginTop:16}}>
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}><table style={{width:"100%",borderCollapse:"collapse"}}>
                 <tbody>
                   <Band label="FINANCIAL POSITION (AS OF TODAY)"/>
                   <Row label="Cash at hand" vals={[cashA,...Array(nCol-1).fill(null)]}/>
@@ -396,13 +396,13 @@ export function LedgerTab({user,onMoney,bal,onChange}){
                   </>}
                   <Row label="NET WORTH" vals={[netWorth,...Array(nCol-1).fill(null)]} bold total/>
                 </tbody>
-              </table>
+              </table></div>
               {nCol>1&&<div style={{fontSize:9.5,color:"#999",marginTop:6}}>Financial position is a single snapshot as of today; only performance figures compare across periods.</div>}
             </div>
             <div style={{textAlign:"center",fontSize:9.5,color:"#999",marginTop:16,paddingTop:10,borderTop:"1px solid #ddd"}}>{BIZ.name} · {BIZ.address} · {bizPhones()}<br/>Generated {genDate} from KARU Accounts. Figures management-prepared, unaudited.</div>
           </div>
           <button className="btn-y" onClick={()=>{document.body.classList.add("printing-statement");window.print();setTimeout(()=>document.body.classList.remove("printing-statement"),500);}} style={{width:"100%",marginTop:12}}>Print / Save as PDF</button>
-          <div style={{fontSize:11,color:"#8A97A8",marginTop:8,textAlign:"center"}}>Screenshot, or Print to save as PDF for a bank or partner.</div>
+          <div style={{fontSize:13,color:"#8A97A8",marginTop:8,textAlign:"center"}}>Screenshot, or Print to save as PDF for a bank or partner.</div>
         </div>
         );
       })()}
@@ -416,14 +416,14 @@ export function LedgerTab({user,onMoney,bal,onChange}){
             <div className="stat"><div className="stat-n" style={{color:"#E85B5B"}}>{fmtK(pettySpent)}</div><div className="stat-l">Spent all time</div></div>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:12}}>
-            <button className="btn-y" onClick={()=>{setTab("overview");setAct("allocate");}} style={{flex:1,fontSize:12}}>Top up petty cash</button>
+            <button className="btn-y" onClick={()=>{setTab("overview");setAct("allocate");}} style={{flex:1,fontSize:14}}>Top up petty cash</button>
           </div>
-          <div style={{fontSize:11,color:"#8A97A8",marginBottom:12}}>Record petty spends on the Expenses tab (+ Petty spend). They appear here and in your expenses.</div>
-          {pettyRows.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0",fontSize:13}}>No petty cash activity yet.</div>:(()=>{
+          <div style={{fontSize:13,color:"#8A97A8",marginBottom:12}}>Record petty spends on the Expenses tab (+ Petty spend). They appear here and in your expenses.</div>
+          {pettyRows.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"20px 0",fontSize:14}}>No petty cash activity yet.</div>:(()=>{
             const pcRow=(r)=>(
               <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #101B36"}}>
-                <div style={{flex:1,minWidth:0,paddingRight:8}}><div style={{fontSize:12,fontWeight:500}}>{r.description||r.type}</div><div style={{fontSize:10,color:"#8A97A8"}}>{r.recorded_by?.split(" ")[0]||""}</div></div>
-                <div style={{fontSize:13,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
+                <div style={{flex:1,minWidth:0,paddingRight:8}}><div style={{fontSize:14,fontWeight:500}}>{r.description||r.type}</div><div style={{fontSize:12,color:"#8A97A8"}}>{r.recorded_by?.split(" ")[0]||""}</div></div>
+                <div style={{fontSize:14,fontWeight:600,color:Number(r.amount)>=0?"#4CAF50":"#E85B5B"}}>{Number(r.amount)>=0?"+":""}{Math.round(Number(r.amount)).toLocaleString()}</div>
               </div>
             );
             const dayNet=arr=>arr.reduce((n,r)=>n+Number(r.amount),0);
@@ -447,16 +447,16 @@ export function LedgerTab({user,onMoney,bal,onChange}){
               {Object.keys(mg).sort((a,b)=>b.localeCompare(a)).map(ym=>{ const t=mg[ym].reduce((n,d)=>n+dayNet(days[d]),0); return (
                 <div key={ym} style={{marginBottom:8}}>
                   <div onClick={()=>tg(ym)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
-                    <span style={{fontSize:13,fontWeight:600,color:"#AEB9C7"}}>{pcOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
-                    <span style={{fontSize:13,fontWeight:600,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:"#AEB9C7"}}>{pcOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
                   </div>
                   {pcOpen[ym]&&<div style={{padding:"4px 10px 0"}}>{mg[ym].map(d=>dayBlock(d,true))}</div>}
                 </div>);})}
               {Object.keys(yg).sort((a,b)=>b.localeCompare(a)).map(y=>{ const t=yg[y].reduce((n,d)=>n+dayNet(days[d]),0); return (
                 <div key={y} style={{marginBottom:8}}>
                   <div onClick={()=>tg(y)} style={{display:"flex",justifyContent:"space-between",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #2E4472",borderRadius:8}}>
-                    <span style={{fontSize:13,fontWeight:700,color:"#E8E2D4"}}>{pcOpen[y]?"▾":"▸"} {y}</span>
-                    <span style={{fontSize:13,fontWeight:700,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
+                    <span style={{fontSize:14,fontWeight:700,color:"#E8E2D4"}}>{pcOpen[y]?"▾":"▸"} {y}</span>
+                    <span style={{fontSize:14,fontWeight:700,color:t>=0?"#4CAF50":"#E85B5B"}}>{net(t)}</span>
                   </div>
                   {pcOpen[y]&&<div style={{padding:"4px 10px 0"}}>{yg[y].map(d=>dayBlock(d,true))}</div>}
                 </div>);})}
@@ -468,4 +468,4 @@ export function LedgerTab({user,onMoney,bal,onChange}){
   );
 }
 
-const pill=(on)=>({padding:"5px 12px",borderRadius:100,border:`1px solid ${on?"#F5C000":"#1A2A4A"}`,background:on?"rgba(245,192,0,0.1)":"transparent",color:on?"#F5C000":"#8899AA",fontSize:12,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'DM Sans',sans-serif"});
+const pill=(on)=>({padding:"5px 12px",borderRadius:100,border:`1px solid ${on?"#F5C000":"#1A2A4A"}`,background:on?"rgba(245,192,0,0.1)":"transparent",color:on?"#F5C000":"#8899AA",fontSize:14,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'DM Sans',sans-serif"});

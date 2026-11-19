@@ -165,10 +165,10 @@ export function ReportsTab({user,bal}){
         const fmt=n=>Math.round(n).toLocaleString();
         return (
           <div className="card" style={{marginBottom:14}}>
-            <div style={{fontSize:11,color:"#AEB9C7",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Month-on-month performance</div>
-            <div style={{fontSize:10,color:"#8A97A8",marginBottom:12}}>Profit = Collected − COGS − Expenses. Amounts in KSh.</div>
+            <div style={{fontSize:13,color:"#AEB9C7",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Month-on-month performance</div>
+            <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>Profit = Collected − COGS − Expenses. Amounts in KSh.</div>
             <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:360}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:14,minWidth:360}}>
                 <thead>
                   <tr>{["Month","Collected","COGS","Expenses","Profit"].map(h=><th key={h} style={{textAlign:h==="Month"?"left":"right",padding:"4px 4px 8px",color:"#AEB9C7",fontWeight:600,borderBottom:"1px solid #1A2A4A",whiteSpace:"nowrap"}}>{h}</th>)}</tr>
                 </thead>
@@ -198,68 +198,68 @@ export function ReportsTab({user,bal}){
         );
       })()}
       <div className="card" style={{marginBottom:14}}>
-        <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
+        <div style={{fontSize:13,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div><div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div><div style={{fontSize:10,color:"#8A97A8"}}>AT COST</div></div>
-          <div><div style={{fontSize:20,fontWeight:600,color:"#4CAF50"}}>KSh {stockPotentialProfit.toLocaleString()}</div><div style={{fontSize:10,color:"#8A97A8"}}>EST. PROFIT IF ALL SELLS</div></div>
+          <div><div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div><div style={{fontSize:12,color:"#8A97A8"}}>AT COST</div></div>
+          <div><div style={{fontSize:20,fontWeight:600,color:"#4CAF50"}}>KSh {stockPotentialProfit.toLocaleString()}</div><div style={{fontSize:12,color:"#8A97A8"}}>EST. PROFIT IF ALL SELLS</div></div>
         </div>
-        <div style={{fontSize:11,color:"#8A97A8",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()}</div>
+        <div style={{fontSize:13,color:"#8A97A8",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()}</div>
       </div>
 
       {/* GROWTH PROJECTION */}
       <div className="card" style={{marginBottom:14}}>
-        <div style={{fontSize:12,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:4}}>Growth projection</div>
-        <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>If the current trend holds ({avgMonthlyNet>=0?"+":""}{fmtK(avgMonthlyNet)}/month average over {monthsOfData} month{monthsOfData!==1?"s":""} of data)</div>
+        <div style={{fontSize:14,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:4}}>Growth projection</div>
+        <div style={{fontSize:14,color:"#8A97A8",marginBottom:12}}>If the current trend holds ({avgMonthlyNet>=0?"+":""}{fmtK(avgMonthlyNet)}/month average over {monthsOfData} month{monthsOfData!==1?"s":""} of data)</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
           {proj.map(p=>(
             <div key={p.months} style={{textAlign:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 6px"}}>
               <div style={{fontSize:15,fontWeight:700,color:p.value>=totalCapital?"#4CAF50":"#E85B5B"}}>{fmtK(p.value)}</div>
-              <div style={{fontSize:11,color:"#8A97A8",marginTop:2}}>in {p.months} mo</div>
+              <div style={{fontSize:13,color:"#8A97A8",marginTop:2}}>in {p.months} mo</div>
             </div>
           ))}
         </div>
-        {monthsOfData<2&&<div style={{fontSize:11,color:"#E8A45B",marginTop:10,lineHeight:1.4}}>Only {monthsOfData} month of data — this projection will get meaningful after 2-3 months of trading.</div>}
-        <div style={{fontSize:10,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>A straight-line estimate, not a forecast. It assumes trading continues as it has. Real results depend on sales, sourcing and seasonality.</div>
+        {monthsOfData<2&&<div style={{fontSize:13,color:"#E8A45B",marginTop:10,lineHeight:1.4}}>Only {monthsOfData} month of data — this projection will get meaningful after 2-3 months of trading.</div>}
+        <div style={{fontSize:12,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>A straight-line estimate, not a forecast. It assumes trading continues as it has. Real results depend on sales, sourcing and seasonality.</div>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
         <div className="card">
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Payment split</div>
+          <div style={{fontSize:13,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Payment split</div>
           {collected>0?<>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{color:"#4CAF50"}}>M-Pesa</span><span>KSh {mpesa.toLocaleString()}</span></div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:14,marginBottom:4}}><span style={{color:"#4CAF50"}}>M-Pesa</span><span>KSh {mpesa.toLocaleString()}</span></div>
             <div style={{height:4,background:"#1A2A4A",borderRadius:2,marginBottom:8}}><div style={{height:4,background:"#4CAF50",borderRadius:2,width:`${collected>0?Math.round(mpesa/collected*100):0}%`}}/></div>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}><span style={{color:"#F5C000"}}>Cash</span><span>KSh {cash.toLocaleString()}</span></div>
-          </>:<div style={{color:"#8A97A8",fontSize:12}}>No sales yet</div>}
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:14}}><span style={{color:"#F5C000"}}>Cash</span><span>KSh {cash.toLocaleString()}</span></div>
+          </>:<div style={{color:"#8A97A8",fontSize:14}}>No sales yet</div>}
         </div>
         <div className="card">
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Expenses</div>
+          <div style={{fontSize:13,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Expenses</div>
           {expBreakdown.length>0?expBreakdown.slice(0,4).map(([cat,amt])=>(
             <div key={cat} style={{marginBottom:6}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:2}}><span style={{color:"#E8E2D4"}}>{cat}</span><span style={{color:"#E85B5B"}}>{expenses>0?Math.round(amt/expenses*100):0}%</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:2}}><span style={{color:"#E8E2D4"}}>{cat}</span><span style={{color:"#E85B5B"}}>{expenses>0?Math.round(amt/expenses*100):0}%</span></div>
               <div style={{height:3,background:"#1A2A4A",borderRadius:2}}><div style={{height:3,background:"#E85B5B",borderRadius:2,width:`${expenses>0?(amt/expenses*100):0}%`}}/></div>
             </div>
-          )):<div style={{color:"#8A97A8",fontSize:12}}>No expenses yet</div>}
+          )):<div style={{color:"#8A97A8",fontSize:14}}>No expenses yet</div>}
         </div>
       </div>
       {topItems.length>0&&(
         <div className="card" style={{marginBottom:14}}>
-          <div style={{fontSize:11,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Top selling items</div>
+          <div style={{fontSize:13,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Top selling items</div>
           {topItems.map(([name,{qty,revenue:rev}],i)=>(
             <div key={name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<topItems.length-1?"1px solid #1A2A4A":"none"}}>
-              <div><div style={{fontSize:13,fontWeight:500}}>{name}</div><div style={{fontSize:11,color:"#8A97A8"}}>{qty} sold</div></div>
-              <div style={{fontSize:13,fontWeight:600,color:"#4CAF50"}}>KSh {rev.toLocaleString()}</div>
+              <div><div style={{fontSize:14,fontWeight:500}}>{name}</div><div style={{fontSize:13,color:"#8A97A8"}}>{qty} sold</div></div>
+              <div style={{fontSize:14,fontWeight:600,color:"#4CAF50"}}>KSh {rev.toLocaleString()}</div>
             </div>
           ))}
         </div>
       )}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-        <button className="btn-g" onClick={()=>exportCSV("sales")} style={{fontSize:12}}>Export sales</button>
-        <button className="btn-g" onClick={()=>exportCSV("expenses")} style={{fontSize:12}}>Export expenses</button>
-        <button className="btn-g" onClick={()=>exportCSV("stock")} style={{fontSize:12}}>Export stock</button>
-        <button className="btn-g" onClick={()=>exportCSV("money")} style={{fontSize:12}}>Export money</button>
-        <button className="btn-g" onClick={()=>exportCSV("losses")} style={{fontSize:12}}>Export losses</button>
+        <button className="btn-g" onClick={()=>exportCSV("sales")} style={{fontSize:14}}>Export sales</button>
+        <button className="btn-g" onClick={()=>exportCSV("expenses")} style={{fontSize:14}}>Export expenses</button>
+        <button className="btn-g" onClick={()=>exportCSV("stock")} style={{fontSize:14}}>Export stock</button>
+        <button className="btn-g" onClick={()=>exportCSV("money")} style={{fontSize:14}}>Export money</button>
+        <button className="btn-g" onClick={()=>exportCSV("losses")} style={{fontSize:14}}>Export losses</button>
       </div>
-      <button className="btn-g" onClick={loadAll} style={{width:"100%",fontSize:13}}>Refresh</button>
+      <button className="btn-g" onClick={loadAll} style={{width:"100%",fontSize:14}}>Refresh</button>
 
       {drill&&(
         <div onClick={()=>setDrill(null)} style={{position:"fixed",inset:0,background:"rgba(5,10,31,0.8)",zIndex:150,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
@@ -269,10 +269,10 @@ export function ReportsTab({user,bal}){
               <button onClick={()=>setDrill(null)} style={{background:"none",border:"none",color:"#8899AA",fontSize:22,cursor:"pointer"}}>×</button>
             </div>
             <div style={{overflowY:"auto",padding:"8px 18px 24px"}}>
-              {drill.rows.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"24px 0",fontSize:13}}>Nothing in this period.</div>:drill.rows.map((r,i)=>(
+              {drill.rows.length===0?<div style={{color:"#8A97A8",textAlign:"center",padding:"24px 0",fontSize:14}}>Nothing in this period.</div>:drill.rows.map((r,i)=>(
                 <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 0",borderBottom:i<drill.rows.length-1?"1px solid #101B36":"none"}}>
-                  <div style={{flex:1,minWidth:0,paddingRight:10}}><div style={{fontSize:13,fontWeight:500}}>{r.label}</div>{r.sub&&<div style={{fontSize:11,color:"#8A97A8"}}>{r.sub}</div>}</div>
-                  <div style={{fontSize:13,fontWeight:600,color:r.amount<0?"#E85B5B":"#E8E2D4",whiteSpace:"nowrap"}}>{r.amount<0?"-":""}KSh {Math.abs(r.amount).toLocaleString()}</div>
+                  <div style={{flex:1,minWidth:0,paddingRight:10}}><div style={{fontSize:14,fontWeight:500}}>{r.label}</div>{r.sub&&<div style={{fontSize:13,color:"#8A97A8"}}>{r.sub}</div>}</div>
+                  <div style={{fontSize:14,fontWeight:600,color:r.amount<0?"#E85B5B":"#E8E2D4",whiteSpace:"nowrap"}}>{r.amount<0?"-":""}KSh {Math.abs(r.amount).toLocaleString()}</div>
                 </div>
               ))}
             </div>
