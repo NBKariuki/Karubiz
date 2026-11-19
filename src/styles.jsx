@@ -8,6 +8,19 @@ export const GS = () => (
     .tog{display:flex;gap:0;border:1px solid #2E4472;border-radius:8px;overflow:hidden} .tog-btn{flex:1;padding:10px 6px;min-height:42px;font-size:14px;font-weight:500;border:none;border-right:1px solid #2E4472;border-radius:0;background:transparent;color:#C2CBD6;cursor:pointer;text-align:center;transition:all 0.15s;font-family:'DM Sans',sans-serif} .tog-btn:last-child{border-right:none}
     .tog-btn.on{background:rgba(245,192,0,0.16);color:#F5C000;font-weight:600}
     .card{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:14px;margin-bottom:10px}
+    .tbl{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;overflow:hidden;margin-bottom:12px}
+    .tbl-h{display:grid;gap:8px;align-items:center;padding:9px 12px;background:#0E1733;border-bottom:1px solid #1A2A4A;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8A97A8}
+    .tbl-r{display:grid;gap:8px;align-items:center;padding:11px 12px;border-bottom:1px solid #101B36;cursor:pointer;min-height:52px;transition:background 0.12s}
+    .tbl-r:hover{background:#0F1A3A} .tbl-r.tbl-static{cursor:default} .tbl-r.tbl-static:hover{background:transparent}
+    .tbl-row.open>.tbl-r{background:#0F1A3A}
+    .tbl-row:last-child>.tbl-r:last-child{border-bottom:none}
+    .tbl-x{padding:6px 12px 12px;background:#070D22;border-bottom:1px solid #101B36}
+    .tbl-sub{font-size:13px;color:#8A97A8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .num{text-align:right;font-variant-numeric:tabular-nums}
+    .chev{display:inline-block;width:8px;height:8px;border-right:2px solid #8A97A8;border-bottom:2px solid #8A97A8;transform:rotate(-45deg);flex-shrink:0;transition:transform 0.15s} .open .chev{transform:rotate(45deg)}
+    .act-row{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid #1A2A4A;padding:13px 4px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#FFFFFF} .act-row:hover,.act-row:active{background:#0F1A3A}
+    .act-ic{width:40px;height:40px;border-radius:10px;background:#101B3C;border:1px solid #24365C;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+    .seg{display:inline-flex;border:1px solid #2E4472;border-radius:8px;overflow:hidden} .seg button{padding:8px 16px;background:transparent;border:none;border-right:1px solid #2E4472;color:#C2CBD6;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif} .seg button:last-child{border-right:none} .seg button.on{background:rgba(245,192,0,0.16);color:#F5C000;font-weight:600}
     .btn-y{background:#F5C000;color:#050A1F;border:none;padding:11px 18px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif} .btn-y:disabled{background:#444;color:#888;cursor:not-allowed}
     .btn-g{background:transparent;color:#C2CBD6;border:1px solid #24365C;padding:10px 15px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
     .btn-r{background:rgba(232,91,91,0.12);color:#E85B5B;border:1px solid rgba(232,91,91,0.3);padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}

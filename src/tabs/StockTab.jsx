@@ -5,6 +5,7 @@ import { OrdersTab } from "../tabs/OrdersTab";
 
 export function StockTab({user,onMoney}){
   const [section,setSection]=useState("stock"); // stock | orders | count
+  const [stockView,setStockView]=useState("items"); const [stockQ,setStockQ]=useState(""); const [itemOpen,setItemOpen]=useState({}); const [noPriceOnly,setNoPriceOnly]=useState(false);
   const [takeCounts,setTakeCounts]=useState({}); const [takeReasons,setTakeReasons]=useState({}); const [takeNotes,setTakeNotes]=useState(""); const [takeSaving,setTakeSaving]=useState(false); const [takeStaff,setTakeStaff]=useState(defStaff(user));
   const [trips,setTrips]=useState([]); const [stock,setStock]=useState([]); const [audit,setAudit]=useState([]);
   const [loading,setLoading]=useState(true); const [view,setView]=useState("list");
@@ -130,6 +131,60 @@ export function StockTab({user,onMoney}){
 
   // Live stock rows with computed available qty for counting
   const liveStock=stock.filter(s=>(s.qty_in-s.qty_sold-(s.qty_adjusted||0))>0 || Number(s.qty_in)>0).map(s=>({...s,available:s.qty_in-s.qty_sold-(s.qty_adjusted||0)})).filter(s=>s.available>0);
+  const renderItems=()=>{
+    if(loading) return <div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading...</div>;
+    const groups={};
+    liveStock.forEach(s=>{ const key=String(s.name||"").trim().toLowerCase(); (groups[key]=groups[key]||{key,name:s.name,cat:s.category,batches:[]}).batches.push(s); });
+    let rows=Object.values(groups).map(g=>{
+      const left=g.batches.reduce((n,b)=>n+b.available,0);
+      const val=g.batches.reduce((n,b)=>n+b.available*Number(b.unit_cost||0),0);
+      const priced=g.batches.filter(b=>Number(b.selling_price)>0).sort((a,b)=>String(b.date_in||"").localeCompare(String(a.date_in||"")));
+      return {...g,left,val,cost:left?val/left:0,price:priced.length?Number(priced[0].selling_price):0,noPrice:g.batches.some(b=>!(Number(b.selling_price)>0)),allNoPrice:priced.length===0};
+    }).sort((a,b)=>a.name.localeCompare(b.name));
+    const nNo=rows.filter(r=>r.noPrice).length;
+    const q=stockQ.trim().toLowerCase();
+    if(q) rows=rows.filter(r=>r.name.toLowerCase().includes(q)||catLabel(r.cat).toLowerCase().includes(q));
+    if(noPriceOnly) rows=rows.filter(r=>r.noPrice);
+    const cols="minmax(0,1fr) 52px 76px 86px";
+    return (<div>
+      <div className="field" style={{marginBottom:10}}><input value={stockQ} onChange={e=>setStockQ(e.target.value)} placeholder="Search items or category"/></div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,fontSize:14,color:"#8A97A8"}}>
+        <span>{rows.length} item{rows.length!==1?"s":""}</span>
+        {nNo>0&&<button onClick={()=>setNoPriceOnly(v=>!v)} style={{background:noPriceOnly?"rgba(232,164,91,0.16)":"transparent",border:"1px solid #E8A45B",borderRadius:100,color:"#E8A45B",fontSize:13,padding:"4px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>{noPriceOnly?"Showing":"Show"} {nNo} without a price</button>}
+      </div>
+      {rows.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>{liveStock.length===0?"No stock yet. Add a trip to bring items in.":"No items match."}</div>:(
+      <div className="tbl">
+        <div className="tbl-h" style={{gridTemplateColumns:cols}}><span>Item</span><span className="num">Left</span><span className="num">Cost</span><span className="num">Price</span></div>
+        {rows.map(r=>{
+          const open=!!itemOpen[r.key];
+          return (<div key={r.key} className={`tbl-row${open?" open":""}`}>
+            <div className="tbl-r" onClick={()=>setItemOpen(x=>({...x,[r.key]:!x[r.key]}))} style={{gridTemplateColumns:cols}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}><span className="chev"/><div style={{minWidth:0}}><div style={{fontSize:15,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</div><div className="tbl-sub">{catLabel(r.cat)}{r.batches.length>1?` · ${r.batches.length} batches`:""}</div></div></div>
+              <div className="num" style={{fontWeight:600,fontSize:15}}>{r.left}</div>
+              <div className="num" style={{fontSize:14,color:"#C2CBD6"}}>{Math.round(r.cost).toLocaleString()}</div>
+              <div className="num" style={{fontSize:14,fontWeight:600,color:r.allNoPrice?"#E8A45B":"#FFFFFF"}}>{r.allNoPrice?"No price":Number(r.price).toLocaleString()}{!r.allNoPrice&&r.noPrice&&<span style={{color:"#E8A45B"}}> *</span>}</div>
+            </div>
+            {open&&<div className="tbl-x">
+              <div style={{fontSize:13,color:"#8A97A8",padding:"6px 0"}}>Stock value {fmtK(r.val)}{r.noPrice&&!r.allNoPrice?" · * some batches have no price":""}</div>
+              {r.batches.slice().sort((a,b)=>(a.trip_no||"").localeCompare(b.trip_no||"")).map(b=>{
+                const tr=trips.find(x=>x.trip_no===b.trip_no); const locked=tr?tr.status==="locked":true;
+                return (<div key={b.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 0",borderTop:"1px solid #101B36"}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:14,color:"#C2CBD6"}}>{b.trip_no}<span style={{color:"#8A97A8"}}> · in {b.date_in?.slice(5)||""}</span></div>
+                    <div style={{fontSize:13,color:"#8A97A8",marginTop:2}}>{b.available} left of {b.qty_in} · Cost {Number(b.unit_cost).toLocaleString()} · {Number(b.selling_price)>0?`Sell ${Number(b.selling_price).toLocaleString()}`:<span style={{color:"#E8A45B"}}>No price set</span>}</div>
+                  </div>
+                  <div style={{display:"flex",gap:2,flexShrink:0}}>
+                    {can(user,"adjust")&&<button onClick={()=>{setAdjItem(b);setAdjQty(1);}} style={{background:"none",border:"none",color:"#C2CBD6",fontSize:14,padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Adjust</button>}
+                    {tr&&!locked&&can(user,"edit")&&withinWindow(b.created_at)&&<button onClick={()=>startEdit(b,tr)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:14,padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Edit</button>}
+                  </div>
+                </div>);
+              })}
+            </div>}
+          </div>);
+        })}
+      </div>)}
+    </div>);
+  };
   const saveStockTake=async()=>{
     // Build lines; a discrepancy needs a reason
     const lines=[]; let sysVal=0, cntVal=0, varCount=0;
@@ -314,35 +369,23 @@ export function StockTab({user,onMoney}){
             const groups={};
             liveStock.forEach(s=>{ const k=s.name.toLowerCase(); if(!groups[k])groups[k]={name:s.name,batches:[]}; groups[k].batches.push(s); });
             const names=Object.values(groups).sort((a,b)=>a.name.localeCompare(b.name));
-            return names.map(g=>{
-              const sysTotal=g.batches.reduce((n,b)=>n+b.available,0);
-              const cntTotal=g.batches.reduce((n,b)=>{ const c=takeCounts[b.id]===undefined||takeCounts[b.id]===""?b.available:Number(takeCounts[b.id]); return n+c; },0);
-              const valTotal=g.batches.reduce((n,b)=>n+b.available*b.unit_cost,0);
-              const gDiff=cntTotal-sysTotal;
-              return (
-                <div key={g.name} className="card" style={{padding:"12px",marginBottom:10,borderLeft:gDiff!==0?`3px solid ${gDiff<0?"#E85B5B":"#4CAF50"}`:"3px solid #24365C"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
-                    <div style={{fontSize:17,fontWeight:700}}>{g.name}</div>
-                    <div style={{fontSize:14,color:"#8A97A8"}}>{catLabel(g.batches[0].category)} · {fmtK(valTotal)}</div>
+            const cols="minmax(0,1fr) 54px 76px 50px";
+            return (<div className="tbl">
+              <div className="tbl-h" style={{gridTemplateColumns:cols}}><span>Item</span><span className="num">System</span><span className="num">Counted</span><span className="num">Diff</span></div>
+              {names.flatMap(g=>g.batches.slice().sort((a,b)=>(a.trip_no||"").localeCompare(b.trip_no||"")).map(s=>{
+                const c=takeCounts[s.id]===undefined||takeCounts[s.id]===""?s.available:Number(takeCounts[s.id]);
+                const diff=c-s.available;
+                return (<div key={s.id} className="tbl-row" style={diff!==0?{boxShadow:`inset 3px 0 0 ${diff<0?"#E85B5B":"#4CAF50"}`}:{}}>
+                  <div className="tbl-r tbl-static" style={{gridTemplateColumns:cols}}>
+                    <div style={{minWidth:0}}><div style={{fontSize:15,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.name}</div><div className="tbl-sub">{s.trip_no} · KSh {Number(s.unit_cost).toLocaleString()}</div></div>
+                    <div className="num" style={{fontSize:16,fontWeight:600}}>{s.available}</div>
+                    <div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"transparent",border:"none",borderBottom:`2px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#5B73A3"}`,borderRadius:0,padding:"6px 2px",fontSize:16,textAlign:"center"}}/></div>
+                    <div className="num" style={{fontSize:15,fontWeight:600,color:diff===0?"#5B6B85":diff<0?"#E85B5B":"#4CAF50"}}>{diff===0?"·":(diff>0?"+":"")+diff}</div>
                   </div>
-                  {g.batches.length>1&&<div style={{fontSize:13,color:"#8A97A8",marginBottom:8}}>{g.batches.length} batches · system total {sysTotal}{gDiff!==0?` · counted ${cntTotal}`:""}</div>}
-                  {g.batches.slice().sort((a,b)=>(a.trip_no||"").localeCompare(b.trip_no||"")).map(s=>{
-                    const c=takeCounts[s.id]===undefined||takeCounts[s.id]===""?s.available:Number(takeCounts[s.id]);
-                    const diff=c-s.available;
-                    return (
-                      <div key={s.id} style={{padding:"8px 0",borderTop:"1px solid #101B36"}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,color:"#AEB9C7"}}>{s.trip_no}</div><div style={{fontSize:13,color:"#8A97A8"}}>KSh {Number(s.unit_cost).toLocaleString()} each · in {s.date_in?.slice(5)||""}</div></div>
-                          <div style={{textAlign:"center",minWidth:48}}><div style={{fontSize:12,color:"#8A97A8"}}>SYSTEM</div><div style={{fontSize:17,fontWeight:700}}>{s.available}</div></div>
-                          <div style={{minWidth:66,marginLeft:8}}><div style={{fontSize:12,color:"#8A97A8",marginBottom:2}}>COUNTED</div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"transparent",border:"none",borderBottom:`2px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#5B73A3"}`,borderRadius:0,padding:"6px 4px",fontSize:17,textAlign:"center"}}/></div>
-                        </div>
-                        {diff!==0&&<div style={{marginTop:6}}><div style={{fontSize:13,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"#0A1128",border:"1px solid #24365C",borderRadius:6,padding:"7px 9px",color:"#FFFFFF",fontSize:15}}/></div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            });
+                  {diff!==0&&<div className="tbl-x"><div style={{fontSize:13,color:diff<0?"#E85B5B":"#4CAF50",marginBottom:4}}>{diff<0?`Short by ${Math.abs(diff)} · loss ${fmtK(Math.abs(diff)*s.unit_cost)}`:`Found ${diff} more`}</div><input value={takeReasons[s.id]||""} onChange={e=>setTakeReasons(x=>({...x,[s.id]:e.target.value}))} placeholder="Reason (damaged, miscount, theft, unrecorded sale...)" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"8px 2px",fontSize:14,color:"#FFFFFF"}}/></div>}
+                </div>);
+              }))}
+            </div>);
           })()}
           <div className="field" style={{marginTop:12}}><label>Notes (optional)</label><input value={takeNotes} onChange={e=>setTakeNotes(e.target.value)} placeholder="e.g. Month-end count"/></div>
           {can(user,"users")&&<div className="field"><label>Counted by</label><div className="tog">{STAFF.map(st=><button key={st} className={`tog-btn${takeStaff===st?" on":""}`} onClick={()=>setTakeStaff(st)}>{st.split(" ")[0]}</button>)}</div></div>}
@@ -372,9 +415,11 @@ export function StockTab({user,onMoney}){
         <div className="stat"><div className="stat-n" style={{color:"#F5C000"}}>KSh {totalSV.toLocaleString()}</div><div className="stat-l">Stock value</div></div>
         <div className="stat"><div className="stat-n" style={{color:"#4CAF50"}}>{totalU}</div><div className="stat-l">Units available</div></div>
       </div>
-      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:14}}>
+        <div className="seg"><button className={stockView==="items"?"on":""} onClick={()=>setStockView("items")}>Items</button><button className={stockView==="trips"?"on":""} onClick={()=>setStockView("trips")}>Trips</button></div>
         <button className="btn-y" onClick={()=>setView("new")} style={{fontSize:15,padding:"9px 16px"}}>+ New Trip</button>
       </div>
+      {stockView==="items"?renderItems():(<>
       {loading?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading...</div>:trips.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>No trips yet.</div>:(()=>{
         const renderTrip=(t)=>{
         const isOpen=expanded[t.id];
@@ -507,6 +552,7 @@ export function StockTab({user,onMoney}){
           ))}
         </div>);
       })()}
+      </>)}
       </>)}
     </div>
   );

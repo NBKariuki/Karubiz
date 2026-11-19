@@ -249,20 +249,23 @@ export function OrdersTab({user,onMoney}){
         {[["open","Open"],["done","Completed"],["all","All"]].map(([id,l])=><button key={id} onClick={()=>setFilter(id)} style={{padding:"5px 12px",borderRadius:100,border:`1px solid ${filter===id?"#F5C000":"#1A2A4A"}`,background:filter===id?"rgba(245,192,0,0.1)":"transparent",color:filter===id?"#F5C000":"#8899AA",fontSize:14,cursor:"pointer"}}>{l}</button>)}
       </div>
       {loading?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading...</div>:shown.length===0?<div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>No orders here.</div>:(()=>{
+        const ordCols="minmax(0,1fr) 92px 88px";
         const orderCard=(o)=>{
-          const subs=o.suppliers||[];
+          const subs=o.suppliers||[]; const dep=orderDeposits(subs);
           return (
-          <div key={o.id} className="card" onClick={()=>setOpenOrder(o)} style={{cursor:"pointer"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-              <div><span style={{fontSize:16,fontWeight:600,color:"#F5C000"}}>{o.order_no}</span><div style={{fontSize:13,color:"#8A97A8",marginTop:2}}>{o.date} · {o.created_by?.split(" ")[0]} · {subs.length} supplier{subs.length!==1?"s":""} · est {fmtK(orderTotal(subs))}</div></div>
-              <span className={`badge ${badge(o.status)}`}>{o.status}</span>
+          <div key={o.id} className="tbl-r" onClick={()=>setOpenOrder(o)} style={{gridTemplateColumns:ordCols}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>{o.order_no}</div>
+              <div className="tbl-sub">{o.date} · {o.created_by?.split(" ")[0]}</div>
+              <div className="tbl-sub">{subs.map(s=>s.supplier).filter(Boolean).join(" · ")||"No suppliers yet"}</div>
+              {dep>0&&<div className="tbl-sub" style={{color:"#4CAF50"}}>Paid {fmtK(dep)} · Balance {fmtK(Math.max(0,orderTotal(subs)-dep))}</div>}
             </div>
-            <div style={{fontSize:13,color:"#8A97A8"}}>{subs.map(s=>s.supplier).filter(Boolean).join(" · ")||"No suppliers yet"}</div>
-            {orderDeposits(subs)>0&&<div style={{fontSize:13,color:"#4CAF50",marginTop:4}}>Deposits {fmtK(orderDeposits(subs))} · Balance {fmtK(Math.max(0,orderTotal(subs)-orderDeposits(subs)))}</div>}
-            <div style={{fontSize:13,color:"#8A97A8",marginTop:6}}>Tap to open</div>
+            <div className="num" style={{fontWeight:600,fontSize:15}}>{fmtK(orderTotal(subs))}</div>
+            <div style={{textAlign:"right"}}><span className={`badge ${badge(o.status)}`}>{o.status}</span></div>
           </div>
           );
         };
+        const ordTable=arr=>(<div className="tbl"><div className="tbl-h" style={{gridTemplateColumns:ordCols}}><span>Order</span><span className="num">Estimate</span><span className="num">Status</span></div>{arr.map(orderCard)}</div>);
         const toggle=k=>setOrdOpen(x=>({...x,[k]:!x[k]}));
         const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
         const now=new Date(); const curMonth=now.toISOString().slice(0,7); const curYear=String(now.getFullYear());
@@ -275,14 +278,14 @@ export function OrdersTab({user,onMoney}){
         });
         return (
           <div>
-            {current.map(orderCard)}
+            {current.length>0&&ordTable(current)}
             {Object.keys(monthGroups).sort((a,b)=>b.localeCompare(a)).map(ym=>(
               <div key={ym} style={{marginBottom:8}}>
                 <div onClick={()=>toggle(ym)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",padding:"8px 10px",background:"#0A1128",border:"1px solid #24365C",borderRadius:8}}>
                   <span style={{fontSize:15,fontWeight:600,color:"#AEB9C7"}}>{ordOpen[ym]?"▾":"▸"} {MONTHS[parseInt(ym.slice(5,7))-1]} · {monthGroups[ym].length} order{monthGroups[ym].length!==1?"s":""}</span>
                   <span style={{fontSize:15,fontWeight:600,color:"#F5C000"}}>{fmtK(gTotal(monthGroups[ym]))}</span>
                 </div>
-                {ordOpen[ym]&&<div style={{padding:"8px 0 0"}}>{monthGroups[ym].map(orderCard)}</div>}
+                {ordOpen[ym]&&<div style={{padding:"8px 0 0"}}>{ordTable(monthGroups[ym])}</div>}
               </div>
             ))}
             {Object.keys(yearGroups).sort((a,b)=>b.localeCompare(a)).map(y=>(
@@ -291,7 +294,7 @@ export function OrdersTab({user,onMoney}){
                   <span style={{fontSize:15,fontWeight:700,color:"#E8E2D4"}}>{ordOpen[y]?"▾":"▸"} {y} · {yearGroups[y].length} order{yearGroups[y].length!==1?"s":""}</span>
                   <span style={{fontSize:15,fontWeight:700,color:"#F5C000"}}>{fmtK(gTotal(yearGroups[y]))}</span>
                 </div>
-                {ordOpen[y]&&<div style={{padding:"8px 0 0"}}>{yearGroups[y].map(orderCard)}</div>}
+                {ordOpen[y]&&<div style={{padding:"8px 0 0"}}>{ordTable(yearGroups[y])}</div>}
               </div>
             ))}
           </div>
