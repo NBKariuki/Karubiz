@@ -121,6 +121,9 @@ export const ROLES = {
 export const can = (user, perm) => !!user && (ROLES[user.role]?.can.includes(perm));
 // Readable message from a Supabase/PostgREST error.
 export const errMsg = e => { try{ const j=JSON.parse(e.message); return j.message||e.message; }catch{ return (e&&e.message)||String(e); } };
+// Discount shown to the client: the quoted (list) price minus the price actually charged, per line and in total.
+export const lineSaved = i => { const q=Number(i.list_price||0), p=Number(i.price||0), n=Number(i.qty)||1; return q>p&&p>0?(q-p)*n:0; };
+export const savedTotal = items => (items||[]).reduce((s,i)=>s+lineSaved(i),0);
 export const fmtK = n => "KSh "+Math.round(n).toLocaleString();
 // Cost of goods: every sale line carries the real unit cost ("cost") saved when it was sold.
 // Old lines without it fall back to the average cost for that product name.

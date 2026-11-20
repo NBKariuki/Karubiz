@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BIZ, H, STAFF, bizPhones, can, defStaff, errMsg, fmtK, initials, parseMpesa, recordMoney, sb, stampCosts, todayStr, withinWindow } from "../lib";
+import { BIZ, H, STAFF, bizPhones, can, defStaff, errMsg, fmtK, initials, lineSaved, parseMpesa, recordMoney, savedTotal, sb, stampCosts, todayStr, withinWindow } from "../lib";
 import { ProductSearch } from "../screens/ProductSearch";
 
 export function SaleTab({user,onMoney}){
@@ -67,6 +67,12 @@ export function SaleTab({user,onMoney}){
   const addItem=()=>setItems(x=>[...x,{id:Date.now(),name:"",qty:1,price:""}]);
   const rmItem=id=>setItems(x=>x.length>1?x.filter(i=>i.id!==id):x);
   const upItem=(id,f,v)=>setItems(x=>x.map(i=>i.id===id?{...i,[f]:v}:i));
+  // Editing the quoted price drags the sold-at price along until the two differ (that gap is the discount).
+  const upQuote=(id,v)=>setItems(x=>x.map(i=>{ if(i.id!==id) return i; const follow=i.price===""||String(i.price)===String(i.quote||""); return {...i,quote:v,price:follow?v:i.price}; }));
+  const stockPriceFor=name=>{ const k=String(name||"").trim().toLowerCase(); const m=(stockItems||[]).filter(x=>String(x.name||"").trim().toLowerCase()===k&&Number(x.selling_price)>0).sort((a,b)=>String(b.date_in||"").localeCompare(String(a.date_in||""))); return m.length?Number(m[0].selling_price):0; };
+  const listPriceOf=p=>Number(p.default_price)>0?Number(p.default_price):stockPriceFor(p.name);
+  const lineSavedUI=i=>lineSaved({list_price:i.quote,price:i.price,qty:i.qty});
+  const savedUI=arr=>arr.reduce((n,i)=>n+lineSavedUI(i),0);
   const selectStock=(id,s)=>setItems(x=>x.map(i=>i.id===id?{...i,name:s.name,price:String(s.selling_price)}:i));
   const total=items.reduce((s,i)=>s+(Number(i.qty||0)*Number(i.price||0)),0);
   const validItems=items.filter(i=>i.name&&Number(i.price)>0);
@@ -131,7 +137,7 @@ export function SaleTab({user,onMoney}){
       const now=new Date(); const date=todayStr();
       const time_str=now.toLocaleTimeString("en-KE",{hour:"2-digit",minute:"2-digit",hour12:true});
       const {creditToUse,amtPaid,balDue,cPart,mPart,methodLabel}=salePlan();
-      const base={date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:validItems,payment_method:methodLabel,mpesa_code:mpesaCode.toUpperCase(),cash_part:cPart,mpesa_part:mPart,total,amount_paid:amtPaid,balance_due:balDue,payment_type:payType,notes,credit_applied:creditToUse};
+      const base={date,time_str,served_by:staff,customer_name:cName,customer_phone:cPhone,items:validItems.map(i=>({name:i.name,qty:Number(i.qty)||1,price:Number(i.price),...(Number(i.quote)>Number(i.price)?{list_price:Number(i.quote)}:{})})),payment_method:methodLabel,mpesa_code:mpesaCode.toUpperCase(),cash_part:cPart,mpesa_part:mPart,total,amount_paid:amtPaid,balance_due:balDue,payment_type:payType,notes,credit_applied:creditToUse};
       let data;
       try{
         const r=await sb.rpc("karu_create_sale",{p:base});
@@ -192,13 +198,13 @@ export function SaleTab({user,onMoney}){
 
   const startExchange=(s)=>{
     setExchSale(s);
-    setExchItems((s.items||[]).map((it,i)=>({id:Date.now()+i,name:it.name,qty:Number(it.qty)||1,price:String(it.price)})));
+    setExchItems((s.items||[]).map((it,i)=>({id:Date.now()+i,name:it.name,qty:Number(it.qty)||1,price:String(it.price),quote:String(it.list_price||"")})));
     setExchStaff(user.full_name); setExchReason(""); setExchErr(""); setShowHistory(false);
   };
   const exUp=(id,f,v)=>setExchItems(x=>x.map(i=>i.id===id?{...i,[f]:v}:i));
   const exRm=(id)=>setExchItems(x=>x.length>1?x.filter(i=>i.id!==id):x);
   const exAdd=()=>setExchItems(x=>[...x,{id:Date.now(),name:"",qty:1,price:""}]);
-  const exSelect=(id,p)=>setExchItems(x=>x.map(i=>i.id===id?{...i,name:p.name,price:p.default_price>0?String(p.default_price):i.price}:i));
+  const exSelect=(id,p)=>setExchItems(x=>x.map(i=>i.id===id?{...i,name:p.name,quote:listPriceOf(p)>0?String(listPriceOf(p)):"",price:listPriceOf(p)>0?String(listPriceOf(p)):i.price}:i));
 
   const saveExchange=async()=>{
     setExchErr("");
@@ -209,7 +215,7 @@ export function SaleTab({user,onMoney}){
     try{
       const s=exchSale;
       // One database call: old items back to stock, new items out, credit, sale update and audit succeed or fail together.
-      const r=await sb.rpc("karu_exchange_sale",{p:{id:s.id,reason:exchReason,by:exchStaff,items:vi.map(i=>({name:i.name,qty:Number(i.qty)||1,price:Number(i.price)}))}});
+      const r=await sb.rpc("karu_exchange_sale",{p:{id:s.id,reason:exchReason,by:exchStaff,items:vi.map(i=>({name:i.name,qty:Number(i.qty)||1,price:Number(i.price),...(Number(i.quote)>Number(i.price)?{list_price:Number(i.quote)}:{})}))}});
       await loadStock(); await loadToday(); await loadPendingSales();
       setExchSale(null);
       if(r&&r.short&&r.short.length) alert("Stock was short for: "+r.short.map(x=>`${x.name} (${x.missing})`).join(", ")+". Check the Stock tab.");
@@ -220,14 +226,14 @@ export function SaleTab({user,onMoney}){
   };
 
   const rcptText=r=>{
-    const il=r.items.map(i=>`${i.name} x${i.qty}  KSh ${(Number(i.qty)*Number(i.price)).toLocaleString()}`).join("\n");
-    return `${BIZ.name}\nReceipt ${r.receipt_no}\nDate: ${r.date} ${r.time_str}\nServed by: ${initials(r.served_by)}\n\nCustomer: ${r.customer_name}${r.customer_phone?"\nPhone: "+r.customer_phone:""}\n\n${il}\n\nTOTAL: KSh ${r.total.toLocaleString()}${r.payment_type==="instalment"?`\nPaid: KSh ${Number(r.amount_paid).toLocaleString()}\nBalance: KSh ${Number(r.balance_due).toLocaleString()}`:""}\nPayment: ${r.payment_method}${r.mpesa_code?"\nCode: "+r.mpesa_code:""}${r.notes?"\nNote: "+r.notes:""}\n\nThank you for shopping with us\n${BIZ.address}\n${bizPhones()}`;
+    const il=r.items.map(i=>`${i.name} x${i.qty}  KSh ${(Number(i.qty)*Number(i.price)).toLocaleString()}`+(lineSaved(i)>0?`\n   Quoted KSh ${(Number(i.qty)*Number(i.list_price)).toLocaleString()}, you save KSh ${lineSaved(i).toLocaleString()}`:"")).join("\n"); const sd=savedTotal(r.items);
+    return `${BIZ.name}\nReceipt ${r.receipt_no}\nDate: ${r.date} ${r.time_str}\nServed by: ${initials(r.served_by)}\n\nCustomer: ${r.customer_name}${r.customer_phone?"\nPhone: "+r.customer_phone:""}\n\n${il}${sd>0?`\n\nYou saved: KSh ${sd.toLocaleString()}`:""}\n\nTOTAL: KSh ${r.total.toLocaleString()}${r.payment_type==="instalment"?`\nPaid: KSh ${Number(r.amount_paid).toLocaleString()}\nBalance: KSh ${Number(r.balance_due).toLocaleString()}`:""}\nPayment: ${r.payment_method}${r.mpesa_code?"\nCode: "+r.mpesa_code:""}${r.notes?"\nNote: "+r.notes:""}\n\nThank you for shopping with us\n${BIZ.address}\n${bizPhones()}`;
   };
   const copyText=()=>navigator.clipboard.writeText(rcptText(receipt)).then(()=>alert("Receipt copied"));
 
   const makeReceiptCanvas=()=>{
     const r=receipt; const S=2;
-    const c=document.createElement("canvas"); const W=380*S; const lines=r.items.length; const H=(430+lines*30+(r.payment_type==="instalment"?50:0)+(r.notes?24:0))*S;
+    const c=document.createElement("canvas"); const W=380*S; const lines=r.items.length; const nd=r.items.filter(i=>lineSaved(i)>0).length; const H=(430+lines*30+nd*18+(nd?30:0)+(r.payment_type==="instalment"?50:0)+(r.notes?24:0))*S;
     c.width=W; c.height=H; const x=c.getContext("2d"); x.scale(S,S);
     x.fillStyle="#fff"; x.fillRect(0,0,380,H/S);
     x.fillStyle="#111"; x.textAlign="center"; x.font="bold 22px Arial"; x.fillText(BIZ.name,190,34);
@@ -237,7 +243,9 @@ export function SaleTab({user,onMoney}){
     const row=(l,v)=>{x.textAlign="left";x.fillStyle="#555";x.fillText(l,18,y);x.textAlign="right";x.fillStyle="#111";x.font="bold 14px Arial";x.fillText(v,362,y);x.font="14px Arial";y+=22;};
     row("Receipt",r.receipt_no); row("Date",r.date+"  "+r.time_str); row("Served by",initials(r.served_by)); row("Customer",r.customer_name); if(r.customer_phone) row("Phone",r.customer_phone);
     y+=4; dash(y); y+=22;
-    r.items.forEach(i=>{ x.textAlign="left";x.fillStyle="#111";x.font="14px Arial";x.fillText(`${i.name}  x${i.qty}`,18,y); x.textAlign="right";x.font="bold 14px Arial";x.fillText("KSh "+(Number(i.qty)*Number(i.price)).toLocaleString(),362,y); y+=26; });
+    r.items.forEach(i=>{ x.textAlign="left";x.fillStyle="#111";x.font="14px Arial";x.fillText(`${i.name}  x${i.qty}`,18,y); x.textAlign="right";x.font="bold 14px Arial";x.fillText("KSh "+(Number(i.qty)*Number(i.price)).toLocaleString(),362,y); y+=26; if(lineSaved(i)>0){ x.textAlign="left";x.fillStyle="#777";x.font="12px Arial";x.fillText(`Quoted KSh ${(Number(i.qty)*Number(i.list_price)).toLocaleString()}  ·  you save KSh ${lineSaved(i).toLocaleString()}`,18,y-6); y+=12; } });
+    const sd=savedTotal(r.items);
+    if(sd>0){ y+=2; x.textAlign="left";x.fillStyle="#1B7F3B";x.font="bold 14px Arial";x.fillText("You saved",18,y); x.textAlign="right";x.fillText("KSh "+sd.toLocaleString(),362,y); y+=22; x.fillStyle="#111"; }
     y+=2; dash(y); y+=28;
     x.textAlign="left";x.fillStyle="#111";x.font="bold 20px Arial";x.fillText("TOTAL",18,y); x.textAlign="right";x.fillText("KSh "+r.total.toLocaleString(),362,y); y+=26;
     if(r.payment_type==="instalment"){ x.font="14px Arial"; row("Paid","KSh "+Number(r.amount_paid).toLocaleString()); row("Balance","KSh "+Number(r.balance_due).toLocaleString()); }
@@ -328,7 +336,8 @@ export function SaleTab({user,onMoney}){
         <div className="rcpt-row"><span className="l">Served by</span><span className="v">{initials(receipt.served_by)}</span></div>
         <div className="rcpt-row"><span className="l">Customer</span><span className="v">{receipt.customer_name}</span></div>
         {receipt.customer_phone&&<div className="rcpt-row"><span className="l">Phone</span><span className="v">{receipt.customer_phone}</span></div>}
-        <div className="rcpt-items">{receipt.items.map((i,idx)=><div key={idx} className="rcpt-it"><span className="n">{i.name} <span style={{color:"#555"}}>x{i.qty}</span></span><span style={{fontWeight:600}}>KSh {(Number(i.qty)*Number(i.price)).toLocaleString()}</span></div>)}</div>
+        <div className="rcpt-items">{receipt.items.map((i,idx)=><div key={idx} className="rcpt-it"><span className="n">{i.name} <span style={{color:"#555"}}>x{i.qty}</span></span><span style={{fontWeight:600}}>{lineSaved(i)>0&&<span style={{textDecoration:"line-through",color:"#888",fontWeight:400,fontSize:12,marginRight:6}}>KSh {(Number(i.qty)*Number(i.list_price)).toLocaleString()}</span>}KSh {(Number(i.qty)*Number(i.price)).toLocaleString()}</span></div>)}</div>
+        {savedTotal(receipt.items)>0&&<div className="rcpt-row"><span className="l" style={{color:"#1B7F3B",fontWeight:600}}>You saved</span><span className="v" style={{color:"#1B7F3B",fontWeight:700}}>KSh {savedTotal(receipt.items).toLocaleString()}</span></div>}
         <div className="rcpt-tot"><span>TOTAL</span><span>KSh {receipt.total.toLocaleString()}</span></div>{Number(receipt.credit_applied)>0&&<div className="rcpt-row"><span className="l">Store credit used</span><span className="v">- KSh {Number(receipt.credit_applied).toLocaleString()}</span></div>}
         {receipt.payment_type==="instalment"&&<><div className="rcpt-row"><span className="l">Paid</span><span className="v">KSh {Number(receipt.amount_paid).toLocaleString()}</span></div><div className="rcpt-row"><span className="l">Balance</span><span className="v" style={{color:"#B45309"}}>KSh {Number(receipt.balance_due).toLocaleString()}</span></div></>}
         {receipt.payment_type==="instalment"&&payTrail.length>0&&(
@@ -542,14 +551,15 @@ export function SaleTab({user,onMoney}){
                 {items.map(i=>(
                   <div key={i.id} style={{borderBottom:"1px solid #1A2A4A",padding:"6px 0 14px",marginBottom:12}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
-                      <ProductSearch user={user} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>it.id===i.id?{...it,name:p.name,price:p.default_price>0?String(p.default_price):it.price}:it))} placeholder="Search product..." noAdd/>
+                      <ProductSearch user={user} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>{ if(it.id!==i.id) return it; const lp=listPriceOf(p); return {...it,name:p.name,quote:lp>0?String(lp):"",price:lp>0?String(lp):it.price}; }))} placeholder="Search product..." noAdd/>
                       <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:18,paddingTop:6}}>x</button>
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-                      <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Qty</div><input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,textAlign:"center"}}/></div>
-                      <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Unit price (KSh)</div><input type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/></div>
+                    <div style={{display:"grid",gridTemplateColumns:"0.7fr 1fr 1fr",gap:8}}>
+                      <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Qty</div><input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",fontSize:15,color:"#E8E2D4",textAlign:"center"}}/></div>
+                      <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Quoted (KSh)</div><input type="number" value={i.quote||""} min={0} onChange={e=>upQuote(i.id,e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",fontSize:15,color:"#C2CBD6"}}/></div>
+                      <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Sold at (KSh)</div><input type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",fontSize:15,color:"#FFFFFF"}}/></div>
                     </div>
-                    {i.name&&i.price&&i.qty&&<div style={{fontSize:13,color:"#F5C000",marginTop:5,textAlign:"right"}}>{fmtK(Number(i.qty)*Number(i.price))}</div>}
+                    {i.name&&Number(i.price)>0&&Number(i.qty)>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6,fontSize:13}}><span style={{color:"#4CAF50"}}>{lineSavedUI(i)>0?`Discount ${fmtK(lineSavedUI(i))}`:""}</span><span style={{color:"#F5C000"}}>{fmtK(Number(i.qty)*Number(i.price))}</span></div>}
                   </div>
                 ))}
                 <button className="btn-g" onClick={addItem} style={{width:"100%",fontSize:15}}>+ Add another item</button>
@@ -562,7 +572,8 @@ export function SaleTab({user,onMoney}){
                 )}
                 <div style={{background:"transparent",border:"1px solid #2E4472",borderRadius:8,padding:12,marginBottom:14}}>
                   <div style={{fontSize:15,fontWeight:600,marginBottom:2}}>{cName}{cPhone?<span style={{color:"#8899AA",fontWeight:400}}> · {cPhone}</span>:null}</div>
-                  {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:14,color:"#8899AA",padding:"2px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
+                  {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:14,color:"#8899AA",padding:"2px 0"}}><span>{i.name} x{i.qty}</span><span>{lineSavedUI(i)>0&&<span style={{textDecoration:"line-through",marginRight:6,color:"#5B6B85"}}>{fmtK(Number(i.qty)*Number(i.quote))}</span>}{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
+                  {savedUI(validItems)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:14,color:"#4CAF50",padding:"2px 0"}}><span>Client saves</span><span>{fmtK(savedUI(validItems))}</span></div>}
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:600,color:"#F5C000",marginTop:6,paddingTop:6,borderTop:"1px solid #1A2A4A"}}><span>Total</span><span>{fmtK(total)}</span></div>
                 </div>
                 {custCredit>0&&(
@@ -602,7 +613,8 @@ export function SaleTab({user,onMoney}){
                   <div style={{fontSize:14,color:"#8A97A8",marginBottom:12}}>Check everything before recording. Stock and money update when you confirm.</div>
                   <div style={{fontSize:16,fontWeight:600,marginBottom:6}}>{cName}{cPhone?<span style={{color:"#8A97A8",fontWeight:400}}> · {cPhone}</span>:null}</div>
                   <div style={{borderTop:"1px solid #1A2A4A",borderBottom:"1px solid #1A2A4A",padding:"6px 0",marginBottom:8}}>
-                    {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:15,padding:"3px 0"}}><span>{i.name} x{i.qty}</span><span>{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
+                    {validItems.map(i=><div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:15,padding:"3px 0"}}><span>{i.name} x{i.qty}</span><span>{lineSavedUI(i)>0&&<span style={{textDecoration:"line-through",marginRight:6,color:"#5B6B85"}}>{fmtK(Number(i.qty)*Number(i.quote))}</span>}{fmtK(Number(i.qty)*Number(i.price))}</span></div>)}
+                    {savedUI(validItems)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:15,padding:"3px 0",color:"#4CAF50"}}><span>Client saves</span><span>{fmtK(savedUI(validItems))}</span></div>}
                   </div>
                   {row("Total",fmtK(total),"#F5C000")}
                   {pl.creditToUse>0&&row("Store credit applied","- "+fmtK(pl.creditToUse),"#4CAF50")}

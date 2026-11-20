@@ -136,16 +136,26 @@ export function StockTab({user,onMoney}){
   // Live stock rows with computed available qty for counting
   const liveStock=stock.filter(s=>(s.qty_in-s.qty_sold-(s.qty_adjusted||0))>0 || Number(s.qty_in)>0).map(s=>({...s,available:s.qty_in-s.qty_sold-(s.qty_adjusted||0)})).filter(s=>s.available>0);
   // Set the selling price on one or more batches (any signed-in owner or manager, even on a locked trip) and log it.
+  // Once a price is set on a locked trip it is final. Unpriced batches can still be priced, and open trips stay editable.
+  const priceLocked=b=>{ const tr=trips.find(x=>x.trip_no===b.trip_no); const locked=tr?tr.status==="locked":true; return locked&&Number(b.selling_price)>0; };
   const setPrices=async(batches,raw,key)=>{
     const p=Number(raw);
     if(!(p>0)){alert("Enter a selling price above zero.");return;}
+    const todo=batches.filter(b=>!priceLocked(b));
+    if(!todo.length){alert("These prices are locked because the trip is locked.");return;}
     setPriceSaving(true);
     try{
-      for(const b of batches){
+      for(const b of todo){
         if(Number(b.selling_price)===p) continue;
         await sb.patch("karu_stock",b.id,{selling_price:p});
         await logAudit({trip_no:b.trip_no,record_id:b.id,action:"set_price",field_changed:"selling_price",old_value:String(b.selling_price||0),new_value:String(p),reason:"Selling price set",changed_by:user.full_name});
       }
+      // Keep the product's default (quoted) price in step, but never overwrite one that is already set.
+      try{
+        const names=[...new Set(todo.map(b=>String(b.name||"").trim().toLowerCase()))];
+        const prods=await sb.get("karu_products","select=id,name,default_price");
+        for(const pr of prods){ if(names.includes(String(pr.name||"").trim().toLowerCase())&&!(Number(pr.default_price)>0)) await sb.patch("karu_products",pr.id,{default_price:p}); }
+      }catch(e){ console.error("product price:",e); }
       setPriceDraft(x=>{ const n={...x}; delete n[key]; return n; });
       await loadAll();
     }catch(e){alert("Could not save the price: "+errMsg(e));}
@@ -190,7 +200,7 @@ export function StockTab({user,onMoney}){
             </div>
             {open&&<div className="tbl-x">
               <div style={{fontSize:13,color:"#8A97A8",padding:"6px 0"}}>Stock value {fmtK(r.val)}{r.noPrice&&!r.allNoPrice?" · * some batches have no price":""}</div>
-              {priceEditor(r.batches,r.key,r.price,r.allNoPrice,"Selling price for all batches (KSh)")}
+              {(()=>{ const ok=r.batches.filter(b=>!priceLocked(b)); return ok.length?<>{priceEditor(ok,r.key,r.price,r.allNoPrice,ok.length<r.batches.length?"Selling price for open batches (KSh)":"Selling price for all batches (KSh)")}{ok.length<r.batches.length&&<div style={{fontSize:13,color:"#8A97A8",paddingBottom:8}}>{r.batches.length-ok.length} batch{r.batches.length-ok.length!==1?"es":""} on locked trips keep their price.</div>}</>:<div style={{fontSize:13,color:"#8A97A8",padding:"4px 0 8px"}}>Price is final: it was set on a locked trip.</div>; })()}
               {r.batches.slice().sort((a,b)=>(a.trip_no||"").localeCompare(b.trip_no||"")).map(b=>{
                 const tr=trips.find(x=>x.trip_no===b.trip_no); const locked=tr?tr.status==="locked":true;
                 return (<div key={b.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 0",borderTop:"1px solid #101B36"}}>
@@ -482,7 +492,7 @@ export function StockTab({user,onMoney}){
                           <div className="num" style={{fontSize:14,fontWeight:600,color:has?"#FFFFFF":"#E8A45B"}}>{has?Number(s.selling_price).toLocaleString():"No price"}</div>
                         </div>
                         {op&&<div className="tbl-x" style={{background:"#050A1F"}}>
-                          {priceEditor([s],"b"+s.id,Number(s.selling_price),!has,"Selling price (KSh)")}
+                          {!priceLocked(s)?priceEditor([s],"b"+s.id,Number(s.selling_price),!has,"Selling price (KSh)"):<div style={{fontSize:13,color:"#8A97A8",padding:"4px 0 8px"}}>Price is final: this trip is locked.</div>}
                           <div style={{display:"flex",gap:2}}>
                             {avail>0&&can(user,"adjust")&&<button onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{background:"none",border:"none",color:"#C2CBD6",fontSize:14,padding:"8px 8px 8px 0",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Adjust stock</button>}
                             {!locked&&can(user,"edit")&&withinWindow(s.created_at)&&<button onClick={()=>startEdit(s,t)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:14,padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Edit item</button>}
