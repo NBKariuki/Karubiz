@@ -179,7 +179,7 @@ export function StockTab({user,onMoney}){
     const q=stockQ.trim().toLowerCase();
     if(q) rows=rows.filter(r=>r.name.toLowerCase().includes(q)||catLabel(r.cat).toLowerCase().includes(q));
     if(noPriceOnly) rows=rows.filter(r=>r.noPrice);
-    const cols="minmax(0,1fr) 52px 76px 86px";
+    const cols="minmax(0,1fr) 42px 66px 78px";
     return (<div>
       <div className="field" style={{marginBottom:10}}><input value={stockQ} onChange={e=>setStockQ(e.target.value)} placeholder="Search items or category"/></div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,fontSize:14,color:"#8A97A8"}}>
@@ -193,14 +193,14 @@ export function StockTab({user,onMoney}){
           const open=!!itemOpen[r.key];
           return (<div key={r.key} className={`tbl-row${open?" open":""}`}>
             <div className="tbl-r" onClick={()=>setItemOpen(x=>({...x,[r.key]:!x[r.key]}))} style={{gridTemplateColumns:cols}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}><span className="chev"/><div style={{minWidth:0}}><div style={{fontSize:15,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</div><div className="tbl-sub">{catLabel(r.cat)}{r.batches.length>1?` · ${r.batches.length} batches`:""}</div></div></div>
+              <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}><span className="chev"/><div style={{minWidth:0}}><div style={{fontSize:15,fontWeight:600,lineHeight:1.25,wordBreak:"break-word"}}>{r.name}</div><div className="tbl-sub">{catLabel(r.cat)}{r.batches.length>1?` · ${r.batches.length} batches`:""}</div></div></div>
               <div className="num" style={{fontWeight:600,fontSize:15}}>{r.left}</div>
               <div className="num" style={{fontSize:14,color:"#C2CBD6"}}>{Math.round(r.cost).toLocaleString()}</div>
               <div className="num" style={{fontSize:14,fontWeight:600,color:r.allNoPrice?"#E8A45B":"#FFFFFF"}}>{r.allNoPrice?"No price":Number(r.price).toLocaleString()}{!r.allNoPrice&&r.noPrice&&<span style={{color:"#E8A45B"}}> *</span>}</div>
             </div>
             {open&&<div className="tbl-x">
               <div style={{fontSize:13,color:"#8A97A8",padding:"6px 0"}}>Stock value {fmtK(r.val)}{r.noPrice&&!r.allNoPrice?" · * some batches have no price":""}</div>
-              {(()=>{ const ok=r.batches.filter(b=>!priceLocked(b)); return ok.length?<>{priceEditor(ok,r.key,r.price,r.allNoPrice,ok.length<r.batches.length?"Selling price for open batches (KSh)":"Selling price for all batches (KSh)")}{ok.length<r.batches.length&&<div style={{fontSize:13,color:"#8A97A8",paddingBottom:8}}>{r.batches.length-ok.length} batch{r.batches.length-ok.length!==1?"es":""} on locked trips keep their price.</div>}</>:<div style={{fontSize:13,color:"#8A97A8",padding:"4px 0 8px"}}>Price is final: it was set on a locked trip.</div>; })()}
+              {(()=>{ const ok=r.batches.filter(b=>!priceLocked(b)); return ok.length?priceEditor(ok,r.key,r.price,r.allNoPrice,ok.length<r.batches.length?"Selling price for open batches (KSh)":"Selling price for all batches (KSh)"):null; })()}
               {r.batches.slice().sort((a,b)=>(a.trip_no||"").localeCompare(b.trip_no||"")).map(b=>{
                 const tr=trips.find(x=>x.trip_no===b.trip_no); const locked=tr?tr.status==="locked":true;
                 return (<div key={b.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 0",borderTop:"1px solid #101B36"}}>
@@ -406,7 +406,7 @@ export function StockTab({user,onMoney}){
             const groups={};
             liveStock.forEach(s=>{ const k=s.name.toLowerCase(); if(!groups[k])groups[k]={name:s.name,batches:[]}; groups[k].batches.push(s); });
             const names=Object.values(groups).sort((a,b)=>a.name.localeCompare(b.name));
-            const cols="minmax(0,1fr) 54px 76px 50px";
+            const cols="minmax(0,1fr) 50px 70px 44px";
             return (<div className="tbl">
               <div className="tbl-h" style={{gridTemplateColumns:cols}}><span>Item</span><span className="num">System</span><span className="num">Counted</span><span className="num">Diff</span></div>
               {names.flatMap(g=>g.batches.slice().sort((a,b)=>(a.trip_no||"").localeCompare(b.trip_no||"")).map(s=>{
@@ -414,7 +414,7 @@ export function StockTab({user,onMoney}){
                 const diff=c-s.available;
                 return (<div key={s.id} className="tbl-row" style={diff!==0?{boxShadow:`inset 3px 0 0 ${diff<0?"#E85B5B":"#4CAF50"}`}:{}}>
                   <div className="tbl-r tbl-static" style={{gridTemplateColumns:cols}}>
-                    <div style={{minWidth:0}}><div style={{fontSize:15,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.name}</div><div className="tbl-sub">{s.trip_no} · KSh {Number(s.unit_cost).toLocaleString()}</div></div>
+                    <div style={{minWidth:0}}><div style={{fontSize:15,fontWeight:600,lineHeight:1.25,wordBreak:"break-word"}}>{g.name}</div><div className="tbl-sub">{s.trip_no} · KSh {Number(s.unit_cost).toLocaleString()}</div></div>
                     <div className="num" style={{fontSize:16,fontWeight:600}}>{s.available}</div>
                     <div><input type="number" value={takeCounts[s.id]===undefined?"":takeCounts[s.id]} onChange={e=>setTakeCounts(x=>({...x,[s.id]:e.target.value}))} placeholder={String(s.available)} style={{width:"100%",background:"transparent",border:"none",borderBottom:`2px solid ${diff!==0?(diff<0?"#E85B5B":"#4CAF50"):"#5B73A3"}`,borderRadius:0,padding:"6px 2px",fontSize:16,textAlign:"center"}}/></div>
                     <div className="num" style={{fontSize:15,fontWeight:600,color:diff===0?"#5B6B85":diff<0?"#E85B5B":"#4CAF50"}}>{diff===0?"·":(diff>0?"+":"")+diff}</div>
@@ -480,19 +480,19 @@ export function StockTab({user,onMoney}){
             {isOpen&&(
               <div className="tbl-x" style={{paddingTop:10}}>
                 <div className="tbl" style={{margin:"0 0 8px"}}>
-                  <div className="tbl-h" style={{gridTemplateColumns:"minmax(0,1fr) 52px 70px 84px"}}><span>Item</span><span className="num">Left</span><span className="num">Cost</span><span className="num">Price</span></div>
+                  <div className="tbl-h" style={{gridTemplateColumns:"minmax(0,1fr) 42px 62px 78px"}}><span>Item</span><span className="num">Left</span><span className="num">Cost</span><span className="num">Price</span></div>
                   {tItems.map(s=>{
                     const adj=s.qty_adjusted||0; const avail=s.qty_in-s.qty_sold-adj; const op=!!itemOpen["t"+s.id]; const has=Number(s.selling_price)>0;
                     return (
                       <div key={s.id} className={`tbl-row${op?" open":""}`}>
-                        <div className="tbl-r" onClick={()=>setItemOpen(x=>({...x,["t"+s.id]:!x["t"+s.id]}))} style={{gridTemplateColumns:"minmax(0,1fr) 52px 70px 84px"}}>
-                          <div style={{minWidth:0}}><div style={{fontSize:15,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div><div className="tbl-sub">{catLabel(s.category)} · In {s.qty_in}{Number(s.qty_sold)>0?` · Sold ${s.qty_sold}`:""}{adj>0?` · Adj ${adj}`:""}</div></div>
+                        <div className="tbl-r" onClick={()=>setItemOpen(x=>({...x,["t"+s.id]:!x["t"+s.id]}))} style={{gridTemplateColumns:"minmax(0,1fr) 42px 62px 78px"}}>
+                          <div style={{minWidth:0}}><div style={{fontSize:15,fontWeight:600,lineHeight:1.25,wordBreak:"break-word"}}>{s.name}</div><div className="tbl-sub">{catLabel(s.category)} · In {s.qty_in}{Number(s.qty_sold)>0?` · Sold ${s.qty_sold}`:""}{adj>0?` · Adj ${adj}`:""}</div></div>
                           <div className="num" style={{fontSize:15,fontWeight:600,color:avail>0?"#4CAF50":"#E85B5B"}}>{avail}</div>
                           <div className="num" style={{fontSize:14,color:"#C2CBD6"}}>{Number(s.unit_cost).toLocaleString()}</div>
                           <div className="num" style={{fontSize:14,fontWeight:600,color:has?"#FFFFFF":"#E8A45B"}}>{has?Number(s.selling_price).toLocaleString():"No price"}</div>
                         </div>
                         {op&&<div className="tbl-x" style={{background:"#050A1F"}}>
-                          {!priceLocked(s)?priceEditor([s],"b"+s.id,Number(s.selling_price),!has,"Selling price (KSh)"):<div style={{fontSize:13,color:"#8A97A8",padding:"4px 0 8px"}}>Price is final: this trip is locked.</div>}
+                          {!priceLocked(s)&&priceEditor([s],"b"+s.id,Number(s.selling_price),!has,"Selling price (KSh)")}
                           <div style={{display:"flex",gap:2}}>
                             {avail>0&&can(user,"adjust")&&<button onClick={()=>{setAdjItem(s);setAdjQty(1);}} style={{background:"none",border:"none",color:"#C2CBD6",fontSize:14,padding:"8px 8px 8px 0",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Adjust stock</button>}
                             {!locked&&can(user,"edit")&&withinWindow(s.created_at)&&<button onClick={()=>startEdit(s,t)} style={{background:"none",border:"none",color:"#E85B5B",fontSize:14,padding:"8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Edit item</button>}

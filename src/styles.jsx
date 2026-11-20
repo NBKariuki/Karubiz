@@ -15,7 +15,7 @@ export const GS = () => (
     .tbl-row.open>.tbl-r{background:#0F1A3A}
     .tbl-row:last-child>.tbl-r:last-child{border-bottom:none}
     .tbl-x{padding:6px 12px 12px;background:#070D22;border-bottom:1px solid #101B36}
-    .tbl-sub{font-size:13px;color:#8A97A8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tbl-sub{font-size:13px;color:#8A97A8;margin-top:2px;line-height:1.3;word-break:break-word}
     .num{text-align:right;font-variant-numeric:tabular-nums}
     .chev{display:inline-block;width:8px;height:8px;border-right:2px solid #8A97A8;border-bottom:2px solid #8A97A8;transform:rotate(-45deg);flex-shrink:0;transition:transform 0.15s} .open .chev{transform:rotate(45deg)}
     .act-row{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid #1A2A4A;padding:13px 4px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#FFFFFF} .act-row:hover,.act-row:active{background:#0F1A3A}
