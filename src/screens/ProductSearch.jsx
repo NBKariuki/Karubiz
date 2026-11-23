@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { CAT_OPTS, can, catLabel, sb } from "../lib";
 
-export function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, noAdd}){
+export function ProductSearch({user, value, onChange, onPick, placeholder, priceMode, noAdd, stockRows}){
+  // stockRows (optional): raw stock rows. When given, anything in stock is searchable even if it is missing from the product list,
+  // and each result shows how many are left.
   // priceMode: "price" fills default_price, "cost" fills default_cost, "none" fills nothing
   const [products,setProducts]=useState([]); const [open,setOpen]=useState(false);
   const [adding,setAdding]=useState(false); const [saving,setSaving]=useState(false);
@@ -9,10 +11,17 @@ export function ProductSearch({user, value, onChange, onPick, placeholder, price
   const load=async()=>{ try{ setProducts(await sb.get("karu_products","select=*&active=eq.true&order=name.asc")); }catch(e){console.error(e);} };
   useEffect(()=>{ load(); },[]);
   const q=(value||"").toLowerCase().trim();
-  const matches = q.length>0 ? products.filter(p=>
-      p.name.toLowerCase().includes(q) || (p.tags||"").toLowerCase().includes(q)
-    ).slice(0,8) : [];
-  const exactExists = products.some(p=>p.name.toLowerCase()===q);
+  // Forgiving matching: ignores apostrophes and plural "s", and every word typed must appear in the name or tags.
+  const toks=s=>String(s||"").toLowerCase().replace(/['\u2019`]/g,"").replace(/[^a-z0-9]+/g," ").trim().split(" ").filter(Boolean).map(w=>w.length>3&&w.endsWith("s")&&!w.endsWith("ss")?w.slice(0,-1):w);
+  const qt=toks(q);
+  const byName={};
+  (stockRows||[]).forEach(s=>{ const k=String(s.name||"").trim().toLowerCase(); const av=Math.max(0,Number(s.qty_in||0)-Number(s.qty_sold||0)-Number(s.qty_adjusted||0)); const g=byName[k]=byName[k]||{name:s.name,category:s.category,avail:0,price:0,priceDate:"",cost:0}; g.avail+=av; g.cost+=av*Number(s.unit_cost||0); if(Number(s.selling_price)>0&&String(s.date_in||"")>=g.priceDate){ g.price=Number(s.selling_price); g.priceDate=String(s.date_in||""); } });
+  const known=new Set(products.map(x=>String(x.name||"").trim().toLowerCase()));
+  const all=[...products.map(x=>({...x,_avail:stockRows?(byName[String(x.name||"").trim().toLowerCase()]||{avail:0}).avail:undefined})),
+    ...Object.entries(byName).filter(([k,g])=>g.avail>0&&!known.has(k)).map(([k,g])=>({id:"stock:"+k,name:g.name,category:g.category,default_price:g.price,default_cost:g.avail?g.cost/g.avail:0,tags:"",_avail:g.avail,_fromStock:true}))];
+  const matches = qt.length>0 ? all.filter(x=>{ const hay=toks(x.name).join(" ")+" "+toks(x.tags).join(" "); return qt.every(t=>hay.includes(t)); })
+      .sort((a,b)=>(stockRows?((b._avail>0)-(a._avail>0)):0)||String(a.name).localeCompare(String(b.name))).slice(0,10) : [];
+  const exactExists = all.some(x=>String(x.name||"").trim().toLowerCase()===q);
 
   const saveNew=async()=>{
     if(!nf.name.trim()){alert("Name required.");return;}
@@ -35,7 +44,7 @@ export function ProductSearch({user, value, onChange, onPick, placeholder, price
           {matches.map(p=>(
             <div key={p.id} className="ac-item" onMouseDown={()=>{onPick(p);setOpen(false);}}>
               <div style={{fontSize:13,fontWeight:500}}>{p.name}</div>
-              <div style={{fontSize:11,color:"#8899AA"}}>{catLabel(p.category)}{p.default_price>0?` · KSh ${Number(p.default_price).toLocaleString()}`:""}{p.tags?` · ${p.tags}`:""}</div>
+              <div style={{fontSize:11,color:"#8899AA"}}>{catLabel(p.category)}{p.default_price>0?` · KSh ${Number(p.default_price).toLocaleString()}`:""}{p.tags?` · ${p.tags}`:""}{stockRows&&<span style={{color:p._avail>0?"#4CAF50":"#8A97A8"}}>{p._avail>0?` · ${p._avail} left`:" · out of stock"}</span>}</div>
             </div>
           ))}
           {matches.length===0&&<div style={{padding:"9px 12px",fontSize:12,color:"#8A97A8"}}>No match for "{value}"</div>}

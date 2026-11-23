@@ -288,7 +288,7 @@ export function SaleTab({user,onMoney}){
         {exchItems.map(it=>(
           <div key={it.id} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid #101B36"}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 24px",gap:6,marginBottom:6,alignItems:"center"}}>
-              <ProductSearch user={user} value={it.name} onChange={v=>exUp(it.id,"name",v)} onPick={p=>exSelect(it.id,p)} placeholder="Search product..."/>
+              <ProductSearch user={user} stockRows={stockItems} value={it.name} onChange={v=>exUp(it.id,"name",v)} onPick={p=>exSelect(it.id,p)} placeholder="Search product..."/>
               {exchItems.length>1&&<button onClick={()=>exRm(it.id)} style={{background:"none",border:"none",color:"#8A97A8",cursor:"pointer",fontSize:18}}>×</button>}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
@@ -551,7 +551,7 @@ export function SaleTab({user,onMoney}){
                 {items.map(i=>(
                   <div key={i.id} style={{borderBottom:"1px solid #1A2A4A",padding:"6px 0 14px",marginBottom:12}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 28px",gap:6,marginBottom:7}}>
-                      <ProductSearch user={user} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>{ if(it.id!==i.id) return it; const lp=listPriceOf(p); return {...it,name:p.name,quote:lp>0?String(lp):"",price:lp>0?String(lp):it.price}; }))} placeholder="Search product..." noAdd/>
+                      <ProductSearch user={user} stockRows={stockItems} value={i.name} onChange={v=>upItem(i.id,"name",v)} onPick={p=>setItems(x=>x.map(it=>{ if(it.id!==i.id) return it; const lp=listPriceOf(p); return {...it,name:p.name,quote:lp>0?String(lp):"",price:lp>0?String(lp):it.price}; }))} placeholder="Search product..." noAdd/>
                       <button onClick={()=>rmItem(i.id)} style={{background:"none",border:"none",color:"#E85B5B",cursor:"pointer",fontSize:18,paddingTop:6}}>x</button>
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"0.7fr 1fr 1fr",gap:8}}>
