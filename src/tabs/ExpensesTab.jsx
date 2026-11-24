@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { ACCT_LABEL, EXP_CATS, EXP_GROUPS, EXP_HINTS, STAFF, can, defStaff, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
+import { ACCT_LABEL, STAFF, can, defStaff, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
+import { CategoryPicker } from "../screens/CategoryPicker";
 
 export function ExpensesTab({user,onMoney}){
   const [exp,setExp]=useState([]);
@@ -118,7 +119,7 @@ export function ExpensesTab({user,onMoney}){
         <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
           <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Record Petty Cash Spend</div>
           <div style={{fontSize:13,color:"#8A97A8",marginBottom:12}}>Comes out of the petty cash pocket and logs here as an expense.</div>
-          <div className="field"><label>Category</label><select value={pcCat} onChange={ev=>setPcCat(ev.target.value)}>{EXP_GROUPS.map(([g,cs])=><optgroup key={g} label={g}>{cs.map(c=><option key={c}>{c}</option>)}</optgroup>)}</select><div style={{fontSize:13,color:"#8A97A8",marginTop:5}}>{EXP_HINTS[pcCat]}</div></div>
+          <div className="field"><label>Category</label><CategoryPicker value={pcCat} onChange={setPcCat}/></div>
           <div className="field"><label>Note (what for)</label><input value={pcNote} onChange={e=>setPcNote(e.target.value)} placeholder="e.g. Tea for the shop"/></div>
           <div className="field"><label>Amount (KSh)</label><input type="number" value={pcAmt} onChange={e=>setPcAmt(e.target.value)} placeholder="0"/></div>
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={doPettySpend} disabled={pcSaving} style={{flex:1}}>{pcSaving?"Saving...":"Record Spend"}</button><button className="btn-g" onClick={()=>{setShowPetty(false);setPcAmt("");setPcNote("");}}>Cancel</button></div>
@@ -128,7 +129,7 @@ export function ExpensesTab({user,onMoney}){
         <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
           <div style={{fontSize:14,fontWeight:600,marginBottom:14}}>Log Expense</div>
           <div className="field"><label>Date</label><input type="date" value={form.date} onChange={e=>setForm(x=>({...x,date:e.target.value}))}/></div>
-          <div className="field"><label>Category</label><select value={form.category} onChange={e=>setForm(x=>({...x,category:e.target.value}))}>{EXP_GROUPS.map(([g,cs])=><optgroup key={g} label={g}>{cs.map(c=><option key={c}>{c}</option>)}</optgroup>)}</select><div style={{fontSize:13,color:"#8A97A8",marginTop:5}}>{EXP_HINTS[form.category]}</div></div>
+          <div className="field"><label>Category</label><CategoryPicker value={form.category} onChange={v=>setForm(x=>({...x,category:v}))}/></div>
           <div className="field"><label>Description</label><input value={form.description} onChange={e=>setForm(x=>({...x,description:e.target.value}))} placeholder="e.g. October rent payment"/></div>
           <div className="field"><label>Amount (KSh)</label><input type="number" value={form.amount} onChange={e=>setForm(x=>({...x,amount:e.target.value}))} placeholder="0"/></div>
           <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${form.recorded_by===s?" on":""}`} onClick={()=>setForm(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
@@ -143,7 +144,7 @@ export function ExpensesTab({user,onMoney}){
           <div style={{fontSize:14,fontWeight:600,marginBottom:4,color:"#E8A45B"}}>Edit Expense</div>
           <div style={{fontSize:13,color:"#8899AA",marginBottom:12}}>The money effect will be corrected automatically.</div>
           <div className="field"><label>Date</label><input type="date" value={editing.date} onChange={e=>setEditing(x=>({...x,date:e.target.value}))}/></div>
-          <div className="field"><label>Category</label><select value={editing.category} onChange={e=>setEditing(x=>({...x,category:e.target.value}))}>{!EXP_CATS.includes(editing.category)&&<option>{editing.category}</option>}{EXP_GROUPS.map(([g,cs])=><optgroup key={g} label={g}>{cs.map(c=><option key={c}>{c}</option>)}</optgroup>)}</select><div style={{fontSize:13,color:"#8A97A8",marginTop:5}}>{EXP_HINTS[editing.category]}</div></div>
+          <div className="field"><label>Category</label><CategoryPicker value={editing.category} extra={editing.category} onChange={v=>setEditing(x=>({...x,category:v}))}/></div>
           <div className="field"><label>Description</label><input value={editing.description||""} onChange={e=>setEditing(x=>({...x,description:e.target.value}))}/></div>
           <div className="field"><label>Amount (KSh)</label><input type="number" value={editing.amount} onChange={e=>setEditing(x=>({...x,amount:e.target.value}))}/></div>
           <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${editing.recorded_by===s?" on":""}`} onClick={()=>setEditing(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
