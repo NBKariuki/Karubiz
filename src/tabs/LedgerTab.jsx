@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BIZ, PARTNERS, bizPhones, can, firstName, fmtK, logAudit, makeAvgCost, partnerKey, recordMoney, saleCost, sb, shareOf, todayStr } from "../lib";
+import { BIZ, EXP_CATS, EXP_LEGACY, PARTNERS, bizPhones, can, firstName, fmtK, isDirect, logAudit, makeAvgCost, partnerKey, recordMoney, saleCost, sb, shareOf, sumDirect, todayStr } from "../lib";
 import { LoansTab } from "../tabs/LoansTab";
 import { ActBox } from "../screens/ActBox";
 import { Whobar } from "../screens/Whobar";
@@ -38,8 +38,8 @@ export function LedgerTab({user,onMoney,bal,onChange}){
   useEffect(()=>{load();},[]);
   const refreshAll=async()=>{ await load(); if(onChange) onChange(); };
 
-  const ACCTS=[["cash","Cash"],["sacco","SACCO"],["petty","Petty Cash"]];
-  const acctLabel=a=>({cash:"Cash",sacco:"SACCO",petty:"Petty Cash",loans:"Loans"}[a]||(String(a).startsWith("owed_")?"Owed "+String(a).slice(5).replace(/^./,c=>c.toUpperCase()):a));
+  const ACCTS=[["cash","Cash"],["sacco","Bank"],["petty","Petty Cash"]];
+  const acctLabel=a=>({cash:"Cash",sacco:"Bank",petty:"Petty Cash",loans:"Loans"}[a]||(String(a).startsWith("owed_")?"Owed "+String(a).slice(5).replace(/^./,c=>c.toUpperCase()):a));
   const total=(bal.cash||0)+(bal.sacco||0)+(bal.petty||0);
 
   // ── Capital vs Profit (live) ──
@@ -47,9 +47,10 @@ export function LedgerTab({user,onMoney,bal,onChange}){
   const avgCostFn=makeAvgCost(pl.stock);
   const cogsAll=pl.sales.reduce((s,x)=>s+saleCost(x,avgCostFn),0);
   const salesAll=pl.sales.reduce((s,x)=>s+Number(x.total),0);
-  const expAll=pl.expenses.reduce((s,x)=>s+Number(x.amount),0);
+  const directAll=sumDirect(pl.expenses);
+  const expAll=pl.expenses.reduce((s,x)=>s+Number(x.amount),0)-directAll;
   const lossAll=(pl.losses||[]).reduce((s,l)=>s+Number(l.cost_value||0),0);
-  const grossProfitAll=salesAll-cogsAll;
+  const grossProfitAll=salesAll-cogsAll-directAll;
   const netProfitAll=grossProfitAll-expAll-lossAll;
   const liquidAll=(bal?.cash||0)+(bal?.sacco||0)+(bal?.petty||0);
   // Capital float = total liquid + stock, minus profit already earned = the working capital still circulating
@@ -165,7 +166,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
       {/* Balances header */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
         <div className="stat" style={{padding:"10px 8px"}}><div style={{fontSize:15,fontWeight:700,color:"#FFFFFF"}}>{fmtK(bal.cash||0)}</div><div className="stat-l">Cash</div></div>
-        <div className="stat" style={{padding:"10px 8px"}}><div style={{fontSize:15,fontWeight:700,color:"#FFFFFF"}}>{fmtK(bal.sacco||0)}</div><div className="stat-l">SACCO</div></div>
+        <div className="stat" style={{padding:"10px 8px"}}><div style={{fontSize:15,fontWeight:700,color:"#FFFFFF"}}>{fmtK(bal.sacco||0)}</div><div className="stat-l">Bank</div></div>
         <div className="stat" style={{padding:"10px 8px"}}><div style={{fontSize:15,fontWeight:700,color:"#FFFFFF"}}>{fmtK(bal.petty||0)}</div><div className="stat-l">Petty</div></div>
       </div>
       <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"12px 14px",marginBottom:12}}>
@@ -198,13 +199,13 @@ export function LedgerTab({user,onMoney,bal,onChange}){
         <div>
           {!act&&<div>
             <div>
-              {[["bank","🏦","Bank cash into SACCO","Move cash from the till into the SACCO account"],["withdraw","💵","Withdraw SACCO to cash","Take money out of SACCO into cash"],["partner","🤝","Partner money in or out","Loans, capital and withdrawals by a partner"],["allocate","👛","Top up petty cash","Move money into the petty cash pocket"],["reconcile","⚖️","Reconcile a balance","Fix a balance after counting what is really there"]].map(([id,ic,ti,de])=>(
+              {[["bank","🏦","Deposit cash into Bank","Move cash from the till into the bank account"],["withdraw","💵","Withdraw from Bank to cash","Take money out of the bank into cash"],["partner","🤝","Partner money in or out","Loans, capital and withdrawals by a partner"],["allocate","👛","Top up petty cash","Move money into the petty cash pocket"],["reconcile","⚖️","Reconcile a balance","Fix a balance after counting what is really there"]].map(([id,ic,ti,de])=>(
                 <button key={id} className="act-row" onClick={()=>setAct(id)}><span className="act-ic">{ic}</span><span style={{flex:1,minWidth:0}}><span style={{display:"block",fontSize:16,fontWeight:600}}>{ti}</span><span style={{display:"block",fontSize:14,color:"#A9B5C6",marginTop:2}}>{de}</span></span><span className="chev"/></button>
               ))}
             </div>
           </div>}
-          {act==="bank"&&<ActBox title="Bank cash into SACCO"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doBank} off={rb} saving={saving}/></ActBox>}
-          {act==="withdraw"&&<ActBox title="Withdraw SACCO to cash"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doWithdraw} off={rb} saving={saving}/></ActBox>}
+          {act==="bank"&&<ActBox title="Deposit cash into Bank"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doBank} off={rb} saving={saving}/></ActBox>}
+          {act==="withdraw"&&<ActBox title="Withdraw from Bank to cash"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doWithdraw} off={rb} saving={saving}/></ActBox>}
           {act==="partner"&&(()=>{ const sk=who.split(" ")[0].toLowerCase(); const owedNow=Number(bal["owed_"+sk]||0); const drawnNow=Number(bal["drawn_"+sk]||0); const share=shareOf(netProfitAll); const a=Number(amt||0);
             return (<ActBox title="Partner money"><Whobar who={who} setWho={setWho}/>
             <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${dir==="in"?" on":""}`} onClick={()=>setDir("in")}>Puts in</button><button className={`tog-btn${dir==="out"?" on":""}`} onClick={()=>setDir("out")}>Takes out</button></div>
@@ -220,7 +221,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
             <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" className="lg-in"/><Confirm on={doPartner} off={rb} saving={saving}/></ActBox>);
           })()}
           {act==="allocate"&&<ActBox title="Top up petty cash"><div style={{fontSize:13,color:"#8899AA",marginBottom:8}}>Moves money into petty cash and records it as a Petty cash expense in reports.</div>
-            <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${pcFrom==="cash"?" on":""}`} onClick={()=>setPcFrom("cash")}>From Cash</button><button className={`tog-btn${pcFrom==="sacco"?" on":""}`} onClick={()=>setPcFrom("sacco")}>From SACCO</button></div>
+            <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${pcFrom==="cash"?" on":""}`} onClick={()=>setPcFrom("cash")}>From Cash</button><button className={`tog-btn${pcFrom==="sacco"?" on":""}`} onClick={()=>setPcFrom("sacco")}>From Bank</button></div>
             <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doAllocatePetty} off={rb} saving={saving}/></ActBox>}
           {act==="spend"&&<ActBox title="Record petty spend"><div style={{fontSize:13,color:"#8899AA",marginBottom:8}}>Petty cash balance: {fmtK(bal.petty||0)}</div>
             <div className="tog" style={{marginBottom:8,flexWrap:"wrap"}}>{PETTY_CATS.map(c=><button key={c} className={`tog-btn${pcCat===c?" on":""}`} onClick={()=>setPcCat(c)} style={{fontSize:13,flex:"none",padding:"6px 10px"}}>{c}</button>)}</div>
@@ -229,7 +230,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
           {act==="reconcile"&&<ActBox title="Reconcile a balance"><div className="tog" style={{marginBottom:8}}>{ACCTS.map(([id,l])=><button key={id} className={`tog-btn${recAcct===id?" on":""}`} onClick={()=>setRecAcct(id)}>{l}</button>)}</div>
             <div style={{fontSize:14,color:"#8899AA",marginBottom:8}}>App shows: {fmtK(recAcct==="cash"?bal.cash:recAcct==="petty"?bal.petty:bal.sacco)}</div>
             <input type="number" step="0.01" value={recActual} onChange={e=>setRecActual(e.target.value)} placeholder="Actual balance (KSh)" autoFocus className="lg-in"/>
-            <input value={recReason} onChange={e=>setRecReason(e.target.value)} placeholder="Reason (e.g. SACCO interest)" className="lg-in"/><Confirm on={doReconcile} off={rb} saving={saving}/></ActBox>}
+            <input value={recReason} onChange={e=>setRecReason(e.target.value)} placeholder="Reason (e.g. bank interest)" className="lg-in"/><Confirm on={doReconcile} off={rb} saving={saving}/></ActBox>}
         </div>
       )}
 
@@ -301,7 +302,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
       )}
 
       {tab==="statement"&&(()=>{
-        const EXP_CATS_LIST=["Rent","Transport","Utilities","Marketing","Staff","Loan interest","Petty cash","Other"];
+        const EXP_CATS_LIST=[...EXP_CATS.filter(c=>!isDirect(c)&&c!=="Other"),...EXP_LEGACY,"Other"];
         const costLookup={}; pl.stock.forEach(st=>{ const k=st.name.toLowerCase(); if(!costLookup[k])costLookup[k]=[]; costLookup[k].push(Number(st.unit_cost)); });
         const avgC=n=>{ const a=costLookup[(n||"").toLowerCase()]; return a&&a.length?a.reduce((x,y)=>x+y,0)/a.length:0; };
         const computePL=(f,t)=>{
@@ -309,12 +310,13 @@ export function LedgerTab({user,onMoney,bal,onChange}){
           const s=pl.sales.filter(x=>inR(x.date)); const e=pl.expenses.filter(x=>inR(x.date)); const lo=(pl.losses||[]).filter(x=>inR(x.date));
           const revenue=s.reduce((a,x)=>a+Number(x.total),0);
           const cogs=s.reduce((a,x)=>a+saleCost(x,avgC),0);
+          const direct=sumDirect(e);
           const byCat={}; EXP_CATS_LIST.forEach(c=>byCat[c]=0);
-          e.forEach(x=>{ const c=EXP_CATS_LIST.includes(x.category)?x.category:"Other"; byCat[c]+=Number(x.amount); });
-          const expTotal=e.reduce((a,x)=>a+Number(x.amount),0);
+          e.filter(x=>!isDirect(x.category)).forEach(x=>{ const c=EXP_CATS_LIST.includes(x.category)?x.category:"Other"; byCat[c]+=Number(x.amount); });
+          const expTotal=e.reduce((a,x)=>a+Number(x.amount),0)-direct;
           const lossTotal=lo.reduce((a,x)=>a+Number(x.cost_value||0),0);
-          const gross=revenue-cogs; const net=gross-expTotal-lossTotal;
-          return {revenue,cogs,byCat,expTotal,lossTotal,gross,net};
+          const gross=revenue-cogs-direct; const net=gross-expTotal-lossTotal;
+          return {revenue,cogs,direct,byCat,expTotal,lossTotal,gross,net};
         };
         const results=periods.map(p=>({...p,pl:computePL(p.from,p.to)}));
         const nCol=results.length;
@@ -369,6 +371,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
                 <Row label="Total Revenue" vals={results.map(r=>r.pl.revenue)} bold total/>
                 <Band label="COST OF GOODS SOLD"/>
                 <Row label="Cost of goods sold" vals={results.map(r=>r.pl.cogs)} neg/>
+                {results.some(r=>r.pl.direct>0)&&<Row label="Goods transport" vals={results.map(r=>r.pl.direct)} neg/>}
                 <Row label="Gross Profit" vals={results.map(r=>r.pl.gross)} bold total/>
                 <Band label="EXPENSES"/>
                 {EXP_CATS_LIST.map(c=>(results.some(r=>r.pl.byCat[c]>0)?<Row key={c} label={c} vals={results.map(r=>r.pl.byCat[c])} neg/>:null))}
@@ -383,7 +386,7 @@ export function LedgerTab({user,onMoney,bal,onChange}){
                 <tbody>
                   <Band label="FINANCIAL POSITION (AS OF TODAY)"/>
                   <Row label="Cash at hand" vals={[cashA,...Array(nCol-1).fill(null)]}/>
-                  <Row label="SACCO" vals={[saccoA,...Array(nCol-1).fill(null)]}/>
+                  <Row label="Bank" vals={[saccoA,...Array(nCol-1).fill(null)]}/>
                   <Row label="Petty cash" vals={[pettyA,...Array(nCol-1).fill(null)]}/>
                   <Row label="Stock (at cost)" vals={[stockA,...Array(nCol-1).fill(null)]}/>
                   <Row label="Total Assets" vals={[totalAssets,...Array(nCol-1).fill(null)]} bold total/>

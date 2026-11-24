@@ -71,7 +71,7 @@ export function LoansTab({user,onChange}){
             {l.notes&&<div style={{fontSize:14,color:"#A9B5C6",marginTop:6}}>{l.notes}</div>}
             {c.lp.length>0&&(<div style={{marginTop:10}}>
               <div style={{fontSize:14,color:"#A9B5C6",marginBottom:4}}>Repayments</div>
-              {c.lp.map(p=><div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:14,padding:"5px 0",borderBottom:"1px solid #0F1A3A"}}><span>{fmtD(p.date)} · from {p.paid_from==="sacco"?"SACCO":"cash"}{Number(p.interest_part)>0?` (interest ${fmtK(p.interest_part)})`:""}</span><span style={{color:"#4CAF50"}}>{fmtK(p.amount)}</span></div>)}
+              {c.lp.map(p=><div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:14,padding:"5px 0",borderBottom:"1px solid #0F1A3A"}}><span>{fmtD(p.date)} · from {p.paid_from==="sacco"?"Bank":"cash"}{Number(p.interest_part)>0?` (interest ${fmtK(p.interest_part)})`:""}</span><span style={{color:"#4CAF50"}}>{fmtK(p.amount)}</span></div>)}
             </div>)}
             {c.balance>=1&&!pf&&<button className="btn-y" onClick={()=>{setErr("");setPf({loan:l.id,amount:"",interest:"",from:"cash",date:todayStr(),note:""});}} style={{width:"100%",marginTop:12,fontSize:14}}>Record repayment</button>}
             {pf&&pf.loan===l.id&&(
@@ -79,7 +79,7 @@ export function LoansTab({user,onChange}){
                 <div style={{fontSize:15,fontWeight:600,marginBottom:10,color:"#F5C000"}}>Record repayment</div>
                 <div className="field"><label>Amount paid (KSh)</label><input type="number" value={pf.amount} onChange={e=>setPf(x=>({...x,amount:e.target.value}))} placeholder={String(Math.round(c.balance))}/></div>
                 {c.intLeft>0&&<div className="field"><label>Of which interest (KSh)</label><input type="number" value={pf.interest} onChange={e=>setPf(x=>({...x,interest:e.target.value}))} placeholder={`0 (up to ${Math.round(c.intLeft).toLocaleString()})`}/></div>}
-                <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${pf.from==="cash"?" on":""}`} onClick={()=>setPf(x=>({...x,from:"cash"}))}>Cash</button><button className={`tog-btn${pf.from==="sacco"?" on":""}`} onClick={()=>setPf(x=>({...x,from:"sacco"}))}>SACCO</button></div></div>
+                <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${pf.from==="cash"?" on":""}`} onClick={()=>setPf(x=>({...x,from:"cash"}))}>Cash</button><button className={`tog-btn${pf.from==="sacco"?" on":""}`} onClick={()=>setPf(x=>({...x,from:"sacco"}))}>Bank</button></div></div>
                 <div className="field"><label>Date</label><input type="date" value={pf.date} onChange={e=>setPf(x=>({...x,date:e.target.value}))}/></div>
                 <div className="field"><label>Note (optional)</label><input value={pf.note} onChange={e=>setPf(x=>({...x,note:e.target.value}))} placeholder="e.g. Part payment"/></div>
                 {err&&<div style={{color:"#E85B5B",fontSize:14,marginBottom:10}}>{err}</div>}
@@ -107,7 +107,7 @@ export function LoansTab({user,onChange}){
             ?<div className="field"><label>Partner</label><div className="tog">{PARTNERS.map(s=>{ const n=s.split(" ")[0]; return <button key={s} className={`tog-btn${nf.partner===n?" on":""}`} onClick={()=>setNf(x=>({...x,partner:n}))}>{n}</button>; })}</div></div>
             :<div className="field"><label>Lender name</label><input value={nf.lender} onChange={e=>setNf(x=>({...x,lender:e.target.value}))} placeholder="e.g. Bank, SACCO, chama"/></div>}
           <div className="field"><label>Amount borrowed (KSh)</label><input type="number" value={nf.principal} onChange={e=>setNf(x=>({...x,principal:e.target.value}))} placeholder="0"/></div>
-          <div className="field"><label>Money received into</label><div className="tog"><button className={`tog-btn${nf.received_into==="cash"?" on":""}`} onClick={()=>setNf(x=>({...x,received_into:"cash"}))}>Cash</button><button className={`tog-btn${nf.received_into==="sacco"?" on":""}`} onClick={()=>setNf(x=>({...x,received_into:"sacco"}))}>SACCO</button></div></div>
+          <div className="field"><label>Money received into</label><div className="tog"><button className={`tog-btn${nf.received_into==="cash"?" on":""}`} onClick={()=>setNf(x=>({...x,received_into:"cash"}))}>Cash</button><button className={`tog-btn${nf.received_into==="sacco"?" on":""}`} onClick={()=>setNf(x=>({...x,received_into:"sacco"}))}>Bank</button></div></div>
           <div className="field"><label>Interest, % of the amount over the whole loan</label><input type="number" value={nf.interest_pct} onChange={e=>setNf(x=>({...x,interest_pct:e.target.value}))} placeholder="0 if none"/></div>
           {Number(nf.principal)>0&&<div style={{fontSize:14,color:"#F5C000",marginBottom:16}}>To repay in total: {fmtK(prev.t)}{prev.i>0?` (interest ${fmtK(prev.i)})`:""}</div>}
           <div className="field"><label>Date received</label><input type="date" value={nf.start_date} onChange={e=>setNf(x=>({...x,start_date:e.target.value}))}/></div>
@@ -122,7 +122,7 @@ export function LoansTab({user,onChange}){
       {done.length>0&&<div style={{fontSize:14,color:"#A9B5C6",margin:"14px 0 8px"}}>Repaid</div>}
       {done.map(renderLoan)}
       {loans.length===0&&!nf&&<div style={{textAlign:"center",color:"#A9B5C6",fontSize:14,padding:"24px 10px"}}>No loans recorded yet.</div>}
-      <div style={{fontSize:14,color:"#8A97A8",lineHeight:1.5,marginTop:14}}>Borrowing adds money to Cash or SACCO and records what is owed. Repayments reduce what is owed. The interest part of a repayment is saved as a "Loan interest" expense.</div>
+      <div style={{fontSize:14,color:"#8A97A8",lineHeight:1.5,marginTop:14}}>Borrowing adds money to Cash or Bank and records what is owed. Repayments reduce what is owed. The interest part of a repayment is saved as a "Loan interest" expense.</div>
     </div>
   );
 }

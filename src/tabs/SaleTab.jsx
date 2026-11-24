@@ -537,9 +537,9 @@ export function SaleTab({user,onMoney}){
               {step===1&&(<>
                 <div style={{fontSize:18,fontWeight:600,color:"#FFFFFF",marginBottom:14}}>Customer</div>
                 <div style={{background:"transparent",border:"1px dashed #2E4472",borderRadius:8,padding:10,marginBottom:14}}>
-                  <div style={{fontSize:13,color:"#8899AA",marginBottom:6}}>Paste M-Pesa or SACCO SMS to auto-fill (optional)</div>
+                  <div style={{fontSize:13,color:"#8899AA",marginBottom:6}}>Paste the M-Pesa or bank SMS to auto-fill (optional)</div>
                   <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste SMS here..." style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,resize:"none",minHeight:52,fontFamily:"'DM Sans',sans-serif"}}/>
-                  {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:14,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"SACCO":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||"no name"}</div>}
+                  {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:14,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"Bank":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||"no name"}</div>}
                 </div>
                 <div className="field"><label>Customer name</label><input value={cName} onChange={e=>setCName(e.target.value)} placeholder="Full name" autoFocus/></div>
                 <div className="field"><label>Phone (optional)</label><input value={cPhone} onChange={e=>setCPhone(e.target.value)} onBlur={e=>checkCredit(e.target.value)} placeholder="07XX XXX XXX" type="tel"/></div>

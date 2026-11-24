@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { EXP_CATS, STAFF, can, defStaff, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
+import { ACCT_LABEL, EXP_CATS, EXP_GROUPS, EXP_HINTS, STAFF, can, defStaff, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
 
 export function ExpensesTab({user,onMoney}){
   const [exp,setExp]=useState([]);
@@ -8,14 +8,13 @@ export function ExpensesTab({user,onMoney}){
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
   const [showForm,setShowForm]=useState(false);
-  const [showPetty,setShowPetty]=useState(false); const [pcCat,setPcCat]=useState("Refreshments"); const [pcNote,setPcNote]=useState(""); const [pcAmt,setPcAmt]=useState(""); const [pcSaving,setPcSaving]=useState(false);
-  const PETTY_CATS=["Refreshments","Transport","Airtime","Cleaning","Office","Other"];
+  const [showPetty,setShowPetty]=useState(false); const [pcCat,setPcCat]=useState("Staff welfare"); const [pcNote,setPcNote]=useState(""); const [pcAmt,setPcAmt]=useState(""); const [pcSaving,setPcSaving]=useState(false);
   const doPettySpend=async()=>{
     const a=Number(pcAmt); if(!a||a<=0){alert("Enter an amount.");return;} if(!pcNote.trim()){alert("Add a note.");return;}
     setPcSaving(true);
     try{
       await recordMoney({account:"petty",amount:-a,type:"petty_spend",description:`${pcCat}: ${pcNote}`,date:todayStr(),recorded_by:user.full_name});
-      await sb.post("karu_expenses",{date:todayStr(),category:"Petty cash",description:`${pcCat}: ${pcNote}`,amount:a,recorded_by:user.full_name,paid_from:"petty"});
+      await sb.post("karu_expenses",{date:todayStr(),category:pcCat,description:pcNote,amount:a,recorded_by:user.full_name,paid_from:"petty"});
       if(onMoney) onMoney();
       setShowPetty(false); setPcAmt(""); setPcNote("");
       await loadExp();
@@ -119,7 +118,7 @@ export function ExpensesTab({user,onMoney}){
         <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
           <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Record Petty Cash Spend</div>
           <div style={{fontSize:13,color:"#8A97A8",marginBottom:12}}>Comes out of the petty cash pocket and logs here as an expense.</div>
-          <div className="field"><label>Category</label><div className="tog" style={{flexWrap:"wrap"}}>{PETTY_CATS.map(c=><button key={c} className={`tog-btn${pcCat===c?" on":""}`} onClick={()=>setPcCat(c)} style={{flex:"1 0 30%",fontSize:14}}>{c}</button>)}</div></div>
+          <div className="field"><label>Category</label><select value={pcCat} onChange={ev=>setPcCat(ev.target.value)}>{EXP_GROUPS.map(([g,cs])=><optgroup key={g} label={g}>{cs.map(c=><option key={c}>{c}</option>)}</optgroup>)}</select><div style={{fontSize:13,color:"#8A97A8",marginTop:5}}>{EXP_HINTS[pcCat]}</div></div>
           <div className="field"><label>Note (what for)</label><input value={pcNote} onChange={e=>setPcNote(e.target.value)} placeholder="e.g. Tea for the shop"/></div>
           <div className="field"><label>Amount (KSh)</label><input type="number" value={pcAmt} onChange={e=>setPcAmt(e.target.value)} placeholder="0"/></div>
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={doPettySpend} disabled={pcSaving} style={{flex:1}}>{pcSaving?"Saving...":"Record Spend"}</button><button className="btn-g" onClick={()=>{setShowPetty(false);setPcAmt("");setPcNote("");}}>Cancel</button></div>
@@ -129,11 +128,11 @@ export function ExpensesTab({user,onMoney}){
         <div className="card" style={{marginBottom:14,border:"1px solid rgba(245,192,0,0.25)"}}>
           <div style={{fontSize:14,fontWeight:600,marginBottom:14}}>Log Expense</div>
           <div className="field"><label>Date</label><input type="date" value={form.date} onChange={e=>setForm(x=>({...x,date:e.target.value}))}/></div>
-          <div className="field"><label>Category</label><select value={form.category} onChange={e=>setForm(x=>({...x,category:e.target.value}))}>{EXP_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+          <div className="field"><label>Category</label><select value={form.category} onChange={e=>setForm(x=>({...x,category:e.target.value}))}>{EXP_GROUPS.map(([g,cs])=><optgroup key={g} label={g}>{cs.map(c=><option key={c}>{c}</option>)}</optgroup>)}</select><div style={{fontSize:13,color:"#8A97A8",marginTop:5}}>{EXP_HINTS[form.category]}</div></div>
           <div className="field"><label>Description</label><input value={form.description} onChange={e=>setForm(x=>({...x,description:e.target.value}))} placeholder="e.g. October rent payment"/></div>
           <div className="field"><label>Amount (KSh)</label><input type="number" value={form.amount} onChange={e=>setForm(x=>({...x,amount:e.target.value}))} placeholder="0"/></div>
           <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${form.recorded_by===s?" on":""}`} onClick={()=>setForm(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
-          <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${form.paid_from==="cash"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${form.paid_from==="sacco"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${form.paid_from==="personal"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
+          <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${form.paid_from==="cash"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${form.paid_from==="sacco"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"sacco"}))}>Bank</button><button className={`tog-btn${form.paid_from==="personal"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
           {form.paid_from==="personal"&&<div style={{fontSize:13,color:"#E8A45B",marginTop:5}}>Business will owe {form.recorded_by.split(" ")[0]} this amount</div>}</div>
           {err&&<div style={{color:"#E85B5B",fontSize:14,marginBottom:10}}>{err}</div>}
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={save} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save"}</button><button className="btn-g" onClick={()=>{setShowForm(false);setErr("");}}>Cancel</button></div>
@@ -144,11 +143,11 @@ export function ExpensesTab({user,onMoney}){
           <div style={{fontSize:14,fontWeight:600,marginBottom:4,color:"#E8A45B"}}>Edit Expense</div>
           <div style={{fontSize:13,color:"#8899AA",marginBottom:12}}>The money effect will be corrected automatically.</div>
           <div className="field"><label>Date</label><input type="date" value={editing.date} onChange={e=>setEditing(x=>({...x,date:e.target.value}))}/></div>
-          <div className="field"><label>Category</label><select value={editing.category} onChange={e=>setEditing(x=>({...x,category:e.target.value}))}>{EXP_CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+          <div className="field"><label>Category</label><select value={editing.category} onChange={e=>setEditing(x=>({...x,category:e.target.value}))}>{!EXP_CATS.includes(editing.category)&&<option>{editing.category}</option>}{EXP_GROUPS.map(([g,cs])=><optgroup key={g} label={g}>{cs.map(c=><option key={c}>{c}</option>)}</optgroup>)}</select><div style={{fontSize:13,color:"#8A97A8",marginTop:5}}>{EXP_HINTS[editing.category]}</div></div>
           <div className="field"><label>Description</label><input value={editing.description||""} onChange={e=>setEditing(x=>({...x,description:e.target.value}))}/></div>
           <div className="field"><label>Amount (KSh)</label><input type="number" value={editing.amount} onChange={e=>setEditing(x=>({...x,amount:e.target.value}))}/></div>
           <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${editing.recorded_by===s?" on":""}`} onClick={()=>setEditing(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
-          <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${editing.paid_from==="cash"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${editing.paid_from==="sacco"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${editing.paid_from==="personal"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"personal"}))}>Personal</button></div></div>
+          <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${editing.paid_from==="cash"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${editing.paid_from==="sacco"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"sacco"}))}>Bank</button><button className={`tog-btn${editing.paid_from==="personal"?" on":""}`} onClick={()=>setEditing(x=>({...x,paid_from:"personal"}))}>Personal</button></div></div>
           <div className="field"><label>Reason for change (required)</label><textarea value={editReason} onChange={e=>setEditReason(e.target.value)} placeholder="e.g. Wrong amount entered, corrected"/></div>
           {err&&<div style={{color:"#E85B5B",fontSize:14,marginBottom:10}}>{err}</div>}
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={saveEdit} disabled={saving} style={{flex:1}}>{saving?"Saving...":"Save Changes"}</button><button className="btn-g" onClick={()=>{setEditing(null);setErr("");}}>Cancel</button></div>
@@ -160,7 +159,7 @@ export function ExpensesTab({user,onMoney}){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:14,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.description||e.category}</div>
-                <div style={{fontSize:13,color:"#8A97A8"}}>{e.category} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+e.paid_from:""}</div>
+                <div style={{fontSize:13,color:"#8A97A8"}}>{e.category} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+(ACCT_LABEL[e.paid_from]||e.paid_from):""}</div>
               </div>
               <span style={{fontSize:14,fontWeight:600,color:"#E85B5B",marginLeft:10,whiteSpace:"nowrap"}}>{fmtK(Number(e.amount))}</span>
             </div>

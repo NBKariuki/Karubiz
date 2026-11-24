@@ -351,7 +351,7 @@ export function StockTab({user,onMoney}){
         <div className="field"><label>Recorded by</label><div style={{fontSize:16,color:"#E8E2D4",padding:"9px 0"}}>{trip.created_by}</div></div>
       )}
       <div className="field"><label>Notes</label><input value={trip.notes} onChange={e=>setTrip(x=>({...x,notes:e.target.value}))} placeholder="e.g. Gachie sourcing run"/></div>
-      <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${trip.paid_from==="cash"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${trip.paid_from==="sacco"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"sacco"}))}>SACCO</button><button className={`tog-btn${trip.paid_from==="personal"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
+      <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${trip.paid_from==="cash"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${trip.paid_from==="sacco"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"sacco"}))}>Bank</button><button className={`tog-btn${trip.paid_from==="personal"?" on":""}`} onClick={()=>setTrip(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
       {trip.paid_from==="personal"&&<div style={{fontSize:13,color:"#E8A45B",marginTop:5}}>Business will owe {trip.created_by.split(" ")[0]} this amount</div>}</div>
       <div className="field">
         <label>Items purchased</label>

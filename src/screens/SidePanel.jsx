@@ -53,13 +53,13 @@ export function SidePanel({user,bal,onClose,onChange,onLogout}){
           <div className="qa-title">Set opening balances</div>
           <div style={{fontSize:11,color:"#8899AA",marginBottom:8}}>One time only. What do you have right now?</div>
           <input type="number" value={openCash} onChange={e=>setOpenCash(e.target.value)} placeholder="Cash at hand (KSh)"/>
-          <input type="number" value={openSacco} onChange={e=>setOpenSacco(e.target.value)} placeholder="SACCO balance (KSh)"/>
+          <input type="number" value={openSacco} onChange={e=>setOpenSacco(e.target.value)} placeholder="Bank balance (KSh)"/>
           <button className="btn-y" onClick={doOpening} disabled={saving} style={{width:"100%"}}>{saving?"Saving...":"Save"}</button>
         </div>
       ):(<>
         <div style={{marginBottom:16}}>
           <div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>Cash at hand</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(bal.cash)}</span></div>
-          <div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>SACCO</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(bal.sacco)}</span></div>
+          <div className="bal-row"><span style={{color:"#8899AA",fontSize:13}}>Bank</span><span style={{fontSize:15,fontWeight:600,color:"#FFFFFF"}}>{fmtK(bal.sacco)}</span></div>
           <div className="bal-row"><span style={{color:"#FFFFFF",fontSize:13,fontWeight:600}}>Total</span><span style={{fontSize:17,fontWeight:700,color:"#F5C000"}}>{fmtK(total)}</span></div>
           {PARTNERS.map(p=>{ const k="owed_"+partnerKey(p); return bal[k]>0&&<div key={k} className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Business owes {firstName(p)}</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal[k])}</span></div>; })}
           {bal.loans>0&&<div className="bal-row"><span style={{color:"#E8A45B",fontSize:12}}>Loans owed</span><span style={{color:"#E8A45B",fontSize:13,fontWeight:600}}>{fmtK(bal.loans)}</span></div>}
@@ -82,7 +82,7 @@ export function SidePanel({user,bal,onClose,onChange,onLogout}){
         {act==="partner"&&<div className="qa"><div className="qa-title">Partner money</div>
           <div className="tog" style={{marginBottom:8}}>{STAFF.map(s=><button key={s} className={`tog-btn${who===s?" on":""}`} onClick={()=>setWho(s)}>{s.split(" ")[0]}</button>)}</div>
           <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${dir==="in"?" on":""}`} onClick={()=>setDir("in")}>Puts in</button><button className={`tog-btn${dir==="out"?" on":""}`} onClick={()=>setDir("out")}>Takes out</button><button className={`tog-btn${dir==="repay"?" on":""}`} onClick={()=>setDir("repay")}>Repay</button></div>
-          <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${acc==="cash"?" on":""}`} onClick={()=>setAcc("cash")}>Cash</button><button className={`tog-btn${acc==="sacco"?" on":""}`} onClick={()=>setAcc("sacco")}>SACCO</button></div>
+          <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${acc==="cash"?" on":""}`} onClick={()=>setAcc("cash")}>Cash</button><button className={`tog-btn${acc==="sacco"?" on":""}`} onClick={()=>setAcc("sacco")}>Bank</button></div>
           <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)"/>
           <div style={{display:"flex",gap:6}}><button className="btn-y" onClick={doPartner} disabled={saving} style={{flex:1,fontSize:13}}>{saving?"...":"Confirm"}</button><button className="btn-g" onClick={()=>{setAct(null);setAmt("");}} style={{fontSize:13}}>Cancel</button></div></div>}
         {moves.length>0&&<div><div style={{fontSize:11,color:"#8A97A8",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Recent movements</div>

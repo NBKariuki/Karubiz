@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fmtK, makeAvgCost, saleCost, sb, todayStr } from "../lib";
+import { fmtK, isDirect, makeAvgCost, saleCost, sb, sumDirect, todayStr } from "../lib";
 
 export function ReportsTab({user,bal}){
   const [data,setData]=useState({sales:[],expenses:[],stock:[],losses:[]});
@@ -63,12 +63,13 @@ export function ReportsTab({user,bal}){
   const salesValue=fSales.reduce((s,x)=>s+Number(x.total),0);
   const collected=fSales.reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
   const receivables=fSales.reduce((s,x)=>s+Number(x.balance_due||0),0);
-  const expenses=fExp.reduce((s,x)=>s+Number(x.amount),0);
+  const directCost=sumDirect(fExp); // goods transport: counted with cost of goods
+  const expenses=fExp.reduce((s,x)=>s+Number(x.amount),0)-directCost;
   const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
   const stockRetail=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*(i.selling_price||0)),0);
   const stockPotentialProfit=stockRetail-stockValue;
   const avgCostR=makeAvgCost(data.stock);
-  const cogs=fSales.reduce((s,x)=>s+saleCost(x,avgCostR),0);
+  const cogs=fSales.reduce((s,x)=>s+saleCost(x,avgCostR),0)+directCost;
   const fLosses=filterDate(data.losses||[]);
   const lossCost=fLosses.reduce((s,l)=>s+Number(l.cost_value||0),0);
   const grossProfit=salesValue-cogs;
@@ -79,7 +80,7 @@ export function ReportsTab({user,bal}){
   const liquidPct=totalCapital>0?Math.round(liquid/totalCapital*100):0;
   const SAFETY_FLOOR=(()=>{ try{ const v=localStorage.getItem("karu_safety_floor"); return v?Number(v):15000; }catch{ return 15000; } })();
   const inflow=collected;
-  const outflow=expenses+lossCost;
+  const outflow=expenses+directCost+lossCost;
   const netFlow=inflow-outflow;
   let capState="green", capMsg="Healthy — liquid money is strong and inflow covers costs.";
   if(liquid<SAFETY_FLOOR){ capState="red"; capMsg=`Below your safety floor of ${fmtK(SAFETY_FLOOR)}. Liquid cash is critically low — hold off on non-essential spend and prioritise collecting balances.`; }
@@ -104,7 +105,7 @@ export function ReportsTab({user,bal}){
   const bucketLabel = key => byMonth ? MONTHS[parseInt(key.slice(5,7))-1]+(period==="all"?" "+key.slice(2,4):"") : key.slice(5);
   const pvMap={};
   fSales.forEach(s=>{ const k=bucketKey(s.date); if(!pvMap[k])pvMap[k]={profit:0,expenses:0}; pvMap[k].profit += Number(s.total)*blendedMargin; });
-  fExp.forEach(e=>{ const k=bucketKey(e.date); if(!pvMap[k])pvMap[k]={profit:0,expenses:0}; pvMap[k].expenses += Number(e.amount); });
+  fExp.filter(e=>!isDirect(e.category)).forEach(e=>{ const k=bucketKey(e.date); if(!pvMap[k])pvMap[k]={profit:0,expenses:0}; pvMap[k].expenses += Number(e.amount); });
   const pvCap = byMonth ? 12 : 31;
   let pvData;
   if(monthSummary){
@@ -124,7 +125,7 @@ export function ReportsTab({user,bal}){
   const topItems=Object.entries(itemMap).sort(([,a],[,b])=>b.revenue-a.revenue).slice(0,5);
 
   const expMap={};
-  fExp.forEach(e=>{expMap[e.category]=(expMap[e.category]||0)+Number(e.amount);});
+  fExp.filter(e=>!isDirect(e.category)).forEach(e=>{expMap[e.category]=(expMap[e.category]||0)+Number(e.amount);});
   const expBreakdown=Object.entries(expMap).sort(([,a],[,b])=>b-a);
   const mpesa=fSales.filter(s=>s.payment_method==="M-Pesa").reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
   const cash=fSales.filter(s=>s.payment_method==="Cash").reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
@@ -133,13 +134,13 @@ export function ReportsTab({user,bal}){
   const drillCollected=()=>({ title:"Collected", color:"#4CAF50", total:collected,
     rows:fSales.filter(s=>Number(s.amount_paid!=null?s.amount_paid:s.total)>0).map(s=>({label:s.customer_name,sub:`${s.receipt_no} · ${s.date.slice(5)} · ${s.payment_method}`,amount:Number(s.amount_paid!=null?s.amount_paid:s.total)})) });
   const drillExpenses=()=>({ title:"Expenses", color:"#E85B5B", total:expenses,
-    rows:fExp.map(e=>({label:e.description||e.category,sub:`${e.category} · ${e.date.slice(5)} · ${e.recorded_by?.split(" ")[0]||""}`,amount:Number(e.amount)})) });
+    rows:fExp.filter(e=>!isDirect(e.category)).map(e=>({label:e.description||e.category,sub:`${e.category} · ${e.date.slice(5)} · ${e.recorded_by?.split(" ")[0]||""}`,amount:Number(e.amount)})) });
   const drillSalesValue=()=>({ title:"Sales value (invoiced)", color:"#8899AA", total:salesValue,
     rows:fSales.map(s=>({label:s.customer_name,sub:`${s.receipt_no} · ${s.date.slice(5)}`,amount:Number(s.total)})) });
   const drillOwed=()=>({ title:"Owed to us", color:"#E8A45B", total:receivables,
     rows:fSales.filter(s=>Number(s.balance_due||0)>0).map(s=>({label:s.customer_name,sub:`${s.receipt_no} · paid ${fmtK(Number(s.amount_paid||0))} of ${fmtK(Number(s.total))}`,amount:Number(s.balance_due)})) });
   const drillGross=()=>({ title:"Gross profit breakdown", color:"#F5C000", total:grossProfit,
-    rows:[{label:"Sales value (invoiced)",sub:"what was billed",amount:salesValue},{label:"Less: cost of goods sold",sub:"COGS on items sold",amount:-cogs}] });
+    rows:[{label:"Sales value (invoiced)",sub:"what was billed",amount:salesValue},{label:"Less: cost of goods sold",sub:"COGS on items sold",amount:-(cogs-directCost)},...(directCost>0?[{label:"Less: goods transport",sub:"hauling goods you bought",amount:-directCost}]:[])] });
   const drillNet=()=>({ title:"Net profit breakdown", color:netProfit>=0?"#4CAF50":"#E85B5B", total:netProfit,
     rows:[{label:"Gross profit",sub:"sales value less COGS",amount:grossProfit},{label:"Less: expenses",sub:`${fExp.length} entries`,amount:-expenses},...(lossCost>0?[{label:"Less: losses",sub:`${fLosses.length} incidents`,amount:-lossCost}]:[])] });
 
@@ -157,7 +158,7 @@ export function ReportsTab({user,bal}){
           mmap[m].collected+=Number(s.amount_paid!=null?s.amount_paid:s.total);
           mmap[m].cogs+=saleCost(s,avgCost);
         });
-        data.expenses.forEach(e=>{const m=e.date.slice(0,7);if(!mmap[m])mmap[m]={collected:0,cogs:0,expenses:0};mmap[m].expenses+=Number(e.amount);});
+        data.expenses.forEach(e=>{const m=e.date.slice(0,7);if(!mmap[m])mmap[m]={collected:0,cogs:0,expenses:0}; if(isDirect(e.category)) mmap[m].cogs+=Number(e.amount); else mmap[m].expenses+=Number(e.amount);});
         const rows=Object.entries(mmap).sort(([a],[b])=>b.localeCompare(a)).map(([month,d])=>({month,collected:d.collected,cogs:d.cogs,expenses:d.expenses,profit:d.collected-d.cogs-d.expenses}));
         if(!rows.length) return null;
         const tots=rows.reduce((s,r)=>({collected:s.collected+r.collected,cogs:s.cogs+r.cogs,expenses:s.expenses+r.expenses,profit:s.profit+r.profit}),{collected:0,cogs:0,expenses:0,profit:0});
@@ -166,7 +167,7 @@ export function ReportsTab({user,bal}){
         return (
           <div className="card" style={{marginBottom:14}}>
             <div style={{fontSize:13,color:"#AEB9C7",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Month-on-month performance</div>
-            <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>Profit = Collected − COGS − Expenses. Amounts in KSh.</div>
+            <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>Profit = Collected − COGS − Expenses. COGS includes goods transport. Amounts in KSh.</div>
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:14,minWidth:360}}>
                 <thead>

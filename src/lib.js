@@ -33,7 +33,38 @@ export const loadBiz = async () => {
   }catch(e){ /* keep defaults */ }
 };
 export const bizPhones = () => [BIZ.phone1,BIZ.phone2].filter(Boolean).join(" · ");
-export const EXP_CATS = ["Rent","Transport","Utilities","Marketing","Staff","Loan interest","Other"];
+// Expense categories, grouped. Goods transport is a direct cost: it is shown with cost of goods so gross profit is honest.
+export const EXP_GROUPS = [
+  ["Cost of goods",["Goods transport"]],
+  ["Premises",["Rent","Utilities"]],
+  ["Staff",["Stipends","Staff welfare"]],
+  ["Selling",["Display labour","Marketing"]],
+  ["Operations",["Errand fares","Tools and small equipment","Airtime and data","Cleaning","Bank charges"]],
+  ["Finance",["Loan interest"]],
+  ["Other",["Other"]],
+];
+export const EXP_CATS = EXP_GROUPS.flatMap(g=>g[1]);
+export const EXP_LEGACY = ["Transport","Staff","Petty cash"]; // older entries keep these names
+export const EXP_HINTS = {
+  "Goods transport":"Hauling goods you bought to the shop. Counts as cost of goods.",
+  "Rent":"Shop and store rent.",
+  "Utilities":"Electricity, water, internet.",
+  "Stipends":"Regular pay to staff. One entry per person.",
+  "Staff welfare":"Lunch, tea, small support for staff. Not loans.",
+  "Display labour":"Moving furniture out for display and back in.",
+  "Marketing":"Ads, signs, promotions.",
+  "Errand fares":"Fares to run errands, bank trips, small deliveries.",
+  "Tools and small equipment":"Hammer, hand saw and other tools.",
+  "Airtime and data":"Phone airtime and bundles for work.",
+  "Cleaning":"Cleaning supplies and services.",
+  "Bank charges":"Bank, M-Pesa and transfer fees.",
+  "Loan interest":"Interest paid on a loan. The Loans tab adds this for you.",
+  "Other":"Only if nothing else fits. Describe it clearly.",
+};
+export const DIRECT_CATS = ["Goods transport"];
+export const isDirect = c => DIRECT_CATS.includes(c);
+export const sumDirect = list => (list||[]).filter(x=>isDirect(x.category)).reduce((s,x)=>s+Number(x.amount),0);
+export const ACCT_LABEL = {cash:"Cash",sacco:"Bank",petty:"Petty cash",personal:"Paid personally"};
 export const CAT_OPTS = [{id:"living",label:"Living Room"},{id:"bedroom",label:"Bedroom"},{id:"decor",label:"Decor"},{id:"other",label:"Other"}];
 export const catLabel = id => ({living:"Living Room",bedroom:"Bedroom",decor:"Decor",other:"Other"}[id]||id);
 export const H = {"apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"};
