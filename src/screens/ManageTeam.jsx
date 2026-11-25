@@ -31,8 +31,8 @@ export function ManageTeam({user,onBack}){
       {adding&&(
         <div className="qa" style={{marginBottom:14}}>
           <div className="qa-title">New team member</div>
-          <div className="field"><label>Full name</label><input value={f.full_name} onChange={e=>setF(x=>({...x,full_name:e.target.value}))} placeholder="e.g. Jane Wanjiru"/></div>
-          <div className="field"><label>Username (they log in with this)</label><input value={f.username} onChange={e=>setF(x=>({...x,username:e.target.value}))} placeholder="e.g. jane" autoCapitalize="none"/></div>
+          <div className="field"><label>Full name</label><input required value={f.full_name} onChange={e=>setF(x=>({...x,full_name:e.target.value}))} placeholder="e.g. Jane Wanjiru"/></div>
+          <div className="field"><label>Username (they log in with this)</label><input required value={f.username} onChange={e=>setF(x=>({...x,username:e.target.value}))} placeholder="e.g. jane" autoCapitalize="none"/></div>
           <div className="field"><label>Phone (optional)</label><input value={f.phone} onChange={e=>setF(x=>({...x,phone:e.target.value}))} placeholder="07XX XXX XXX" type="tel"/></div>
           <div className="field"><label>Role</label><div className="tog"><button className={`tog-btn${f.role==="attendant"?" on":""}`} onClick={()=>setF(x=>({...x,role:"attendant"}))} style={{fontSize:12}}>Attendant</button><button className={`tog-btn${f.role==="manager"?" on":""}`} onClick={()=>setF(x=>({...x,role:"manager"}))} style={{fontSize:12}}>Manager</button><button className={`tog-btn${f.role==="owner"?" on":""}`} onClick={()=>setF(x=>({...x,role:"owner"}))} style={{fontSize:12}}>Owner</button></div></div>
           <div style={{fontSize:11,color:"#8899AA",marginBottom:10}}>{f.role==="attendant"?"They'll set a 6-digit PIN at first login.":"They'll set a password at first login (owners and managers use passwords)."}</div>

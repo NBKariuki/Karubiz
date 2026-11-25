@@ -505,7 +505,7 @@ export function SaleTab({user,onMoney}){
                     </div>
                   )}
                   <div className="field"><label>Method</label><div className="tog"><button className={`tog-btn${addPayMethod==="mpesa"?" on":""}`} onClick={()=>setAddPayMethod("mpesa")}>M-Pesa</button><button className={`tog-btn${addPayMethod==="cash"?" on":""}`} onClick={()=>setAddPayMethod("cash")}>Cash</button></div></div>
-                  {addPayMethod==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={addPayCode} onChange={e=>setAddPayCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>}
+                  {addPayMethod==="mpesa"&&<div className="field"><label>M-Pesa code</label><input required value={addPayCode} onChange={e=>setAddPayCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>}
                   <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${addPayStaff===s?" on":""}`} onClick={()=>setAddPayStaff(s)}>{s.split(" ")[0]}</button>)}</div></div>
                   <div className="field"><label>Notes (optional)</label><input value={addPayNotes} onChange={e=>setAddPayNotes(e.target.value)} placeholder="e.g. Second instalment"/></div>
                   <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={addPaymentToSale} disabled={addPaySaving} style={{flex:1,fontSize:15}}>{addPaySaving?"Saving...":"Record Payment"}</button><button className="btn-g" onClick={()=>setAddPaySale(null)} style={{fontSize:15}}>Cancel</button></div>
@@ -541,7 +541,7 @@ export function SaleTab({user,onMoney}){
                   <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste SMS here..." style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,resize:"none",minHeight:52,fontFamily:"'DM Sans',sans-serif"}}/>
                   {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:14,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"Bank":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||"no name"}</div>}
                 </div>
-                <div className="field"><label>Customer name</label><input value={cName} onChange={e=>setCName(e.target.value)} placeholder="Full name" autoFocus/></div>
+                <div className="field"><label>Customer name</label><input required value={cName} onChange={e=>setCName(e.target.value)} placeholder="Full name" autoFocus/></div>
                 <div className="field"><label>Phone (optional)</label><input value={cPhone} onChange={e=>setCPhone(e.target.value)} onBlur={e=>checkCredit(e.target.value)} placeholder="07XX XXX XXX" type="tel"/></div>
                 {custCredit>0&&<div style={{background:"rgba(76,175,80,0.08)",border:"1px solid rgba(76,175,80,0.3)",borderRadius:8,padding:10,fontSize:14,color:"#4CAF50"}}>This customer holds {fmtK(custCredit)} store credit. It will be offered at payment.</div>}
               </>)}
@@ -557,7 +557,7 @@ export function SaleTab({user,onMoney}){
                     <div style={{display:"grid",gridTemplateColumns:"0.7fr 1fr 1fr",gap:8}}>
                       <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Qty</div><input type="number" value={i.qty} min={1} onChange={e=>upItem(i.id,"qty",e.target.value)} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",fontSize:15,color:"#E8E2D4",textAlign:"center"}}/></div>
                       <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Quoted (KSh)</div><input type="number" value={i.quote||""} min={0} onChange={e=>upQuote(i.id,e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",fontSize:15,color:"#C2CBD6"}}/></div>
-                      <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Sold at (KSh)</div><input type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",fontSize:15,color:"#FFFFFF"}}/></div>
+                      <div><div style={{fontSize:13,color:"#A9B5C6",marginBottom:0}}>Sold at (KSh)</div><input required type="number" value={i.price} min={0} onChange={e=>upItem(i.id,"price",e.target.value)} placeholder="0" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",fontSize:15,color:"#FFFFFF"}}/></div>
                     </div>
                     {i.name&&Number(i.price)>0&&Number(i.qty)>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6,fontSize:13}}><span style={{color:"#4CAF50"}}>{lineSavedUI(i)>0?`Discount ${fmtK(lineSavedUI(i))}`:""}</span><span style={{color:"#F5C000"}}>{fmtK(Number(i.qty)*Number(i.price))}</span></div>}
                   </div>
@@ -585,15 +585,15 @@ export function SaleTab({user,onMoney}){
                   </div>
                 )}
                 <div className="field"><label>Payment type</label><div className="tog"><button className={`tog-btn${payType==="full"?" on":""}`} onClick={()=>setPayType("full")}>Full</button><button className={`tog-btn${payType==="instalment"?" on":""}`} onClick={()=>setPayType("instalment")}>Instalment</button></div></div>
-                {payType==="instalment"&&<div className="field" style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12}}><label style={{color:"#E8A45B"}}>Paying now (KSh)</label><input type="number" value={initPay} onChange={e=>setInitPay(e.target.value)} placeholder="Amount"/>{initPay&&<div style={{fontSize:14,color:"#E8A45B",marginTop:6}}>Balance: {fmtK(Math.max(0,total-Number(initPay)))}</div>}</div>}
+                {payType==="instalment"&&<div className="field" style={{background:"rgba(232,164,91,0.08)",border:"1px solid rgba(232,164,91,0.3)",borderRadius:8,padding:12}}><label style={{color:"#E8A45B"}}>Paying now (KSh)</label><input required type="number" value={initPay} onChange={e=>setInitPay(e.target.value)} placeholder="Amount"/>{initPay&&<div style={{fontSize:14,color:"#E8A45B",marginTop:6}}>Balance: {fmtK(Math.max(0,total-Number(initPay)))}</div>}</div>}
                 <div className="field"><label>Method</label><div className="tog"><button className={`tog-btn${pay==="mpesa"?" on":""}`} onClick={()=>setPay("mpesa")}>M-Pesa</button><button className={`tog-btn${pay==="cash"?" on":""}`} onClick={()=>setPay("cash")}>Cash</button><button className={`tog-btn${pay==="split"?" on":""}`} onClick={()=>setPay("split")}>Split</button></div></div>
-                {pay==="mpesa"&&<div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace",letterSpacing:"0.05em"}}/></div>}
+                {pay==="mpesa"&&<div className="field"><label>M-Pesa code</label><input required value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace",letterSpacing:"0.05em"}}/></div>}
                 {pay==="split"&&(()=>{ const due=payType==="instalment"?Number(initPay||0):total; const c=Number(cashPart||0),m=Number(mpesaPart||0),sum=c+m; return (
                   <div style={{background:"rgba(245,192,0,0.06)",border:"1px solid rgba(245,192,0,0.25)",borderRadius:8,padding:12,marginBottom:12}}>
                     <div style={{fontSize:14,color:"#8899AA",marginBottom:8}}>Paying {fmtK(due)} across both. Amounts must add up.</div>
                     <div className="field"><label>Cash part (KSh)</label><input type="number" value={cashPart} onChange={e=>setCashPart(e.target.value)} placeholder="0"/></div>
                     <div className="field"><label>M-Pesa part (KSh)</label><input type="number" value={mpesaPart} onChange={e=>setMpesaPart(e.target.value)} placeholder="0"/></div>
-                    <div className="field"><label>M-Pesa code</label><input value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>
+                    <div className="field"><label>M-Pesa code</label><input required value={mpesaCode} onChange={e=>setMpesaCode(e.target.value.toUpperCase())} placeholder="e.g. QJK7X8Y9Z0" style={{fontFamily:"monospace"}}/></div>
                     <div style={{fontSize:14,fontWeight:600,color:sum===due?"#4CAF50":"#E85B5B"}}>{sum===due?"Balanced ✓":sum<due?`Short by ${fmtK(due-sum)}`:`Over by ${fmtK(sum-due)}`}</div>
                   </div>
                 );})()}

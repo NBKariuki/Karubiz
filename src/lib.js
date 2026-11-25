@@ -61,6 +61,8 @@ export const EXP_HINTS = {
   "Loan interest":"Interest paid on a loan. The Loans tab adds this for you.",
   "Other":"Only if nothing else fits. Describe it clearly.",
 };
+export const GROUP_COLORS = {"Cost of goods":"#FF9F5A","Premises":"#6FA8FF","Staff":"#5FD38D","Selling":"#C792FF","Operations":"#4DD0E1","Finance":"#E6C75A","Other":"#9AA7BA"};
+export const catColor = c => { const g=EXP_GROUPS.find(([,cs])=>cs.includes(c)); if(g) return GROUP_COLORS[g[0]]; return c==="Transport"?GROUP_COLORS.Operations:c==="Staff"?GROUP_COLORS.Staff:GROUP_COLORS.Other; };
 export const DIRECT_CATS = ["Goods transport"];
 export const isDirect = c => DIRECT_CATS.includes(c);
 export const sumDirect = list => (list||[]).filter(x=>isDirect(x.category)).reduce((s,x)=>s+Number(x.amount),0);

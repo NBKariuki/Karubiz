@@ -171,7 +171,7 @@ export function OrdersTab({user,onMoney}){
 
               {!locked?(<>
                 <div style={{position:"relative",marginBottom:8}}>
-                  <input value={sub.supplier} onChange={e=>upDraft(si,{supplier:e.target.value,_sug:true})} onFocus={()=>upDraft(si,{_sug:true})} onBlur={()=>setTimeout(()=>upDraft(si,{_sug:false}),200)} placeholder="Supplier name" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
+                  <input required value={sub.supplier} onChange={e=>upDraft(si,{supplier:e.target.value,_sug:true})} onFocus={()=>upDraft(si,{_sug:true})} onBlur={()=>setTimeout(()=>upDraft(si,{_sug:false}),200)} placeholder="Supplier name" style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#FFFFFF",fontSize:15}}/>
                   {sub._sug&&supSuggest(sub.supplier).length>0&&(
                     <div className="ac-drop">{supSuggest(sub.supplier).map(sg=><div key={sg.id} className="ac-item" onMouseDown={()=>upDraft(si,{supplier:sg.name,_sug:false})}>{sg.name}</div>)}</div>
                   )}

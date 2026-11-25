@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ACCT_LABEL, STAFF, can, defStaff, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
+import { ACCT_LABEL, STAFF, can, catColor, defStaff, fmtK, logAudit, recordMoney, sb, todayStr, withinWindow } from "../lib";
 import { CategoryPicker } from "../screens/CategoryPicker";
 
 export function ExpensesTab({user,onMoney}){
@@ -120,8 +120,8 @@ export function ExpensesTab({user,onMoney}){
           <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Record Petty Cash Spend</div>
           <div style={{fontSize:13,color:"#8A97A8",marginBottom:12}}>Comes out of the petty cash pocket and logs here as an expense.</div>
           <div className="field"><label>Category</label><CategoryPicker value={pcCat} onChange={setPcCat}/></div>
-          <div className="field"><label>Note (what for)</label><input value={pcNote} onChange={e=>setPcNote(e.target.value)} placeholder="e.g. Tea for the shop"/></div>
-          <div className="field"><label>Amount (KSh)</label><input type="number" value={pcAmt} onChange={e=>setPcAmt(e.target.value)} placeholder="0"/></div>
+          <div className="field"><label>Note (what for)</label><input required value={pcNote} onChange={e=>setPcNote(e.target.value)} placeholder="e.g. Tea for the shop"/></div>
+          <div className="field"><label>Amount (KSh)</label><input required type="number" value={pcAmt} onChange={e=>setPcAmt(e.target.value)} placeholder="0"/></div>
           <div style={{display:"flex",gap:8}}><button className="btn-y" onClick={doPettySpend} disabled={pcSaving} style={{flex:1}}>{pcSaving?"Saving...":"Record Spend"}</button><button className="btn-g" onClick={()=>{setShowPetty(false);setPcAmt("");setPcNote("");}}>Cancel</button></div>
         </div>
       )}
@@ -130,8 +130,8 @@ export function ExpensesTab({user,onMoney}){
           <div style={{fontSize:14,fontWeight:600,marginBottom:14}}>Log Expense</div>
           <div className="field"><label>Date</label><input type="date" value={form.date} onChange={e=>setForm(x=>({...x,date:e.target.value}))}/></div>
           <div className="field"><label>Category</label><CategoryPicker value={form.category} onChange={v=>setForm(x=>({...x,category:v}))}/></div>
-          <div className="field"><label>Description</label><input value={form.description} onChange={e=>setForm(x=>({...x,description:e.target.value}))} placeholder="e.g. October rent payment"/></div>
-          <div className="field"><label>Amount (KSh)</label><input type="number" value={form.amount} onChange={e=>setForm(x=>({...x,amount:e.target.value}))} placeholder="0"/></div>
+          <div className="field"><label>Description</label><input required value={form.description} onChange={e=>setForm(x=>({...x,description:e.target.value}))} placeholder="e.g. October rent payment"/></div>
+          <div className="field"><label>Amount (KSh)</label><input required type="number" value={form.amount} onChange={e=>setForm(x=>({...x,amount:e.target.value}))} placeholder="0"/></div>
           <div className="field"><label>Recorded by</label><div className="tog">{STAFF.map(s=><button key={s} className={`tog-btn${form.recorded_by===s?" on":""}`} onClick={()=>setForm(x=>({...x,recorded_by:s}))}>{s.split(" ")[0]}</button>)}</div></div>
           <div className="field"><label>Paid from</label><div className="tog"><button className={`tog-btn${form.paid_from==="cash"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"cash"}))}>Cash</button><button className={`tog-btn${form.paid_from==="sacco"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"sacco"}))}>Bank</button><button className={`tog-btn${form.paid_from==="personal"?" on":""}`} onClick={()=>setForm(x=>({...x,paid_from:"personal"}))}>Personal</button></div>
           {form.paid_from==="personal"&&<div style={{fontSize:13,color:"#E8A45B",marginTop:5}}>Business will owe {form.recorded_by.split(" ")[0]} this amount</div>}</div>
@@ -160,7 +160,7 @@ export function ExpensesTab({user,onMoney}){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:14,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{e.description||e.category}</div>
-                <div style={{fontSize:13,color:"#8A97A8"}}>{e.category} · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+(ACCT_LABEL[e.paid_from]||e.paid_from):""}</div>
+                <div style={{fontSize:13,color:"#8A97A8"}}><span style={{color:catColor(e.category),fontWeight:600}}>{e.category}</span> · {e.recorded_by?.split(" ")[0]}{e.paid_from?" · "+(ACCT_LABEL[e.paid_from]||e.paid_from):""}</div>
               </div>
               <span style={{fontSize:14,fontWeight:600,color:"#E85B5B",marginLeft:10,whiteSpace:"nowrap"}}>{fmtK(Number(e.amount))}</span>
             </div>

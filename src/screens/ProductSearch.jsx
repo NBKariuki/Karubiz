@@ -37,7 +37,7 @@ export function ProductSearch({user, value, onChange, onPick, placeholder, price
 
   return (
     <div style={{position:"relative"}}>
-      <input value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),200)}
+      <input required value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),200)}
         placeholder={placeholder||"Search product..."} style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"10px 2px",color:"#FFFFFF",fontSize:15}}/>
       {open&&q.length>0&&(
         <div className="ac-drop">

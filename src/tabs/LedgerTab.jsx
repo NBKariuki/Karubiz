@@ -204,8 +204,8 @@ export function LedgerTab({user,onMoney,bal,onChange}){
               ))}
             </div>
           </div>}
-          {act==="bank"&&<ActBox title="Deposit cash into Bank"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doBank} off={rb} saving={saving}/></ActBox>}
-          {act==="withdraw"&&<ActBox title="Withdraw from Bank to cash"><input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doWithdraw} off={rb} saving={saving}/></ActBox>}
+          {act==="bank"&&<ActBox title="Deposit cash into Bank"><input required type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doBank} off={rb} saving={saving}/></ActBox>}
+          {act==="withdraw"&&<ActBox title="Withdraw from Bank to cash"><input required type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doWithdraw} off={rb} saving={saving}/></ActBox>}
           {act==="partner"&&(()=>{ const sk=who.split(" ")[0].toLowerCase(); const owedNow=Number(bal["owed_"+sk]||0); const drawnNow=Number(bal["drawn_"+sk]||0); const share=shareOf(netProfitAll); const a=Number(amt||0);
             return (<ActBox title="Partner money"><Whobar who={who} setWho={setWho}/>
             <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${dir==="in"?" on":""}`} onClick={()=>setDir("in")}>Puts in</button><button className={`tog-btn${dir==="out"?" on":""}`} onClick={()=>setDir("out")}>Takes out</button></div>
@@ -218,18 +218,18 @@ export function LedgerTab({user,onMoney,bal,onChange}){
               {a>0&&<div style={{marginTop:4,color:a>owedNow&&(drawnNow+(a-owedNow))>share?"#E8A45B":"#4CAF50"}}>{a<=owedNow?`All ${fmtK(a)} comes off what's owed.`:`${fmtK(owedNow)} off what's owed, ${fmtK(a-owedNow)} as a drawing.${(drawnNow+(a-owedNow))>share?" ⚠ exceeds profit share — into capital.":""}`}</div>}
             </div>}
             <div className="tog" style={{marginBottom:8}}>{ACCTS.map(([id,l])=><button key={id} className={`tog-btn${acc===id?" on":""}`} onClick={()=>setAcc(id)}>{l}</button>)}</div>
-            <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" className="lg-in"/><Confirm on={doPartner} off={rb} saving={saving}/></ActBox>);
+            <input required type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" className="lg-in"/><Confirm on={doPartner} off={rb} saving={saving}/></ActBox>);
           })()}
           {act==="allocate"&&<ActBox title="Top up petty cash"><div style={{fontSize:13,color:"#8899AA",marginBottom:8}}>Moves money into petty cash and records it as a Petty cash expense in reports.</div>
             <div className="tog" style={{marginBottom:8}}><button className={`tog-btn${pcFrom==="cash"?" on":""}`} onClick={()=>setPcFrom("cash")}>From Cash</button><button className={`tog-btn${pcFrom==="sacco"?" on":""}`} onClick={()=>setPcFrom("sacco")}>From Bank</button></div>
-            <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doAllocatePetty} off={rb} saving={saving}/></ActBox>}
+            <input required type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" autoFocus className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doAllocatePetty} off={rb} saving={saving}/></ActBox>}
           {act==="spend"&&<ActBox title="Record petty spend"><div style={{fontSize:13,color:"#8899AA",marginBottom:8}}>Petty cash balance: {fmtK(bal.petty||0)}</div>
             <div className="tog" style={{marginBottom:8,flexWrap:"wrap"}}>{PETTY_CATS.map(c=><button key={c} className={`tog-btn${pcCat===c?" on":""}`} onClick={()=>setPcCat(c)} style={{fontSize:13,flex:"none",padding:"6px 10px"}}>{c}</button>)}</div>
-            <input value={pcNote} onChange={e=>setPcNote(e.target.value)} placeholder="What for? e.g. matatu to Kiambu" className="lg-in"/>
-            <input type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doPettySpend} off={rb} saving={saving}/></ActBox>}
+            <input required value={pcNote} onChange={e=>setPcNote(e.target.value)} placeholder="What for? e.g. matatu to Kiambu" className="lg-in"/>
+            <input required type="number" value={amt} onChange={e=>setAmt(e.target.value)} placeholder="Amount (KSh)" className="lg-in"/><Whobar who={who} setWho={setWho}/><Confirm on={doPettySpend} off={rb} saving={saving}/></ActBox>}
           {act==="reconcile"&&<ActBox title="Reconcile a balance"><div className="tog" style={{marginBottom:8}}>{ACCTS.map(([id,l])=><button key={id} className={`tog-btn${recAcct===id?" on":""}`} onClick={()=>setRecAcct(id)}>{l}</button>)}</div>
             <div style={{fontSize:14,color:"#8899AA",marginBottom:8}}>App shows: {fmtK(recAcct==="cash"?bal.cash:recAcct==="petty"?bal.petty:bal.sacco)}</div>
-            <input type="number" step="0.01" value={recActual} onChange={e=>setRecActual(e.target.value)} placeholder="Actual balance (KSh)" autoFocus className="lg-in"/>
+            <input required type="number" step="0.01" value={recActual} onChange={e=>setRecActual(e.target.value)} placeholder="Actual balance (KSh)" autoFocus className="lg-in"/>
             <input value={recReason} onChange={e=>setRecReason(e.target.value)} placeholder="Reason (e.g. bank interest)" className="lg-in"/><Confirm on={doReconcile} off={rb} saving={saving}/></ActBox>}
         </div>
       )}

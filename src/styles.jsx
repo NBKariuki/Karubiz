@@ -22,9 +22,9 @@ export const GS = () => (
     .act-ic{width:40px;height:40px;border-radius:10px;background:#101B3C;border:1px solid #24365C;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
     .pick-btn{display:flex;justify-content:space-between;align-items:center;width:100%;background:transparent;border:none;border-bottom:1px solid #5B73A3;border-radius:0;padding:11px 2px;color:#FFFFFF;font-size:16px;text-align:left;cursor:pointer;font-family:'DM Sans',sans-serif} .pick-btn .chev{transform:rotate(45deg);margin-right:4px} .pick-btn.open .chev{transform:rotate(-135deg)}
     .pick-panel{background:#0A1128;border:1px solid #1A2A4A;border-radius:10px;padding:2px 12px 14px;margin-top:8px}
-    .grp-l{font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8A97A8;margin:12px 0 7px}
+      .grp-l{font-size:12px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--g,#8A97A8);margin:14px 0 8px}
     .chips{display:flex;flex-wrap:wrap;gap:8px}
-    .chip{padding:8px 13px;border:1px solid #2E4472;border-radius:100px;background:transparent;color:#C2CBD6;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif} .chip:active{background:#0F1A3A} .chip.on{border-color:#F5C000;color:#F5C000;background:rgba(245,192,0,0.12);font-weight:600}
+    .chip{padding:8px 13px;border:1.5px solid var(--g,#2E4472);border-radius:100px;background:transparent;color:var(--g,#C2CBD6);font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif} .chip:active{opacity:0.7} .chip.on{background:var(--g,#F5C000);color:#050A1F;font-weight:700}
     .seg{display:inline-flex;border:1px solid #2E4472;border-radius:8px;overflow:hidden} .seg button{padding:8px 16px;background:transparent;border:none;border-right:1px solid #2E4472;color:#C2CBD6;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif} .seg button:last-child{border-right:none} .seg button.on{background:rgba(245,192,0,0.16);color:#F5C000;font-weight:600}
     .btn-y{background:#F5C000;color:#050A1F;border:none;padding:11px 18px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif} .btn-y:disabled{background:#444;color:#888;cursor:not-allowed}
     .btn-g{background:transparent;color:#C2CBD6;border:1px solid #24365C;padding:10px 15px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
@@ -59,6 +59,16 @@ export const GS = () => (
     :root{--surface:#0A1128;--fill:#A8D8FF;--ph:#7C8CA6}
     input,select,textarea{color:var(--fill) !important}
     input::placeholder,textarea::placeholder{color:var(--ph) !important;opacity:1}
+    /* Fillable fields: a lighter well with a visible edge, so every blank is easy to spot */
+    input:not([type=checkbox]):not([type=radio]):not([type=range]):not(.plain),select:not(.plain),textarea:not(.plain){background:#0F1A3A !important;border:1.5px solid #3A5084 !important;border-radius:8px !important;padding-left:10px !important;padding-right:10px !important}
+    /* Still to fill: amber. Typing now: bright ice glow. Done: green. */
+    input[required]:placeholder-shown:not(.plain),textarea[required]:placeholder-shown:not(.plain){border-color:#F5C000 !important;background:#17203F !important}
+    input[required]:not(:placeholder-shown):not(.plain),textarea[required]:not(:placeholder-shown):not(.plain){border-color:#4CD97B !important}
+    input:focus:not([type=checkbox]):not([type=radio]):not(.plain),select:focus:not(.plain),textarea:focus:not(.plain){border-color:#A8D8FF !important;background:#132252 !important;box-shadow:0 0 0 3px rgba(168,216,255,0.22) !important}
+    .field:has(> input[required]:placeholder-shown) > label,.field:has(> textarea[required]:placeholder-shown) > label{color:#F5C000;font-weight:700}
+    .field:has(> input[required]:placeholder-shown) > label::after{content:" *"}
+    .field:has(> input[required]:not(:placeholder-shown)) > label{color:#4CD97B;font-weight:600}
+    .need-l{font-size:13px;color:#F5C000;font-weight:700}
     .subscreen{background:var(--surface);border:1px solid #1A2A4A;border-radius:12px;padding:16px;margin-bottom:12px}
     .subscreen>.subscreen-hd{display:flex;align-items:center;gap:10px;margin-bottom:16px}
     .subscreen>.subscreen-hd .title{font-size:18px;font-weight:600;color:#FFFFFF}
