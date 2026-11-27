@@ -1,11 +1,88 @@
 import { useState, useEffect } from "react";
-import { fmtK, isDirect, makeAvgCost, saleCost, sb, sumDirect, todayStr } from "../lib";
+import { errMsg, fmtK, isDirect, sb, todayStr } from "../lib";
+
+// ---------- small helpers ----------
+const fmt = n => Math.round(Number(n)||0).toLocaleString();
+const num = v => Number(v)||0;
+const pctChange = (cur,prev) => { cur=num(cur); prev=num(prev); if(prev===0) return cur===0?0:null; return (cur-prev)/Math.abs(prev)*100; };
+// Returns {text,tone} for a change. tone: good, bad or flat. upGood says whether a rise is good news.
+const pctDelta = (cur,prev,upGood=true) => {
+  const p=pctChange(cur,prev);
+  if(p===null) return {text:"New",tone:"flat"};
+  if(Math.abs(p)<0.5) return {text:"No change",tone:"flat"};
+  return {text:(p>0?"+":"")+p.toFixed(0)+"%",tone:(p>0)===upGood?"good":"bad"};
+};
+const ptsDelta = (cur,prev,upGood=true) => {
+  const d=cur-prev; if(Math.abs(d)<0.05) return {text:"No change",tone:"flat"};
+  return {text:(d>0?"+":"")+d.toFixed(1)+" pts",tone:(d>0)===upGood?"good":"bad"};
+};
+const TONE = {good:"#4CAF50",bad:"#E85B5B",flat:"#8A97A8"};
+const trendOf = vals => { if(!vals||vals.length<2) return null; const last=vals[vals.length-1]; const prior=vals.slice(0,-1); const m=prior.reduce((a,b)=>a+b,0)/prior.length; const d=(last-m)/(Math.abs(m)||1); return d>0.1?"Rising":d<-0.1?"Falling":"Steady"; };
+
+// Dates are plain YYYY-MM-DD strings, matching how the app stamps records.
+const pd = s => { const [y,m,d]=s.split("-").map(Number); return new Date(Date.UTC(y,m-1,d)); };
+const ds = dt => dt.toISOString().slice(0,10);
+const addDays = (s,n) => { const d=pd(s); d.setUTCDate(d.getUTCDate()+n); return ds(d); };
+const clampDay = (y,m,d) => { const last=new Date(Date.UTC(y,m,0)).getUTCDate(); return ds(new Date(Date.UTC(y,m-1,Math.min(d,last)))); };
+function rangesFor(period,today){
+  const [y,m,d]=today.split("-").map(Number);
+  if(period==="week") return {from:addDays(today,-6),to:today,pFrom:addDays(today,-13),pTo:addDays(today,-7),label:"the last 7 days, against the 7 days before"};
+  if(period==="month"){ const pm=m===1?12:m-1, py=m===1?y-1:y; return {from:clampDay(y,m,1),to:today,pFrom:clampDay(py,pm,1),pTo:clampDay(py,pm,d),label:`days 1 to ${d} of this month, against the same days last month`}; }
+  if(period==="year") return {from:`${y}-01-01`,to:today,pFrom:`${y-1}-01-01`,pTo:clampDay(y-1,m,d),label:"this year so far, against the same days last year"};
+  return {from:"2000-01-01",to:today,pFrom:null,pTo:null,label:"all time"};
+}
+const PERIODS = [["week","7 days"],["month","Month"],["year","Year"],["all","All"]];
+const SECTIONS = [["business","Business"],["sales","Sales"],["stock","Stock"],["expenses","Expenses"]];
+
+// ---------- small pieces ----------
+function Spark({vals,color}){
+  if(!vals||vals.length<2) return null;
+  const w=64,h=22,mn=Math.min(...vals),mx=Math.max(...vals),rg=mx-mn||1;
+  const pts=vals.map((v,i)=>`${(i/(vals.length-1)*w).toFixed(1)},${(h-2-((v-mn)/rg)*(h-4)).toFixed(1)}`).join(" ");
+  return <svg width={w} height={h} style={{display:"block"}}><polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round"/></svg>;
+}
+function Kpi({label,value,sub,delta,spark,onClick,color="#F5C000"}){
+  const tr=trendOf(spark);
+  return (
+    <div className="card" onClick={onClick} style={{marginBottom:0,cursor:onClick?"pointer":"default",minWidth:0}}>
+      <div style={{fontSize:12,color:"#8899AA",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>{label}</div>
+      <div style={{fontSize:19,fontWeight:700,color,wordBreak:"break-word"}}>{value}</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6,minHeight:22}}>
+        <div style={{fontSize:13,fontWeight:600,color:delta?TONE[delta.tone]:"#8A97A8"}}>{delta?delta.text:""}</div>
+        <Spark vals={spark} color={color}/>
+      </div>
+      {tr&&<div style={{fontSize:12,color:"#8A97A8",marginTop:2}}>{tr} over {spark.length} months</div>}
+      {sub&&<div style={{fontSize:12,color:"#8A97A8",marginTop:4,lineHeight:1.35}}>{sub}</div>}
+    </div>
+  );
+}
+function More({title,children}){
+  const [open,setOpen]=useState(false);
+  return (
+    <div className="card" style={{marginBottom:10}}>
+      <button onClick={()=>setOpen(!open)} style={{background:"none",border:"none",width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",color:"#AEB9C7",fontSize:13,textTransform:"uppercase",letterSpacing:"0.05em",cursor:"pointer",padding:0,fontFamily:"inherit"}}>
+        <span>{title}</span><span style={{color:"#F5C000",textTransform:"none",letterSpacing:0}}>{open?"Hide":"Show"}</span>
+      </button>
+      {open&&<div style={{marginTop:12}}>{children}</div>}
+    </div>
+  );
+}
+const Row = ({label,sub,value,color,bold}) => (
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"7px 0",borderBottom:"1px solid #101B36"}}>
+    <div style={{paddingRight:10}}><div style={{fontSize:14,fontWeight:bold?700:500,color:"#E8E2D4"}}>{label}</div>{sub&&<div style={{fontSize:12,color:"#8A97A8"}}>{sub}</div>}</div>
+    <div style={{fontSize:14,fontWeight:bold?700:600,color:color||"#E8E2D4",whiteSpace:"nowrap"}}>{value}</div>
+  </div>
+);
 
 export function ReportsTab({user,bal}){
   const [data,setData]=useState({sales:[],expenses:[],stock:[],losses:[]});
   const [loading,setLoading]=useState(true);
+  const [section,setSection]=useState("business");
   const [period,setPeriod]=useState("month");
-  const [drill,setDrill]=useState(null); // {title, rows:[{label,sub,amount}], total, color}
+  const [drill,setDrill]=useState(null);
+  const [an,setAn]=useState(null);      // {cur,prev,snap,snapPrev,monthly,R}
+  const [anErr,setAnErr]=useState("");
+  const [tick,setTick]=useState(0);
 
   useEffect(()=>{loadAll();},[]);
   const loadAll=async()=>{
@@ -20,7 +97,29 @@ export function ReportsTab({user,bal}){
       setData({sales,expenses,stock,losses});
     }catch(e){console.error(e);}
     setLoading(false);
+    setTick(t=>t+1);
   };
+
+  // Headline numbers come from the database (KARU_ANALYTICS_V1.sql), so every screen uses the same profit definition.
+  useEffect(()=>{
+    let live=true;
+    (async()=>{
+      try{
+        const R=rangesFor(period,todayStr());
+        const [cur,prev,snap,snapPrev,monthly]=await Promise.all([
+          sb.rpc("karu_biz_period",{p_from:R.from,p_to:R.to}),
+          R.pFrom?sb.rpc("karu_biz_period",{p_from:R.pFrom,p_to:R.pTo}):Promise.resolve(null),
+          sb.rpc("karu_biz_snapshot",{p_asof:R.to}),
+          R.pTo?sb.rpc("karu_biz_snapshot",{p_asof:R.pTo}):Promise.resolve(null),
+          sb.get("karu_v_biz_monthly","select=*&order=month.asc"),
+        ]);
+        if(live){ setAn({cur,prev,snap,snapPrev,monthly:monthly||[],R}); setAnErr(""); }
+      }catch(e){
+        if(live){ const m=errMsg(e); setAnErr(/could not find|does not exist|karu_biz|karu_v_/i.test(m)?"Analytics are not installed yet. Run KARU_ANALYTICS_V1.sql in the Supabase SQL editor, then refresh.":m); }
+      }
+    })();
+    return ()=>{live=false;};
+  },[period,tick]);
 
   const exportCSV=async(kind)=>{
     const esc=v=>{const s=v==null?"":String(v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
@@ -50,210 +149,179 @@ export function ReportsTab({user,bal}){
     }catch(e){alert("Export failed: "+e.message);}
   };
 
-  const now=new Date();
-  const filterDate=arr=>{
-    if(period==="week"){const w=new Date(now);w.setDate(now.getDate()-7);return arr.filter(x=>new Date(x.date)>=w);}
-    if(period==="month") return arr.filter(x=>x.date.startsWith(now.toISOString().slice(0,7)));
-    if(period==="year") return arr.filter(x=>x.date.startsWith(now.getFullYear().toString()));
-    return arr;
-  };
+  if(loading) return <div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading reports...</div>;
 
-  const fSales=filterDate(data.sales);
-  const fExp=filterDate(data.expenses);
-  const salesValue=fSales.reduce((s,x)=>s+Number(x.total),0);
-  const collected=fSales.reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
-  const receivables=fSales.reduce((s,x)=>s+Number(x.balance_due||0),0);
-  const directCost=sumDirect(fExp); // goods transport: counted with cost of goods
-  const expenses=fExp.reduce((s,x)=>s+Number(x.amount),0)-directCost;
-  const stockValue=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*i.unit_cost),0);
-  const stockRetail=data.stock.reduce((s,i)=>s+((i.qty_in-i.qty_sold-(i.qty_adjusted||0))*(i.selling_price||0)),0);
-  const stockPotentialProfit=stockRetail-stockValue;
-  const avgCostR=makeAvgCost(data.stock);
-  const cogs=fSales.reduce((s,x)=>s+saleCost(x,avgCostR),0)+directCost;
-  const fLosses=filterDate(data.losses||[]);
-  const lossCost=fLosses.reduce((s,l)=>s+Number(l.cost_value||0),0);
-  const grossProfit=salesValue-cogs;
-  const netProfit=grossProfit-expenses-lossCost;
-  // ── Capital health ──
-  const liquid=(bal?.cash||0)+(bal?.sacco||0)+(bal?.petty||0);
-  const totalCapital=liquid+stockValue;
-  const liquidPct=totalCapital>0?Math.round(liquid/totalCapital*100):0;
+  // ---------- derived values ----------
+  const R=an?an.R:rangesFor(period,todayStr());
+  const inR=(x,a,b)=>a&&x.date>=a&&x.date<=b;
+  const cur=an?an.cur:null, prev=an?an.prev:null, snap=an?an.snap:null, snapPrev=an?an.snapPrev:null;
+  const nowM=todayStr().slice(0,7);
+  const done=(an?an.monthly:[]).filter(r=>String(r.month).slice(0,7)<nowM).slice(-6); // complete months only, so a half month never looks like a dip
+  const ser=f=>done.map(f);
+  const margin=o=>o&&num(o.invoiced)>0?num(o.gross_profit)/num(o.invoiced)*100:0;
+  const aov=o=>o&&num(o.orders)>0?num(o.invoiced)/num(o.orders):0;
+  const liquidOf=s=>s?num(s.cash)+num(s.bank)+num(s.petty):0;
+  const liquid=liquidOf(snap), liquidPrev=liquidOf(snapPrev);
+  const stockCost=snap?num(snap.stock_cost):0, stockRetail=snap?num(snap.stock_retail):0;
   const SAFETY_FLOOR=(()=>{ try{ const v=localStorage.getItem("karu_safety_floor"); return v?Number(v):15000; }catch{ return 15000; } })();
-  const inflow=collected;
-  const outflow=expenses+directCost+lossCost;
-  const netFlow=inflow-outflow;
-  let capState="green", capMsg="Healthy — liquid money is strong and inflow covers costs.";
-  if(liquid<SAFETY_FLOOR){ capState="red"; capMsg=`Below your safety floor of ${fmtK(SAFETY_FLOOR)}. Liquid cash is critically low — hold off on non-essential spend and prioritise collecting balances.`; }
-  else if(netFlow<0){ capState="amber"; capMsg=`Draining — this period you spent ${fmtK(Math.abs(netFlow))} more than you collected. If this continues, capital erodes.`; }
-  else if(liquid<SAFETY_FLOOR*1.5){ capState="amber"; capMsg="Thinning — liquid money is getting close to your safety floor. Watch spending."; }
-  const capColor=capState==="green"?"#4CAF50":capState==="amber"?"#E8A45B":"#E85B5B";
-  // ── Growth projection ──
-  const monthsOfData=(()=>{ const ms=new Set(); data.sales.forEach(s=>ms.add(s.date.slice(0,7))); data.expenses.forEach(e=>ms.add(e.date.slice(0,7))); return Math.max(1,ms.size); })();
-  const allNet=(()=>{ const sv=data.sales.reduce((s,x)=>s+Number(x.total),0); const cg=data.stock.reduce((s,i)=>s+(i.qty_sold*i.unit_cost),0); const ex=data.expenses.reduce((s,x)=>s+Number(x.amount),0); const lo=(data.losses||[]).reduce((s,l)=>s+Number(l.cost_value||0),0); return sv-cg-ex-lo; })();
-  const avgMonthlyNet=allNet/monthsOfData;
-  const proj=[3,6,12].map(m=>({months:m,value:Math.round(totalCapital+avgMonthlyNet*m)}));
 
-  const dailyMap={};
-  fSales.forEach(s=>{dailyMap[s.date]=(dailyMap[s.date]||0)+Number(s.total);});
-  const chartData=Object.entries(dailyMap).sort(([a],[b])=>a.localeCompare(b)).slice(-14).map(([date,total])=>({date:date.slice(5),total}));
-  // Profit vs Expenses, bucketed by period: day for week/month, month for year/all.
-  const blendedMargin = salesValue>0 ? grossProfit/salesValue : 0;
-  const byMonth = (period==="year"||period==="all");
-  const monthSummary = (period==="month");
-  const bucketKey = dateStr => byMonth ? dateStr.slice(0,7) : dateStr; // YYYY-MM or full date
-  const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const bucketLabel = key => byMonth ? MONTHS[parseInt(key.slice(5,7))-1]+(period==="all"?" "+key.slice(2,4):"") : key.slice(5);
-  const pvMap={};
-  fSales.forEach(s=>{ const k=bucketKey(s.date); if(!pvMap[k])pvMap[k]={profit:0,expenses:0}; pvMap[k].profit += Number(s.total)*blendedMargin; });
-  fExp.filter(e=>!isDirect(e.category)).forEach(e=>{ const k=bucketKey(e.date); if(!pvMap[k])pvMap[k]={profit:0,expenses:0}; pvMap[k].expenses += Number(e.amount); });
-  const pvCap = byMonth ? 12 : 31;
-  let pvData;
-  if(monthSummary){
-    const tp=Object.values(pvMap).reduce((s,v)=>s+v.profit,0);
-    const te=Object.values(pvMap).reduce((s,v)=>s+v.expenses,0);
-    pvData=[{date:MONTHS[now.getMonth()],Profit:Math.round(tp),Expenses:Math.round(te)}];
-  } else {
-    pvData=Object.entries(pvMap).sort(([a],[b])=>a.localeCompare(b)).slice(-pvCap).map(([key,v])=>({date:bucketLabel(key),Profit:Math.round(v.profit),Expenses:Math.round(v.expenses)}));
-  }
-  // Period totals for the card
-  const periodProfit = Math.round(salesValue*blendedMargin - 0); // gross margin portion earned on invoiced
-  const pvTotalProfit = Object.values(pvMap).reduce((s,v)=>s+v.profit,0);
-  const pvTotalExpenses = Object.values(pvMap).reduce((s,v)=>s+v.expenses,0);
+  const fSales=data.sales.filter(s=>inR(s,R.from,R.to));
+  const fExp=data.expenses.filter(e=>inR(e,R.from,R.to));
+  const pExp=data.expenses.filter(e=>inR(e,R.pFrom,R.pTo));
+  const fLosses=(data.losses||[]).filter(l=>inR(l,R.from,R.to));
+  const owedSales=data.sales.filter(s=>num(s.balance_due)>0);
+
+  // Largest expense category (goods transport is a cost of goods, so it is left out here)
+  const catTotals=list=>{ const m={}; list.filter(e=>!isDirect(e.category)).forEach(e=>{m[e.category]=(m[e.category]||0)+num(e.amount);}); return m; };
+  const curCats=catTotals(fExp), prevCats=catTotals(pExp);
+  const topCat=Object.entries(curCats).sort(([,a],[,b])=>b-a)[0];
 
   const itemMap={};
-  fSales.forEach(s=>{ if(s.items) s.items.forEach(i=>{ if(!itemMap[i.name]) itemMap[i.name]={qty:0,revenue:0}; itemMap[i.name].qty+=Number(i.qty||1); itemMap[i.name].revenue+=Number(i.qty||1)*Number(i.price||0); }); });
+  fSales.forEach(s=>{ (s.items||[]).forEach(i=>{ if(!itemMap[i.name]) itemMap[i.name]={qty:0,revenue:0}; itemMap[i.name].qty+=num(i.qty||1); itemMap[i.name].revenue+=num(i.qty||1)*num(i.price); }); });
   const topItems=Object.entries(itemMap).sort(([,a],[,b])=>b.revenue-a.revenue).slice(0,5);
 
-  const expMap={};
-  fExp.filter(e=>!isDirect(e.category)).forEach(e=>{expMap[e.category]=(expMap[e.category]||0)+Number(e.amount);});
-  const expBreakdown=Object.entries(expMap).sort(([,a],[,b])=>b-a);
-  const mpesa=fSales.filter(s=>s.payment_method==="M-Pesa").reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
-  const cash=fSales.filter(s=>s.payment_method==="Cash").reduce((s,x)=>s+Number(x.amount_paid!=null?x.amount_paid:x.total),0);
+  // ---------- drill-downs ----------
+  const drillNet=()=>({title:"Net profit breakdown",color:num(cur.net_profit)>=0?"#4CAF50":"#E85B5B",total:num(cur.net_profit),rows:[
+    {label:"Sales (invoiced)",sub:"what was billed",amount:num(cur.invoiced)},
+    {label:"Less: cost of goods sold",sub:"cost of the items sold",amount:-(num(cur.cogs)-num(cur.direct))},
+    ...(num(cur.direct)>0?[{label:"Less: goods transport",sub:"hauling goods you bought",amount:-num(cur.direct)}]:[]),
+    {label:"Less: expenses",sub:`${fExp.filter(e=>!isDirect(e.category)).length} entries`,amount:-num(cur.expenses)},
+    ...(num(cur.losses)>0?[{label:"Less: losses",sub:`${fLosses.length} incidents`,amount:-num(cur.losses)}]:[])]});
+  const drillOwed=()=>({title:"Owed to us",color:"#E8A45B",total:num(snap.receivables),rows:owedSales.map(s=>({label:s.customer_name,sub:`${s.receipt_no} · paid ${fmtK(num(s.amount_paid))} of ${fmtK(num(s.total))}`,amount:num(s.balance_due)}))});
+  const drillSales=()=>({title:"Sales (invoiced)",color:"#8899AA",total:num(cur.invoiced),rows:fSales.map(s=>({label:s.customer_name,sub:`${s.receipt_no} · ${s.date.slice(5)}`,amount:num(s.total)}))});
+  const drillExpenses=()=>({title:"Expenses",color:"#E85B5B",total:num(cur.expenses),rows:fExp.filter(e=>!isDirect(e.category)).map(e=>({label:e.description||e.category,sub:`${e.category} · ${e.date.slice(5)} · ${e.recorded_by?.split(" ")[0]||""}`,amount:num(e.amount)}))});
 
-  // Drill-down builders: each returns {title,color,total,rows:[{label,sub,amount}]}
-  const drillCollected=()=>({ title:"Collected", color:"#4CAF50", total:collected,
-    rows:fSales.filter(s=>Number(s.amount_paid!=null?s.amount_paid:s.total)>0).map(s=>({label:s.customer_name,sub:`${s.receipt_no} · ${s.date.slice(5)} · ${s.payment_method}`,amount:Number(s.amount_paid!=null?s.amount_paid:s.total)})) });
-  const drillExpenses=()=>({ title:"Expenses", color:"#E85B5B", total:expenses,
-    rows:fExp.filter(e=>!isDirect(e.category)).map(e=>({label:e.description||e.category,sub:`${e.category} · ${e.date.slice(5)} · ${e.recorded_by?.split(" ")[0]||""}`,amount:Number(e.amount)})) });
-  const drillSalesValue=()=>({ title:"Sales value (invoiced)", color:"#8899AA", total:salesValue,
-    rows:fSales.map(s=>({label:s.customer_name,sub:`${s.receipt_no} · ${s.date.slice(5)}`,amount:Number(s.total)})) });
-  const drillOwed=()=>({ title:"Owed to us", color:"#E8A45B", total:receivables,
-    rows:fSales.filter(s=>Number(s.balance_due||0)>0).map(s=>({label:s.customer_name,sub:`${s.receipt_no} · paid ${fmtK(Number(s.amount_paid||0))} of ${fmtK(Number(s.total))}`,amount:Number(s.balance_due)})) });
-  const drillGross=()=>({ title:"Gross profit breakdown", color:"#F5C000", total:grossProfit,
-    rows:[{label:"Sales value (invoiced)",sub:"what was billed",amount:salesValue},{label:"Less: cost of goods sold",sub:"COGS on items sold",amount:-(cogs-directCost)},...(directCost>0?[{label:"Less: goods transport",sub:"hauling goods you bought",amount:-directCost}]:[])] });
-  const drillNet=()=>({ title:"Net profit breakdown", color:netProfit>=0?"#4CAF50":"#E85B5B", total:netProfit,
-    rows:[{label:"Gross profit",sub:"sales value less COGS",amount:grossProfit},{label:"Less: expenses",sub:`${fExp.length} entries`,amount:-expenses},...(lossCost>0?[{label:"Less: losses",sub:`${fLosses.length} incidents`,amount:-lossCost}]:[])] });
+  // ---------- one plain sentence per section ----------
+  const soWhat=()=>{
+    if(!cur) return "";
+    if(section==="business"){
+      if(liquid<SAFETY_FLOOR) return `Liquid money is below your safety floor of ${fmtK(SAFETY_FLOOR)}. Hold non-essential spending and collect balances.`;
+      if(num(cur.net_profit)<0) return "Profit is negative for this period. Check margin on what sold and whether expenses are running ahead of sales.";
+      if(prev&&num(prev.net_profit)>0&&num(cur.net_profit)<num(prev.net_profit)*0.8) return `Profit is down ${Math.abs(pctChange(cur.net_profit,prev.net_profit)).toFixed(0)}% on the comparison period. Look at margin and expenses.`;
+      if(num(snap.receivables)>liquid&&num(snap.receivables)>0) return `Customers owe you ${fmtK(num(snap.receivables))}, more than the liquid money you hold. Collecting balances is the quickest cash.`;
+      return prev?"Profit and cash are holding up against the comparison period.":"Profit and cash are in order for this period.";
+    }
+    if(section==="sales"){
+      if(prev&&num(prev.invoiced)>0&&num(cur.invoiced)<num(prev.invoiced)*0.8) return `Sales are down ${Math.abs(pctChange(cur.invoiced,prev.invoiced)).toFixed(0)}% on the comparison period. Follow up open quotes and push what is in stock.`;
+      if(prev&&margin(cur)<margin(prev)-3) return "Margin has slipped by more than 3 points. Check discounts and the cost of what is selling.";
+      return "Sales and margin are steady against the comparison period.";
+    }
+    if(section==="stock"){
+      if(num(cur.losses)>0) return `Losses of ${fmtK(num(cur.losses))} were written off in this period. Check what caused them.`;
+      return `Stock at cost is ${fmtK(stockCost)}, which is ${liquid+stockCost>0?Math.round(stockCost/(liquid+stockCost)*100):0}% of your money tied up in stock and cash.`;
+    }
+    if(prev&&num(prev.expenses)>0&&num(cur.expenses)>num(prev.expenses)*1.2) return `Expenses are up ${Math.abs(pctChange(cur.expenses,prev.expenses)).toFixed(0)}% on the comparison period. See which category moved.`;
+    return "Expenses are in line with the comparison period.";
+  };
 
-  if(loading) return <div style={{textAlign:"center",padding:"2rem",color:"#8A97A8"}}>Loading reports...</div>;
+  // ---------- sections ----------
+  const businessView=()=>{
+    const avgNet=(done.length?done:an.monthly).reduce((s,r)=>s+num(r.net_profit),0)/Math.max(1,(done.length?done:an.monthly).length);
+    const capital=liquid+stockCost;
+    const proj=[3,6,12].map(m=>({m,v:Math.round(capital+avgNet*m)}));
+    const rows=[...an.monthly].reverse().slice(0,12);
+    const fmtM=m=>{const [y,mo]=String(m).slice(0,7).split("-"); return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(mo)-1]+" "+y;};
+    return <>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+        <Kpi label="Net profit" value={`${num(cur.net_profit)<0?"-":""}${fmtK(Math.abs(num(cur.net_profit)))}`} color={num(cur.net_profit)>=0?"#F5C000":"#E85B5B"} delta={prev?pctDelta(cur.net_profit,prev.net_profit):null} spark={ser(r=>num(r.net_profit))} onClick={()=>setDrill(drillNet())}/>
+        <Kpi label="Cash on hand" value={fmtK(liquid)} color="#4CAF50" delta={snapPrev?pctDelta(liquid,liquidPrev):null} sub={`Cash ${fmtK(num(snap.cash))} · Bank ${fmtK(num(snap.bank))}`}/>
+        <Kpi label="Owed by customers" value={fmtK(num(snap.receivables))} color="#E8A45B" sub={`${num(snap.open_balances)} open balance${num(snap.open_balances)===1?"":"s"}`} onClick={()=>setDrill(drillOwed())}/>
+        <Kpi label="Stock at cost" value={fmtK(stockCost)} color="#8899AA" sub={`Retail ${fmtK(stockRetail)}`}/>
+      </div>
+      <More title="Profit breakdown">
+        <Row label="Sales (invoiced)" value={fmtK(num(cur.invoiced))}/>
+        <Row label="Cost of goods sold" sub="includes goods transport" value={"-"+fmtK(num(cur.cogs))} color="#E8A45B"/>
+        <Row label="Gross profit" value={fmtK(num(cur.gross_profit))} bold/>
+        <Row label="Expenses" value={"-"+fmtK(num(cur.expenses))} color="#E85B5B"/>
+        {num(cur.losses)>0&&<Row label="Losses" value={"-"+fmtK(num(cur.losses))} color="#E85B5B"/>}
+        <Row label="Net profit" value={`${num(cur.net_profit)<0?"-":""}${fmtK(Math.abs(num(cur.net_profit)))}`} bold color={num(cur.net_profit)>=0?"#F5C000":"#E85B5B"}/>
+        <Row label="Collected in cash" sub="money actually received for these sales" value={fmtK(num(cur.collected))} color="#4CAF50"/>
+        <Row label="Still owed from these sales" sub="the gap between invoiced and collected" value={fmtK(num(cur.owed))} color="#E8A45B"/>
+      </More>
+      <More title="Month by month">
+        <div style={{fontSize:12,color:"#8A97A8",marginBottom:8}}>Profit = sales invoiced less cost of goods (with goods transport), expenses and losses. Amounts in KSh.</div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:14,minWidth:360}}>
+            <thead><tr>{["Month","Sales","COGS","Expenses","Profit"].map(h=><th key={h} style={{textAlign:h==="Month"?"left":"right",padding:"4px 4px 8px",color:"#AEB9C7",fontWeight:600,borderBottom:"1px solid #1A2A4A",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+            <tbody>{rows.map(r=>(
+              <tr key={r.month} style={{borderBottom:"1px solid #0F1A3A"}}>
+                <td style={{padding:"7px 4px",color:"#E8E2D4",whiteSpace:"nowrap"}}>{fmtM(r.month)}</td>
+                <td style={{textAlign:"right",padding:"7px 4px",color:"#4CAF50"}}>{fmt(r.invoiced)}</td>
+                <td style={{textAlign:"right",padding:"7px 4px",color:"#E8A45B"}}>{fmt(r.cogs)}</td>
+                <td style={{textAlign:"right",padding:"7px 4px",color:"#E85B5B"}}>{fmt(num(r.expenses)+num(r.losses))}</td>
+                <td style={{textAlign:"right",padding:"7px 4px",color:num(r.net_profit)>=0?"#F5C000":"#E85B5B",fontWeight:600}}>{num(r.net_profit)<0?"-":""}{fmt(Math.abs(num(r.net_profit)))}</td>
+              </tr>))}</tbody>
+          </table>
+        </div>
+      </More>
+      <More title="Growth projection">
+        <div style={{fontSize:14,color:"#8A97A8",marginBottom:10}}>If the current trend holds ({avgNet>=0?"+":""}{fmtK(avgNet)} a month on average, from {(done.length?done:an.monthly).length} month{(done.length?done:an.monthly).length===1?"":"s"} of trading)</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+          {proj.map(p=>(
+            <div key={p.m} style={{textAlign:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 6px"}}>
+              <div style={{fontSize:15,fontWeight:700,color:p.v>=capital?"#4CAF50":"#E85B5B"}}>{fmtK(p.v)}</div>
+              <div style={{fontSize:13,color:"#8A97A8",marginTop:2}}>in {p.m} mo</div>
+            </div>))}
+        </div>
+        <div style={{fontSize:12,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>Starts from cash plus stock at cost. A straight-line estimate, not a forecast. Real results depend on sales, sourcing and seasonality.</div>
+      </More>
+      {snap.owed&&Object.keys(snap.owed).length>0&&(
+        <More title="Partner balances">
+          {Object.entries(snap.owed).map(([k,v])=><Row key={k} label={k.slice(5).replace(/^./,c=>c.toUpperCase())} sub={num(v)>=0?"the business owes":"owes the business"} value={fmtK(Math.abs(num(v)))}/>)}
+        </More>)}
+    </>;
+  };
+
+  const salesView=()=>(<>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+      <Kpi label="Sales" value={fmtK(num(cur.invoiced))} color="#4CAF50" delta={prev?pctDelta(cur.invoiced,prev.invoiced):null} spark={ser(r=>num(r.invoiced))} onClick={()=>setDrill(drillSales())}/>
+      <Kpi label="Orders" value={fmt(cur.orders)} color="#F5C000" delta={prev?pctDelta(cur.orders,prev.orders):null} spark={ser(r=>num(r.orders))}/>
+      <Kpi label="Average order" value={fmtK(aov(cur))} color="#8899AA" delta={prev?pctDelta(aov(cur),aov(prev)):null} spark={ser(aov)}/>
+      <Kpi label="Gross margin" value={margin(cur).toFixed(1)+"%"} color="#F5C000" delta={prev?ptsDelta(margin(cur),margin(prev)):null} spark={ser(margin)}/>
+    </div>
+    {topItems.length>0&&(
+      <More title="Top selling items">
+        {topItems.map(([name,{qty,revenue}])=><Row key={name} label={name} sub={`${qty} sold`} value={"KSh "+fmt(revenue)} color="#4CAF50"/>)}
+      </More>)}
+  </>);
+
+  const stockView=()=>(<>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+      <Kpi label="Stock at cost" value={fmtK(stockCost)} color="#F5C000"/>
+      <Kpi label="Stock at retail" value={fmtK(stockRetail)} color="#8899AA"/>
+      <Kpi label="Profit if all sells" value={fmtK(stockRetail-stockCost)} color="#4CAF50"/>
+      <Kpi label="Losses" value={fmtK(num(cur.losses))} color="#E85B5B" delta={prev?pctDelta(cur.losses,prev.losses,false):null} spark={ser(r=>num(r.losses))}/>
+    </div>
+  </>);
+
+  const expensesView=()=>(<>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+      <Kpi label="Expenses" value={fmtK(num(cur.expenses))} color="#E85B5B" delta={prev?pctDelta(cur.expenses,prev.expenses,false):null} spark={ser(r=>num(r.expenses))} onClick={()=>setDrill(drillExpenses())}/>
+      <Kpi label="Share of sales" value={(num(cur.invoiced)>0?num(cur.expenses)/num(cur.invoiced)*100:0).toFixed(1)+"%"} color="#F5C000" delta={prev?ptsDelta(num(cur.invoiced)>0?num(cur.expenses)/num(cur.invoiced)*100:0,num(prev.invoiced)>0?num(prev.expenses)/num(prev.invoiced)*100:0,false):null} spark={ser(r=>num(r.invoiced)>0?num(r.expenses)/num(r.invoiced)*100:0)}/>
+      <Kpi label="Goods transport" value={fmtK(num(cur.direct))} color="#E8A45B" delta={prev?pctDelta(cur.direct,prev.direct,false):null} sub="counted with cost of goods"/>
+      <Kpi label="Largest category" value={topCat?fmtK(topCat[1]):"None yet"} color="#8899AA" delta={topCat&&R.pFrom?pctDelta(topCat[1],prevCats[topCat[0]]||0,false):null} sub={topCat?topCat[0]:""}/>
+    </div>
+  </>);
 
   return (
     <div>
-      {/* Month-on-month table */}
-      {(()=>{
-        // Per-item average cost for COGS
-        const costLookup={}; data.stock.forEach(st=>{ const k=st.name.toLowerCase(); if(!costLookup[k])costLookup[k]=[]; costLookup[k].push(Number(st.unit_cost)); });
-        const avgCost=n=>{ const a=costLookup[(n||"").toLowerCase()]; return a&&a.length?a.reduce((x,y)=>x+y,0)/a.length:0; };
-        const mmap={};
-        data.sales.forEach(s=>{const m=s.date.slice(0,7);if(!mmap[m])mmap[m]={collected:0,cogs:0,expenses:0};
-          mmap[m].collected+=Number(s.amount_paid!=null?s.amount_paid:s.total);
-          mmap[m].cogs+=saleCost(s,avgCost);
-        });
-        data.expenses.forEach(e=>{const m=e.date.slice(0,7);if(!mmap[m])mmap[m]={collected:0,cogs:0,expenses:0}; if(isDirect(e.category)) mmap[m].cogs+=Number(e.amount); else mmap[m].expenses+=Number(e.amount);});
-        const rows=Object.entries(mmap).sort(([a],[b])=>b.localeCompare(a)).map(([month,d])=>({month,collected:d.collected,cogs:d.cogs,expenses:d.expenses,profit:d.collected-d.cogs-d.expenses}));
-        if(!rows.length) return null;
-        const tots=rows.reduce((s,r)=>({collected:s.collected+r.collected,cogs:s.cogs+r.cogs,expenses:s.expenses+r.expenses,profit:s.profit+r.profit}),{collected:0,cogs:0,expenses:0,profit:0});
-        const fmtM=m=>{const[y,mo]=m.split("-");return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(mo)-1]+" "+y;};
-        const fmt=n=>Math.round(n).toLocaleString();
-        return (
-          <div className="card" style={{marginBottom:14}}>
-            <div style={{fontSize:13,color:"#AEB9C7",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Month-on-month performance</div>
-            <div style={{fontSize:12,color:"#8A97A8",marginBottom:12}}>Profit = Collected − COGS − Expenses. COGS includes goods transport. Amounts in KSh.</div>
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:14,minWidth:360}}>
-                <thead>
-                  <tr>{["Month","Collected","COGS","Expenses","Profit"].map(h=><th key={h} style={{textAlign:h==="Month"?"left":"right",padding:"4px 4px 8px",color:"#AEB9C7",fontWeight:600,borderBottom:"1px solid #1A2A4A",whiteSpace:"nowrap"}}>{h}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {rows.map(r=>(
-                    <tr key={r.month} style={{borderBottom:"1px solid #0F1A3A"}}>
-                      <td style={{padding:"7px 4px",color:"#E8E2D4",whiteSpace:"nowrap"}}>{fmtM(r.month)}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",color:"#4CAF50",whiteSpace:"nowrap"}}>{fmt(r.collected)}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",color:"#E8A45B",whiteSpace:"nowrap"}}>{fmt(r.cogs)}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",color:"#E85B5B",whiteSpace:"nowrap"}}>{fmt(r.expenses)}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",color:r.profit>=0?"#F5C000":"#E85B5B",fontWeight:600,whiteSpace:"nowrap"}}>{r.profit<0?"-":""}{fmt(Math.abs(r.profit))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{borderTop:"2px solid #1A2A4A"}}>
-                    <td style={{padding:"8px 4px",fontWeight:700,color:"#FFFFFF"}}>Total</td>
-                    <td style={{textAlign:"right",padding:"8px 4px",color:"#4CAF50",fontWeight:700}}>{fmt(tots.collected)}</td>
-                    <td style={{textAlign:"right",padding:"8px 4px",color:"#E8A45B",fontWeight:700}}>{fmt(tots.cogs)}</td>
-                    <td style={{textAlign:"right",padding:"8px 4px",color:"#E85B5B",fontWeight:700}}>{fmt(tots.expenses)}</td>
-                    <td style={{textAlign:"right",padding:"8px 4px",color:tots.profit>=0?"#F5C000":"#E85B5B",fontWeight:700}}>{tots.profit<0?"-":""}{fmt(Math.abs(tots.profit))}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
-      <div className="card" style={{marginBottom:14}}>
-        <div style={{fontSize:13,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Stock value on hand</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div><div style={{fontSize:20,fontWeight:600,color:"#F5C000"}}>KSh {stockValue.toLocaleString()}</div><div style={{fontSize:12,color:"#8A97A8"}}>AT COST</div></div>
-          <div><div style={{fontSize:20,fontWeight:600,color:"#4CAF50"}}>KSh {stockPotentialProfit.toLocaleString()}</div><div style={{fontSize:12,color:"#8A97A8"}}>EST. PROFIT IF ALL SELLS</div></div>
-        </div>
-        <div style={{fontSize:13,color:"#8A97A8",marginTop:8,paddingTop:8,borderTop:"1px solid #1A2A4A"}}>Retail value KSh {stockRetail.toLocaleString()}</div>
+      <div className="chips" style={{marginBottom:10}}>
+        {SECTIONS.map(([id,label])=><button key={id} className={`chip${section===id?" on":""}`} onClick={()=>setSection(id)}>{label}</button>)}
       </div>
-
-      {/* GROWTH PROJECTION */}
-      <div className="card" style={{marginBottom:14}}>
-        <div style={{fontSize:14,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",fontWeight:600,marginBottom:4}}>Growth projection</div>
-        <div style={{fontSize:14,color:"#8A97A8",marginBottom:12}}>If the current trend holds ({avgMonthlyNet>=0?"+":""}{fmtK(avgMonthlyNet)}/month average over {monthsOfData} month{monthsOfData!==1?"s":""} of data)</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-          {proj.map(p=>(
-            <div key={p.months} style={{textAlign:"center",background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"10px 6px"}}>
-              <div style={{fontSize:15,fontWeight:700,color:p.value>=totalCapital?"#4CAF50":"#E85B5B"}}>{fmtK(p.value)}</div>
-              <div style={{fontSize:13,color:"#8A97A8",marginTop:2}}>in {p.months} mo</div>
-            </div>
-          ))}
-        </div>
-        {monthsOfData<2&&<div style={{fontSize:13,color:"#E8A45B",marginTop:10,lineHeight:1.4}}>Only {monthsOfData} month of data — this projection will get meaningful after 2-3 months of trading.</div>}
-        <div style={{fontSize:12,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>A straight-line estimate, not a forecast. It assumes trading continues as it has. Real results depend on sales, sourcing and seasonality.</div>
+      <div style={{display:"flex",gap:6,marginBottom:10}}>
+        {PERIODS.map(([id,label])=><button key={id} onClick={()=>setPeriod(id)} style={{flex:1,padding:"6px 4px",fontSize:13,borderRadius:8,border:"1px solid #1A2A4A",background:period===id?"#1A2A4A":"transparent",color:period===id?"#F5C000":"#8A97A8",fontWeight:period===id?700:500,cursor:"pointer",fontFamily:"inherit"}}>{label}</button>)}
       </div>
-
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-        <div className="card">
-          <div style={{fontSize:13,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Payment split</div>
-          {collected>0?<>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:14,marginBottom:4}}><span style={{color:"#4CAF50"}}>M-Pesa</span><span>KSh {mpesa.toLocaleString()}</span></div>
-            <div style={{height:4,background:"#1A2A4A",borderRadius:2,marginBottom:8}}><div style={{height:4,background:"#4CAF50",borderRadius:2,width:`${collected>0?Math.round(mpesa/collected*100):0}%`}}/></div>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:14}}><span style={{color:"#F5C000"}}>Cash</span><span>KSh {cash.toLocaleString()}</span></div>
-          </>:<div style={{color:"#8A97A8",fontSize:14}}>No sales yet</div>}
-        </div>
-        <div className="card">
-          <div style={{fontSize:13,color:"#8899AA",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Expenses</div>
-          {expBreakdown.length>0?expBreakdown.slice(0,4).map(([cat,amt])=>(
-            <div key={cat} style={{marginBottom:6}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:2}}><span style={{color:"#E8E2D4"}}>{cat}</span><span style={{color:"#E85B5B"}}>{expenses>0?Math.round(amt/expenses*100):0}%</span></div>
-              <div style={{height:3,background:"#1A2A4A",borderRadius:2}}><div style={{height:3,background:"#E85B5B",borderRadius:2,width:`${expenses>0?(amt/expenses*100):0}%`}}/></div>
-            </div>
-          )):<div style={{color:"#8A97A8",fontSize:14}}>No expenses yet</div>}
-        </div>
-      </div>
-      {topItems.length>0&&(
-        <div className="card" style={{marginBottom:14}}>
-          <div style={{fontSize:13,color:"#8899AA",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.05em"}}>Top selling items</div>
-          {topItems.map(([name,{qty,revenue:rev}],i)=>(
-            <div key={name} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<topItems.length-1?"1px solid #1A2A4A":"none"}}>
-              <div><div style={{fontSize:14,fontWeight:500}}>{name}</div><div style={{fontSize:13,color:"#8A97A8"}}>{qty} sold</div></div>
-              <div style={{fontSize:14,fontWeight:600,color:"#4CAF50"}}>KSh {rev.toLocaleString()}</div>
-            </div>
-          ))}
-        </div>
-      )}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+      {anErr&&<div className="card" style={{color:"#E8A45B",fontSize:14,lineHeight:1.45}}>{anErr}</div>}
+      {!an&&!anErr&&<div style={{textAlign:"center",padding:"1.5rem",color:"#8A97A8"}}>Loading...</div>}
+      {an&&cur&&snap&&<>
+        <div style={{fontSize:12,color:"#8A97A8",marginBottom:10}}>Showing {R.label}.</div>
+        <div className="card" style={{borderLeft:"3px solid #F5C000",fontSize:14,lineHeight:1.5,color:"#E8E2D4"}}>{soWhat()}</div>
+        {section==="business"&&businessView()}
+        {section==="sales"&&salesView()}
+        {section==="stock"&&stockView()}
+        {section==="expenses"&&expensesView()}
+      </>}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,margin:"14px 0 8px"}}>
         <button className="btn-g" onClick={()=>exportCSV("sales")} style={{fontSize:14}}>Export sales</button>
         <button className="btn-g" onClick={()=>exportCSV("expenses")} style={{fontSize:14}}>Export expenses</button>
         <button className="btn-g" onClick={()=>exportCSV("stock")} style={{fontSize:14}}>Export stock</button>
@@ -283,4 +351,3 @@ export function ReportsTab({user,bal}){
     </div>
   );
 }
-
