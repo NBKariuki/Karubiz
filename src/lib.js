@@ -173,8 +173,30 @@ export const EDIT_WINDOW_MS = 24*60*60*1000;
 export const withinWindow = createdAt => { if(!createdAt) return true; return (Date.now()-new Date(createdAt).getTime()) < EDIT_WINDOW_MS; };
 export const windowNote = "Locked — records can only be changed within 24 hours. Use reconciliation for later corrections.";
 
+// Reads M-Pesa / bank payment confirmations. Handles several messages pasted together, drops the helpline number
+// ("Enquiries, call ...") so it is never mistaken for the customer's phone, and skips generic senders like "KCB PAYMENTS" as names.
+const GENERIC_SENDER = /\b(payments?|bank|limited|ltd|paybill|equity|kcb|co-?op|sacco|safaricom|m-?pesa|pochi|till)\b/i;
+const titleCase = s => String(s||"").toLowerCase().replace(/(^|[\s'-])([a-z])/g,(m,p,c)=>p+c.toUpperCase());
+const smsIsoDate = d => { const m=String(d||"").match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(!m) return ""; const y=m[3].length===2?"20"+m[3]:m[3]; return `${y}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`; };
+function parseOneSms(s) {
+  const body = s.split(/Enquiries/i)[0];
+  const codeM = body.match(/^\s*([A-Z0-9]{8,12})\b/);
+  const amtM = body.match(/(?:KES|Ksh)\.?\s*([\d,]+(?:\.\d+)?)/i);
+  const fromM = body.match(/received\s+from\s+(.+?)(?=\s+(?:0[17]\d{8}|254[17]\d{8})\b|\s+for\s+account\b|\s+on\s+\d{1,2}\/|[.,]\s|$)/i);
+  const phoneM = body.match(/\b(0[17]\d{8}|254[17]\d{8})\b/);
+  const acctM = body.match(/for\s+account\s+(\S+)/i);
+  const dateM = body.match(/\bon\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  const timeM = body.match(/\bat\s+(\d{1,2}:\d{2}\s*[AP]M)/i);
+  const amount = amtM ? Number(amtM[1].replace(/,/g,"")) : 0;
+  if (!amount && !codeM) return null;
+  const sender = fromM ? fromM[1].trim() : "";
+  let phone = "";
+  if (phoneM) phone = phoneM[1].startsWith("254") ? "0"+phoneM[1].slice(3) : phoneM[1];
+  return { code: codeM?codeM[1]:"", amount, sender, name: sender && !GENERIC_SENDER.test(sender) ? titleCase(sender) : "", phone,
+           account: acctM?acctM[1]:"", date: smsIsoDate(dateM&&dateM[1]), time: timeM?timeM[1].toUpperCase():"", type: "mpesa" };
+}
 export function parseMpesa(sms) {
-  const s = sms.trim();
+  const s = String(sms||"").trim();
   if (/has been credited to your account/i.test(s)) {
     const amtM=s.match(/KES\s*([\d,]+\.?\d*)\s+has been credited/i);
     const nameM=s.match(/\|\s*([A-Za-z][A-Za-z ]+?)\s*\]/);
@@ -182,12 +204,12 @@ export function parseMpesa(sms) {
     const refM=s.match(/>\s*(\d+)\s*\|\s*[A-Za-z]/);
     let phone="";
     if(phoneM){const intl=phoneM[1].replace(/X/gi,"0");phone="0"+intl.slice(3);}
-    return {code:refM?refM[1]:"",amount:amtM?Number(amtM[1].replace(/,/g,"")):0,name:nameM?nameM[1].trim():"",phone,type:"sacco"};
+    return {code:refM?refM[1]:"",amount:amtM?Number(amtM[1].replace(/,/g,"")):0,name:nameM?nameM[1].trim():"",sender:"",phone,account:"",date:"",time:"",type:"sacco",count:1};
   }
-  const codeM=s.match(/^([A-Z0-9]{8,12})\s/);
-  const amtM=s.match(/(?:received|paid|send|sent)\s+Ksh\s*([\d,]+)/i)||s.match(/Ksh\s*([\d,]+)/i);
-  const nameM=s.match(/from\s+([A-Z][A-Z ]+?)\s+(?:0[679]\d{8}|\d{4,})/i);
-  const phoneM=s.match(/(0[679]\d{8})/);
-  return {code:codeM?codeM[1]:"",amount:amtM?Number(amtM[1].replace(/,/g,"")):0,name:nameM?nameM[1].trim():"",phone:phoneM?phoneM[1]:"",type:"mpesa"};
+  const parts = s.split(/(?=\b[A-Z0-9]{8,12}\s+Confirmed\b)/).map(x=>x.trim()).filter(Boolean);
+  const msgs = []; const seen = new Set();
+  for (const p of (parts.length?parts:[s])) { const m = parseOneSms(p); if (!m) continue; const k = m.code || p; if (seen.has(k)) continue; seen.add(k); msgs.push(m); }
+  const first = msgs[0] || {code:"",amount:0,name:"",sender:"",phone:"",account:"",date:"",time:"",type:"mpesa"};
+  return {...first, count: msgs.length, others: msgs.slice(1).map(m=>m.code)};
 }
 

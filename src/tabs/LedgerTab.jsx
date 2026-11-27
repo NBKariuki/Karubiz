@@ -169,23 +169,6 @@ export function LedgerTab({user,onMoney,bal,onChange}){
         <div className="stat" style={{padding:"10px 8px"}}><div style={{fontSize:15,fontWeight:700,color:"#FFFFFF"}}>{fmtK(bal.sacco||0)}</div><div className="stat-l">Bank</div></div>
         <div className="stat" style={{padding:"10px 8px"}}><div style={{fontSize:15,fontWeight:700,color:"#FFFFFF"}}>{fmtK(bal.petty||0)}</div><div className="stat-l">Petty</div></div>
       </div>
-      <div style={{background:"#0A1128",border:"1px solid #1A2A4A",borderRadius:8,padding:"12px 14px",marginBottom:12}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <span style={{fontSize:14,color:"#AEB9C7"}}>Total on hand</span>
-          <span style={{fontSize:18,fontWeight:700,color:"#F5C000"}}>{fmtK(total)}</span>
-        </div>
-        <div style={{display:"flex",gap:8}}>
-          <div style={{flex:1,background:"transparent",border:"1px solid #24365C",borderRadius:7,padding:"8px 10px"}}>
-            <div style={{fontSize:13,color:"#8A97A8"}}>CAPITAL (keep)</div>
-            <div style={{fontSize:15,fontWeight:700,color:"#E8E2D4"}}>{fmtK(liquidCapitalPortion)}</div>
-          </div>
-          <div style={{flex:1,background:liquidProfitPortion>0?"rgba(76,175,80,0.08)":"#12203C",border:`1px solid ${liquidProfitPortion>0?"rgba(76,175,80,0.35)":"#24365C"}`,borderRadius:7,padding:"8px 10px"}}>
-            <div style={{fontSize:13,color:"#8A97A8"}}>PROFIT (spendable)</div>
-            <div style={{fontSize:15,fontWeight:700,color:liquidProfitPortion>0?"#4CAF50":"#8A97A8"}}>{fmtK(liquidProfitPortion)}</div>
-          </div>
-        </div>
-        <div style={{fontSize:13,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>{liquidProfitPortion>0?`You can take up to ${fmtK(liquidProfitPortion)} without touching capital.`:"All liquid money is capital right now — spending eats into the float."}</div>
-      </div>
       {!checkOK&&<div style={{fontSize:14,marginBottom:12,color:"#E85B5B"}}>⚠ Balance mismatch. Review the register.</div>}
 
       {/* Sub-tabs */}

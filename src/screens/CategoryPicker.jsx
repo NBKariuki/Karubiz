@@ -9,10 +9,13 @@ export function CategoryPicker({ value, onChange, extra }) {
   const legacy = extra && !EXP_CATS.includes(extra) ? extra : null;
   return (
     <div>
-      <button type="button" className={`pick-btn${open ? " open" : ""}`} onClick={() => setOpen(o => !o)}>
-        <span style={{display:"flex",alignItems:"center",gap:10}}><span style={{width:11,height:11,borderRadius:"50%",background:catColor(value),flexShrink:0}}/>{value}</span><span className="chev" />
+      <button type="button" className={`pick-btn${open ? " open" : ""}${value ? " done" : " need"}`} onClick={() => setOpen(o => !o)}>
+        {value
+          ? <span style={{display:"flex",alignItems:"center",gap:10}}><span style={{width:11,height:11,borderRadius:"50%",background:catColor(value),flexShrink:0}}/>{value}</span>
+          : <span>Pick a category *</span>}
+        <span className="chev" />
       </button>
-      {!open && <div style={{ fontSize: 13, color: "#8A97A8", marginTop: 5 }}>{EXP_HINTS[value]}</div>}
+      {!open && value && <div style={{ fontSize: 13, color: "#8A97A8", marginTop: 5 }}>{EXP_HINTS[value]}</div>}
       {open && (
         <div className="pick-panel">
           {legacy && (<div style={{"--g":catColor(legacy)}}><div className="grp-l">Existing</div><div className="chips"><button type="button" className={`chip${value === legacy ? " on" : ""}`} onClick={() => pick(legacy)}>{legacy}</button></div></div>)}

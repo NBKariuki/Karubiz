@@ -5,7 +5,7 @@ import { ProductSearch } from "../screens/ProductSearch";
 export function SaleTab({user,onMoney}){
   const [stockItems,setStockItems]=useState([]);
   const [wiz,setWiz]=useState(false); const [step,setStep]=useState(1);
-  const [sms,setSms]=useState(""); const [parsed,setParsed]=useState(null);
+  const [sms,setSms]=useState(""); const [parsed,setParsed]=useState(null); const [smsWarn,setSmsWarn]=useState("");
   const [staff,setStaff]=useState(defStaff(user));
   const [cName,setCName]=useState(""); const [cPhone,setCPhone]=useState("");
   const [items,setItems]=useState([{id:1,name:"",qty:1,price:""}]);
@@ -39,7 +39,7 @@ export function SaleTab({user,onMoney}){
   const loadStock=async()=>{ try{ setStockItems(await sb.get("karu_stock","select=*&order=date_in.asc")); }catch(e){console.error(e);} };
   useEffect(()=>{ loadStock(); loadPendingSales(); loadToday(); },[]);
 
-  const resetForm=()=>{ setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null);setItems([{id:1,name:"",qty:1,price:""}]);setPayType("full");setInitPay("");setCashPart("");setMpesaPart("");setPay("mpesa");setErr("");setStep(1);setCustCredit(0);setUseCredit(false); };
+  const resetForm=()=>{ setCName("");setCPhone("");setMpesaCode("");setNotes("");setSms("");setParsed(null); setSmsWarn("");setItems([{id:1,name:"",qty:1,price:""}]);setPayType("full");setInitPay("");setCashPart("");setMpesaPart("");setPay("mpesa");setErr("");setStep(1);setCustCredit(0);setUseCredit(false); };
   const openWiz=s=>{ setStaff(s); resetForm();
     if(window.__karuCredit){ const k=window.__karuCredit; setCName(k.name); setCPhone(k.phone||""); setCustCredit(Number(k.balance)||0); setUseCredit(true); window.__karuCredit=null; }
     else { setCustCredit(0); setUseCredit(false); }
@@ -58,6 +58,11 @@ export function SaleTab({user,onMoney}){
       const p=parseMpesa(v);
       if(p.amount>0||p.name||p.code){
         setParsed(p);
+        const warn=[];
+        if(p.date&&p.date!==todayStr()) warn.push(`This message is dated ${p.date.split("-").reverse().join("/")}, not today.`);
+        if(p.count>1) warn.push(`${p.count} messages found, using the first (${p.code}).`);
+        setSmsWarn(warn.join(" "));
+        if(p.code){ const q=encodeURIComponent(p.code); Promise.all([sb.get("karu_sales",`select=receipt_no&mpesa_code=eq.${q}&limit=1`),sb.get("karu_payments",`select=receipt_no&mpesa_code=eq.${q}&limit=1`)]).then(([a,b])=>{ const hit=a[0]||b[0]; if(hit) setSmsWarn(w=>(w?w+" ":"")+`This code was already used on ${hit.receipt_no}.`); }).catch(()=>{}); }
         if(p.name) setCName(p.name); if(p.phone) setCPhone(p.phone); if(p.code) setMpesaCode(p.code);
         if(p.amount>0) setItems(prev=>prev.some(i=>i.name||i.price)?prev:[{id:Date.now(),name:"",qty:1,price:String(p.amount)}]);
         setPay("mpesa");
@@ -539,7 +544,8 @@ export function SaleTab({user,onMoney}){
                 <div style={{background:"transparent",border:"1px dashed #2E4472",borderRadius:8,padding:10,marginBottom:14}}>
                   <div style={{fontSize:13,color:"#8899AA",marginBottom:6}}>Paste the M-Pesa or bank SMS to auto-fill (optional)</div>
                   <textarea value={sms} onChange={e=>handleSms(e.target.value)} placeholder="Paste SMS here..." style={{width:"100%",background:"transparent",border:"none",borderBottom:"1px solid #5B73A3",borderRadius:0,padding:"9px 2px",color:"#E8E2D4",fontSize:15,resize:"none",minHeight:52,fontFamily:"'DM Sans',sans-serif"}}/>
-                  {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:14,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"Bank":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||"no name"}</div>}
+                  {parsed&&(parsed.code||parsed.amount>0)&&<div style={{fontSize:14,color:"#4CAF50",marginTop:4}}>{parsed.type==="sacco"?"Bank":"M-Pesa"} · {parsed.code||"no ref"} · {fmtK(parsed.amount)} · {parsed.name||(parsed.sender?`from ${parsed.sender}`:"no name")}</div>}
+                  {smsWarn&&<div style={{fontSize:13,fontWeight:600,color:/already used/.test(smsWarn)?"#E85B5B":"#F5C000",marginTop:4}}>{smsWarn}</div>}
                 </div>
                 <div className="field"><label>Customer name</label><input required value={cName} onChange={e=>setCName(e.target.value)} placeholder="Full name" autoFocus/></div>
                 <div className="field"><label>Phone (optional)</label><input value={cPhone} onChange={e=>setCPhone(e.target.value)} onBlur={e=>checkCredit(e.target.value)} placeholder="07XX XXX XXX" type="tel"/></div>

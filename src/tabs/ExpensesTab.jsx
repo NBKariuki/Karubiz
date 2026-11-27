@@ -5,19 +5,20 @@ import { CategoryPicker } from "../screens/CategoryPicker";
 export function ExpensesTab({user,onMoney}){
   const [exp,setExp]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [form,setForm]=useState({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:defStaff(user),paid_from:"sacco"});
+  const [form,setForm]=useState({date:new Date().toISOString().split("T")[0],category:"",description:"",amount:"",recorded_by:defStaff(user),paid_from:"sacco"});
   const [saving,setSaving]=useState(false);
   const [err,setErr]=useState("");
   const [showForm,setShowForm]=useState(false);
-  const [showPetty,setShowPetty]=useState(false); const [pcCat,setPcCat]=useState("Staff welfare"); const [pcNote,setPcNote]=useState(""); const [pcAmt,setPcAmt]=useState(""); const [pcSaving,setPcSaving]=useState(false);
+  const [showPetty,setShowPetty]=useState(false); const [pcCat,setPcCat]=useState(""); const [pcNote,setPcNote]=useState(""); const [pcAmt,setPcAmt]=useState(""); const [pcSaving,setPcSaving]=useState(false);
   const doPettySpend=async()=>{
+    if(!pcCat){alert("Pick a category.");return;}
     const a=Number(pcAmt); if(!a||a<=0){alert("Enter an amount.");return;} if(!pcNote.trim()){alert("Add a note.");return;}
     setPcSaving(true);
     try{
       await recordMoney({account:"petty",amount:-a,type:"petty_spend",description:`${pcCat}: ${pcNote}`,date:todayStr(),recorded_by:user.full_name});
       await sb.post("karu_expenses",{date:todayStr(),category:pcCat,description:pcNote,amount:a,recorded_by:user.full_name,paid_from:"petty"});
       if(onMoney) onMoney();
-      setShowPetty(false); setPcAmt(""); setPcNote("");
+      setShowPetty(false); setPcAmt(""); setPcCat(""); setPcNote("");
       await loadExp();
     }catch(e){alert("Failed: "+e.message);}
     setPcSaving(false);
@@ -37,6 +38,7 @@ export function ExpensesTab({user,onMoney}){
   useEffect(()=>{loadExp();},[from,to]);
 
   const save=async()=>{
+    if(!form.category){setErr("Pick a category.");return;}
     if(!form.amount||Number(form.amount)<=0){setErr("Enter a valid amount.");return;}
     setSaving(true); setErr("");
     try{
@@ -46,7 +48,7 @@ export function ExpensesTab({user,onMoney}){
       else await recordMoney({account:form.paid_from,amount:-a,type:"expense",description:lbl,date:form.date,recorded_by:form.recorded_by});
       if(onMoney) onMoney();
       setShowForm(false);
-      setForm({date:new Date().toISOString().split("T")[0],category:"Rent",description:"",amount:"",recorded_by:defStaff(user),paid_from:"sacco"});
+      setForm({date:new Date().toISOString().split("T")[0],category:"",description:"",amount:"",recorded_by:defStaff(user),paid_from:"sacco"});
       await loadExp();
     }catch(e){setErr("Save failed: "+e.message);}
     setSaving(false);
