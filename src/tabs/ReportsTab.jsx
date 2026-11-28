@@ -31,6 +31,31 @@ function rangesFor(period,today){
   if(period==="year") return {from:`${y}-01-01`,to:today,pFrom:`${y-1}-01-01`,pTo:clampDay(y-1,m,d),label:"this year so far, against the same days last year"};
   return {from:"2000-01-01",to:today,pFrom:null,pTo:null,label:"all time"};
 }
+const ewma = (vals,a=0.4) => { if(!vals.length) return 0; let e=vals[0]; for(let i=1;i<vals.length;i++) e=a*vals[i]+(1-a)*e; return e; };
+const sdev = vals => { if(vals.length<2) return 0; const m=vals.reduce((x,y)=>x+y,0)/vals.length; return Math.sqrt(vals.reduce((t,v)=>t+(v-m)**2,0)/(vals.length-1)); };
+const sumOf = a => a.reduce((x,y)=>x+y,0);
+const weekStart = str => addDays(str,-((pd(str).getUTCDay()+6)%7)); // weeks start on Monday
+const STATUS_COLOR = {Slow:"#E85B5B",Slowing:"#E8A45B",Rising:"#4CAF50",Normal:"#8A97A8"};
+// Status from the last few weeks against the weeks before them (equal-sized windows) and from how long since the last sale
+// against the usual gap between sales. Uses whatever history exists.
+function statusFor(ov,series){
+  const k=Math.min(4,Math.floor(series.length/2));
+  const ch=k>=1&&sumOf(series.slice(-2*k,-k))>0?(sumOf(series.slice(-k))-sumOf(series.slice(-2*k,-k)))/sumOf(series.slice(-2*k,-k)):null;
+  const gr=ov&&num(ov.usual_gap)>0&&ov.days_since!=null?num(ov.days_since)/num(ov.usual_gap):null;
+  if((ch!==null&&ch<=-0.4)||(gr!==null&&gr>=3)) return "Slow";
+  if((ch!==null&&ch<=-0.2)||(gr!==null&&gr>=2)) return "Slowing";
+  if(ch!==null&&ch>=0.2) return "Rising";
+  if(ch===null&&gr===null) return null;
+  return "Normal";
+}
+function planNote(status,cover,stockUnits,selling){
+  if(selling&&stockUnits<=0) return "Out of stock. Sales may be lost until the next order.";
+  if((status==="Slow"||status==="Slowing")&&cover!==null&&cover>8) return "Selling slower and plenty in stock. Hold the next order, and promote it or bundle it with a strong type.";
+  if(status==="Slow"||status==="Slowing") return "Selling slower than usual. Promote it and follow up open quotes before ordering more.";
+  if(status==="Rising"&&cover!==null&&cover<4) return "Selling faster than usual and stock is getting low. Check the next order.";
+  if(cover!==null&&cover<3) return "Stock is low against the sales pace. Plan the next order.";
+  return "Steady. No action needed.";
+}
 const PERIODS = [["week","7 days"],["month","Month"],["year","Year"],["all","All"]];
 const SECTIONS = [["business","Business"],["sales","Sales"],["stock","Stock"],["expenses","Expenses"]];
 
@@ -83,6 +108,10 @@ export function ReportsTab({user,bal}){
   const [an,setAn]=useState(null);      // {cur,prev,snap,snapPrev,monthly,R}
   const [anErr,setAnErr]=useState("");
   const [tick,setTick]=useState(0);
+  const [ty,setTy]=useState(null);       // {cur,prev,overview,weekly}
+  const [tyErr,setTyErr]=useState("");
+  const [sheet,setSheet]=useState(null);  // product type opened from the Sales section
+  const [showAllTypes,setShowAllTypes]=useState(false);
 
   useEffect(()=>{loadAll();},[]);
   const loadAll=async()=>{
@@ -116,6 +145,26 @@ export function ReportsTab({user,bal}){
         if(live){ setAn({cur,prev,snap,snapPrev,monthly:monthly||[],R}); setAnErr(""); }
       }catch(e){
         if(live){ const m=errMsg(e); setAnErr(/could not find|does not exist|karu_biz|karu_v_/i.test(m)?"Analytics are not installed yet. Run KARU_ANALYTICS_V1.sql in the Supabase SQL editor, then refresh.":m); }
+      }
+    })();
+    return ()=>{live=false;};
+  },[period,tick]);
+
+  // Per product type numbers (KARU_PRODUCT_TYPES_V1.sql). Kept separate so the Business section works without it.
+  useEffect(()=>{
+    let live=true;
+    (async()=>{
+      try{
+        const t=todayStr(), R=rangesFor(period,t);
+        const [cur,prev,overview,weekly]=await Promise.all([
+          sb.rpc("karu_type_period",{p_from:R.from,p_to:R.to}),
+          R.pFrom?sb.rpc("karu_type_period",{p_from:R.pFrom,p_to:R.pTo}):Promise.resolve(null),
+          sb.rpc("karu_type_overview",{p_today:t}),
+          sb.get("karu_v_type_weekly",`select=*&week=gte.${addDays(weekStart(t),-7*13)}&order=week.asc`),
+        ]);
+        if(live){ setTy({cur:cur||[],prev:prev||[],overview:overview||[],weekly:weekly||[]}); setTyErr(""); }
+      }catch(e){
+        if(live){ setTy(null); const m=errMsg(e); setTyErr(/could not find|does not exist|karu_type|karu_v_/i.test(m)?"missing":m); }
       }
     })();
     return ()=>{live=false;};
@@ -180,6 +229,28 @@ export function ReportsTab({user,bal}){
   fSales.forEach(s=>{ (s.items||[]).forEach(i=>{ if(!itemMap[i.name]) itemMap[i.name]={qty:0,revenue:0}; itemMap[i.name].qty+=num(i.qty||1); itemMap[i.name].revenue+=num(i.qty||1)*num(i.price); }); });
   const topItems=Object.entries(itemMap).sort(([,a],[,b])=>b.revenue-a.revenue).slice(0,5);
 
+  // ---------- per product type ----------
+  const curWk=weekStart(todayStr());
+  const wkRows=ty?ty.weekly:[];
+  const firstWk=wkRows.reduce((m,r)=>{const w=String(r.week).slice(0,10);return !m||w<m?w:m;},null);
+  const weeks=[]; for(let w=addDays(curWk,-7);weeks.length<12&&firstWk&&w>=firstWk;w=addDays(w,-7)) weeks.unshift(w); // complete weeks only
+  const wmap=new Map(wkRows.map(r=>[String(r.week).slice(0,10)+"|"+r.product_type,r]));
+  const typeSeries=(name,f)=>weeks.map(w=>{const r=wmap.get(w+"|"+name);return r?num(r[f]):0;});
+  const allTypeSeries=f=>weeks.map(w=>sumOf(wkRows.filter(r=>String(r.week).slice(0,10)===w).map(r=>num(r[f]))));
+  const curBy=Object.fromEntries((ty?ty.cur:[]).map(t=>[t.type,t]));
+  const prevBy=Object.fromEntries((ty?ty.prev:[]).map(t=>[t.type,t]));
+  const ovBy=Object.fromEntries((ty?ty.overview:[]).map(t=>[t.type,t]));
+  const typeNames=ty?[...new Set([...Object.keys(curBy),...wkRows.map(r=>r.product_type)])]:[];
+  const typeRows=typeNames.map(name=>{
+    const series=typeSeries(name,"units"), ov=ovBy[name]||null, c=curBy[name]||null;
+    const status=statusFor(ov,series);
+    const recent=series.slice(-4), rate=recent.length?sumOf(recent)/recent.length:0; // units per week
+    const stockUnits=ov?num(ov.stock_units):0;
+    const cover=rate>0?stockUnits/rate:null;
+    return {name,series,ov,c,p:prevBy[name]||null,status,cover,stockUnits,rate,selling:rate>0||!!c};
+  }).sort((a,b)=>num(b.c&&b.c.revenue)-num(a.c&&a.c.revenue)||a.name.localeCompare(b.name));
+  const slowTypes=typeRows.filter(r=>r.status==="Slow"||r.status==="Slowing");
+
   // ---------- drill-downs ----------
   const drillNet=()=>({title:"Net profit breakdown",color:num(cur.net_profit)>=0?"#4CAF50":"#E85B5B",total:num(cur.net_profit),rows:[
     {label:"Sales (invoiced)",sub:"what was billed",amount:num(cur.invoiced)},
@@ -202,6 +273,7 @@ export function ReportsTab({user,bal}){
       return prev?"Profit and cash are holding up against the comparison period.":"Profit and cash are in order for this period.";
     }
     if(section==="sales"){
+      if(slowTypes.length) return `${slowTypes.map(r=>r.name).slice(0,3).join(", ")} ${slowTypes.length===1?"is":"are"} selling slower than usual. See By product type below.`;
       if(prev&&num(prev.invoiced)>0&&num(cur.invoiced)<num(prev.invoiced)*0.8) return `Sales are down ${Math.abs(pctChange(cur.invoiced,prev.invoiced)).toFixed(0)}% on the comparison period. Follow up open quotes and push what is in stock.`;
       if(prev&&margin(cur)<margin(prev)-3) return "Margin has slipped by more than 3 points. Check discounts and the cost of what is selling.";
       return "Sales and margin are steady against the comparison period.";
@@ -279,6 +351,45 @@ export function ReportsTab({user,bal}){
       <Kpi label="Average order" value={fmtK(aov(cur))} color="#8899AA" delta={prev?pctDelta(aov(cur),aov(prev)):null} spark={ser(aov)}/>
       <Kpi label="Gross margin" value={margin(cur).toFixed(1)+"%"} color="#F5C000" delta={prev?ptsDelta(margin(cur),margin(prev)):null} spark={ser(margin)}/>
     </div>
+    {tyErr==="missing"&&<div className="card" style={{color:"#E8A45B",fontSize:14,lineHeight:1.45}}>Product type reports are not installed yet. Run KARU_PRODUCT_TYPES_V1.sql in the Supabase SQL editor, then refresh.</div>}
+    {tyErr&&tyErr!=="missing"&&<div className="card" style={{color:"#E8A45B",fontSize:14}}>{tyErr}</div>}
+    {ty&&typeRows.length>0&&(
+      <div className="card" style={{marginBottom:10}}>
+        <div style={{fontSize:13,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:2}}>By product type</div>
+        <div style={{fontSize:12,color:"#8A97A8",marginBottom:6}}>Trend line shows weekly units. Tap a type for its items and outlook.</div>
+        {(showAllTypes?typeRows:typeRows.slice(0,6)).map((r,i,arr)=>{
+          const col=STATUS_COLOR[r.status]||"#8A97A8";
+          const d=r.c&&R.pFrom?pctDelta(num(r.c.units),num(r.p&&r.p.units)):null;
+          const pace=[r.ov&&r.ov.last_sale?`Last sale ${r.ov.days_since} day${r.ov.days_since===1?"":"s"} ago${num(r.ov.usual_gap)>0?`, usually every ${num(r.ov.usual_gap)===1?"day":num(r.ov.usual_gap)+" days"}`:""}`:null,
+            r.selling&&r.stockUnits<=0?"Out of stock":(r.cover!==null?(r.cover<1?"under 1 week of stock":`${Math.round(r.cover)} week${Math.round(r.cover)===1?"":"s"} of stock`):null)].filter(Boolean).join(" · ");
+          return (
+            <div key={r.name} onClick={()=>setSheet(r.name)} style={{padding:"10px 0",borderBottom:i<arr.length-1?"1px solid #101B36":"none",cursor:"pointer"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                <div style={{minWidth:0,flex:1}}>
+                  <div style={{fontSize:15,fontWeight:600,color:"#E8E2D4"}}>{r.name}{r.status&&<span style={{marginLeft:8,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:100,border:`1px solid ${col}`,color:col}}>{r.status}</span>}</div>
+                  <div style={{fontSize:12,color:"#8A97A8",marginTop:2}}>{r.c?`${fmt(r.c.units)} unit${num(r.c.units)===1?"":"s"} · KSh ${fmt(r.c.revenue)}`:"No sales in this period"}{d&&<span style={{color:TONE[d.tone],fontWeight:600}}> · {d.text}</span>}</div>
+                </div>
+                <Spark vals={r.series.slice(-8)} color={col}/>
+              </div>
+              {pace&&<div style={{fontSize:12,color:"#8A97A8",marginTop:3}}>{pace}</div>}
+              {r.name==="Untyped"&&<div style={{fontSize:12,color:"#E8A45B",marginTop:3}}>Set a type in Product List to group these.</div>}
+            </div>);
+        })}
+        {typeRows.length>6&&<button className="btn-g" onClick={()=>setShowAllTypes(v=>!v)} style={{width:"100%",fontSize:13,marginTop:8}}>{showAllTypes?"Show fewer":`Show all ${typeRows.length}`}</button>}
+      </div>)}
+    {ty&&weeks.length>0&&(()=>{
+      const ur=allTypeSeries("units"), rv=allTypeSeries("revenue");
+      const eU=ewma(ur), eR=ewma(rv), sU=sdev(ur)*2, sR=sdev(rv)*2;
+      const lowStock=typeRows.filter(r=>r.cover!==null&&r.cover<3&&r.status!=="Slow");
+      return (
+        <More title="Next 4 weeks outlook">
+          <Row label="Expected units" sub={weeks.length>1?`range ${fmt(Math.max(0,4*eU-sU))} to ${fmt(4*eU+sU)}`:""} value={fmt(4*eU)}/>
+          <Row label="Expected sales" sub={weeks.length>1?`range KSh ${fmt(Math.max(0,4*eR-sR))} to ${fmt(4*eR+sR)}`:""} value={"KSh "+fmt(4*eR)} color="#4CAF50"/>
+          {slowTypes.length>0&&<Row label="Likely slow" sub="selling slower than usual" value={slowTypes.map(r=>r.name).slice(0,4).join(", ")} color="#E8A45B"/>}
+          {lowStock.length>0&&<Row label="Check stock" sub="under 3 weeks of cover" value={lowStock.map(r=>r.name).slice(0,4).join(", ")}/>}
+          <div style={{fontSize:12,color:"#8A97A8",marginTop:8,lineHeight:1.4}}>Based on {weeks.length} complete week{weeks.length===1?"":"s"} of sales, weighted towards the recent ones. The range is the normal ups and downs, so one big sale does not move it much. This improves as more weeks are recorded.</div>
+        </More>);
+    })()}
     {topItems.length>0&&(
       <More title="Top selling items">
         {topItems.map(([name,{qty,revenue}])=><Row key={name} label={name} sub={`${qty} sold`} value={"KSh "+fmt(revenue)} color="#4CAF50"/>)}
@@ -330,6 +441,50 @@ export function ReportsTab({user,bal}){
       </div>
       <button className="btn-g" onClick={loadAll} style={{width:"100%",fontSize:14}}>Refresh</button>
 
+      {sheet&&(()=>{
+        const r=typeRows.find(x=>x.name===sheet); if(!r) return null;
+        const c=r.c, items=c&&c.items?c.items:[];
+        const eU=ewma(r.series), sU=sdev(r.series)*2;
+        const col=STATUS_COLOR[r.status]||"#8A97A8";
+        return (
+          <div onClick={()=>setSheet(null)} style={{position:"fixed",inset:0,background:"rgba(5,10,31,0.8)",zIndex:150,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"#0A1128",borderTop:`3px solid ${col}`,borderRadius:"16px 16px 0 0",width:"100%",maxWidth:500,maxHeight:"85vh",display:"flex",flexDirection:"column"}}>
+              <div style={{padding:"16px 18px",borderBottom:"1px solid #1A2A4A",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div><div style={{fontSize:17,fontWeight:700}}>{r.name}{r.status&&<span style={{marginLeft:8,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:100,border:`1px solid ${col}`,color:col}}>{r.status}</span>}</div><div style={{fontSize:12,color:"#8A97A8",marginTop:2}}>{R.label}</div></div>
+                <button onClick={()=>setSheet(null)} style={{background:"none",border:"none",color:"#8899AA",fontSize:22,cursor:"pointer"}}>×</button>
+              </div>
+              <div style={{overflowY:"auto",padding:"10px 18px 24px"}}>
+                <div style={{fontSize:14,lineHeight:1.5,color:"#E8E2D4",marginBottom:10}}>{planNote(r.status,r.cover,r.stockUnits,r.selling)}</div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><div style={{fontSize:12,color:"#8A97A8"}}>Weekly units, last {Math.min(12,r.series.length)} weeks</div><Spark vals={r.series} color={col}/></div>
+                {c?<>
+                  <Row label="Units sold" value={fmt(c.units)}/>
+                  <Row label="Sales" value={"KSh "+fmt(c.revenue)} color="#4CAF50"/>
+                  <Row label="Margin" sub="before goods transport and expenses" value={(num(c.revenue)>0?num(c.margin)/num(c.revenue)*100:0).toFixed(1)+"%"}/>
+                  <Row label="Discount given" sub="quoted price against price sold" value={(num(c.revenue)+num(c.discount)>0?num(c.discount)/(num(c.revenue)+num(c.discount))*100:0).toFixed(1)+"%"}/>
+                </>:<div style={{fontSize:14,color:"#8A97A8",padding:"6px 0"}}>No sales of this type in this period.</div>}
+                {r.series.length>0&&<Row label="Expected next 4 weeks" sub={r.series.length>1?`range ${fmt(Math.max(0,4*eU-sU))} to ${fmt(4*eU+sU)} units`:""} value={fmt(4*eU)+" units"}/>}
+                <Row label="Stock on hand" value={`${fmt(r.stockUnits)} unit${r.stockUnits===1?"":"s"}`} sub={r.ov?`worth ${fmtK(num(r.ov.stock_cost))} at cost`:""}/>
+                {items.length>0&&<>
+                  <div style={{fontSize:13,color:"#AEB9C7",textTransform:"uppercase",letterSpacing:"0.05em",margin:"16px 0 6px"}}>Items in this type</div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:340}}>
+                      <thead><tr>{["Item","Units","Share","Margin","Disc."].map(h=><th key={h} style={{textAlign:h==="Item"?"left":"right",padding:"4px 4px 6px",color:"#AEB9C7",fontWeight:600,borderBottom:"1px solid #1A2A4A"}}>{h}</th>)}</tr></thead>
+                      <tbody>{items.map(it=>(
+                        <tr key={it.item} style={{borderBottom:"1px solid #0F1A3A"}}>
+                          <td style={{padding:"7px 4px",color:"#E8E2D4"}}>{it.item}</td>
+                          <td style={{textAlign:"right",padding:"7px 4px"}}>{fmt(it.units)}</td>
+                          <td style={{textAlign:"right",padding:"7px 4px"}}>{num(c.revenue)>0?Math.round(num(it.revenue)/num(c.revenue)*100):0}%</td>
+                          <td style={{textAlign:"right",padding:"7px 4px",color:"#F5C000"}}>{num(it.revenue)>0?(num(it.margin)/num(it.revenue)*100).toFixed(0):0}%</td>
+                          <td style={{textAlign:"right",padding:"7px 4px"}}>{num(it.revenue)+num(it.discount)>0?(num(it.discount)/(num(it.revenue)+num(it.discount))*100).toFixed(0):0}%</td>
+                        </tr>))}</tbody>
+                    </table>
+                  </div>
+                  <div style={{fontSize:12,color:"#8A97A8",marginTop:6}}>Share is of this type's sales. Disc. is the average discount off the quoted price.</div>
+                </>}
+              </div>
+            </div>
+          </div>);
+      })()}
       {drill&&(
         <div onClick={()=>setDrill(null)} style={{position:"fixed",inset:0,background:"rgba(5,10,31,0.8)",zIndex:150,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
           <div onClick={e=>e.stopPropagation()} style={{background:"#0A1128",borderTop:`3px solid ${drill.color}`,borderRadius:"16px 16px 0 0",width:"100%",maxWidth:500,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
